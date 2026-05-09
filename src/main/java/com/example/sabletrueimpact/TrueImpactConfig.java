@@ -79,6 +79,9 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.IntValue SUBLEVEL_FRACTURE_MAX_BLOCKS;
     public static final ModConfigSpec.IntValue SUBLEVEL_FRACTURE_MAX_CANDIDATE_CHECKS;
     public static final ModConfigSpec.IntValue SUBLEVEL_FRACTURE_MAX_CANDIDATES;
+    public static final ModConfigSpec.BooleanValue ENABLE_ASYNC_FRACTURE_ANALYSIS;
+    public static final ModConfigSpec.IntValue ASYNC_FRACTURE_MAX_QUEUED_JOBS;
+    public static final ModConfigSpec.IntValue ASYNC_FRACTURE_MAX_APPLIED_JOBS_PER_TICK;
     public static final ModConfigSpec.DoubleValue SUBLEVEL_FRACTURE_FRICTION_RESISTANCE;
     public static final ModConfigSpec.DoubleValue SUBLEVEL_FRACTURE_SAME_BLOCK_RESISTANCE;
     public static final ModConfigSpec.DoubleValue SUBLEVEL_FRACTURE_STICKY_RESISTANCE;
@@ -251,6 +254,12 @@ public final class TrueImpactConfig {
                 .defineInRange("subLevelFractureMaxCandidateChecks", 384, 1, 1000000);
         SUBLEVEL_FRACTURE_MAX_CANDIDATES = BUILDER.comment("Maximum fracture candidates kept for sorting and chance checks. Lower this if impacts stutter when many blocks are nearby.")
                 .defineInRange("subLevelFractureMaxCandidates", 96, 1, 1000000);
+        ENABLE_ASYNC_FRACTURE_ANALYSIS = BUILDER.comment("Experimental: compute fracture candidates on a background thread after the world snapshot is captured on the server thread. Final block changes still run on the server thread.")
+                .define("enableAsyncFractureAnalysis", false);
+        ASYNC_FRACTURE_MAX_QUEUED_JOBS = BUILDER.comment("Maximum pending async fracture jobs. New async jobs are skipped when the queue is full to protect server TPS.")
+                .defineInRange("asyncFractureMaxQueuedJobs", 64, 1, 1000000);
+        ASYNC_FRACTURE_MAX_APPLIED_JOBS_PER_TICK = BUILDER.comment("Maximum completed async fracture jobs applied to the world per tick.")
+                .defineInRange("asyncFractureMaxAppliedJobsPerTick", 4, 1, 10000);
         SUBLEVEL_FRACTURE_FRICTION_RESISTANCE = BUILDER.comment("High-friction blocks resist fracture by this multiplier per friction point.")
                 .defineInRange("subLevelFractureFrictionResistance", 1.6, 0.0, 1000.0);
         SUBLEVEL_FRACTURE_SAME_BLOCK_RESISTANCE = BUILDER.comment("Same-material connections resist fracture more than mixed-material seams.")

@@ -72,6 +72,9 @@ Useful feature switches:
 - `subLevelFracture.enableSubLevelFracture`: internal fracture of Sable physical structures.
 - `subLevelFracture.subLevelFractureMaxCandidateChecks`: maximum nearby positions inspected by one fracture event.
 - `subLevelFracture.subLevelFractureMaxCandidates`: maximum fracture candidates kept for sorting and chance checks.
+- `subLevelFracture.enableAsyncFractureAnalysis`: experimental background fracture candidate calculation. World reads and block changes still run on the server thread.
+- `subLevelFracture.asyncFractureMaxQueuedJobs`: queue limit for async fracture jobs.
+- `subLevelFracture.asyncFractureMaxAppliedJobsPerTick`: completed async fracture jobs applied per server tick.
 - `pairReaction.enablePairReaction`: elastic pair-collision counter impulse.
 - `cumulativeDamage.enableCumulativeBlockDamage`: repeated crack-level hits accumulate until breakage.
 - `performance.enablePerformanceLogging`: periodic low-level counters for collision, fracture, and entity scan cost.

@@ -4,6 +4,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import org.joml.Vector3d;
 
 import java.lang.reflect.Method;
@@ -14,6 +16,12 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public final class SubLevelFracture {
     private static final Method GET_LEVEL = findMethod("dev.ryanhcode.sable.sublevel.ServerSubLevel", "getLevel");
@@ -22,7 +30,10 @@ public final class SubLevelFracture {
     private static final Method GET_MASS = findMethod("dev.ryanhcode.sable.api.physics.mass.MassData", "getMass");
     private static final Method GET_CENTER_OF_MASS = findMethod("dev.ryanhcode.sable.api.physics.mass.MassData", "getCenterOfMass");
     private static final Method ON_SOLID_REMOVED = findMethod("dev.ryanhcode.sable.sublevel.plot.heat.SubLevelHeatMapManager", "onSolidRemoved", BlockPos.class);
-    private static final Map<Integer, List<Offset>> OFFSET_CACHE = new HashMap<>();
+    private static final Map<Integer, List<Offset>> OFFSET_CACHE = new ConcurrentHashMap<>();
+    private static final ExecutorService FRACTURE_EXECUTOR = Executors.newSingleThreadExecutor(new FractureThreadFactory());
+    private static final ConcurrentLinkedQueue<PendingFracture> COMPLETED_FRACTURES = new ConcurrentLinkedQueue<>();
+    private static final AtomicInteger QUEUED_ASYNC_JOBS = new AtomicInteger();
 
     private SubLevelFracture() {
     }
@@ -58,13 +69,63 @@ public final class SubLevelFracture {
         }
 
         FractureSnapshot snapshot = FractureSnapshot.capture(level, center, radiusForSnapshot());
-        CandidateScan scan = candidates(level, snapshot, center, planeNormal, fracturePower);
-        List<Candidate> candidates = scan.candidates();
-        candidates.sort(Comparator.comparingDouble(Candidate::score).reversed());
+        Object heatMapManager = heatMapManager(subLevel);
+        if (TrueImpactConfig.ENABLE_ASYNC_FRACTURE_ANALYSIS.get()) {
+            submitAsync(level, snapshot, center, planeNormal, fracturePower, heatMapManager, startedAt);
+            return;
+        }
+        CandidateScan scan = candidates(snapshot, center, planeNormal, fracturePower);
+        int removed = applyCandidates(level, heatMapManager, scan.candidates());
+        TrueImpactPerformance.recordFracture(startedAt, scan.checkedBlocks(), scan.candidates().size(), removed);
+    }
 
+    @SubscribeEvent
+    public static void onLevelTick(LevelTickEvent.Post event) {
+        if (!(event.getLevel() instanceof ServerLevel level) || COMPLETED_FRACTURES.isEmpty()) {
+            return;
+        }
+        String dimension = level.dimension().location().toString();
+        int applied = 0;
+        int maxApplied = TrueImpactConfig.ASYNC_FRACTURE_MAX_APPLIED_JOBS_PER_TICK.get();
+        int attempts = COMPLETED_FRACTURES.size();
+        while (applied < maxApplied && attempts-- > 0) {
+            PendingFracture pending = COMPLETED_FRACTURES.peek();
+            if (pending == null) {
+                break;
+            }
+            COMPLETED_FRACTURES.poll();
+            if (!pending.dimension().equals(dimension)) {
+                COMPLETED_FRACTURES.add(pending);
+                continue;
+            }
+            int removed = applyCandidates(level, pending.heatMapManager(), pending.scan().candidates());
+            TrueImpactPerformance.recordFracture(pending.startedAt(), pending.scan().checkedBlocks(), pending.scan().candidates().size(), removed);
+            applied++;
+        }
+    }
+
+    private static void submitAsync(ServerLevel level, FractureSnapshot snapshot, BlockPos center, Vector3d normal, double fracturePower, Object heatMapManager, long startedAt) {
+        int maxQueued = TrueImpactConfig.ASYNC_FRACTURE_MAX_QUEUED_JOBS.get();
+        if (QUEUED_ASYNC_JOBS.incrementAndGet() > maxQueued) {
+            QUEUED_ASYNC_JOBS.decrementAndGet();
+            return;
+        }
+        String dimension = level.dimension().location().toString();
+        Vector3d normalCopy = new Vector3d(normal);
+        FRACTURE_EXECUTOR.execute(() -> {
+            try {
+                CandidateScan scan = candidates(snapshot, center, normalCopy, fracturePower);
+                COMPLETED_FRACTURES.add(new PendingFracture(dimension, heatMapManager, scan, startedAt));
+            } finally {
+                QUEUED_ASYNC_JOBS.decrementAndGet();
+            }
+        });
+    }
+
+    private static int applyCandidates(ServerLevel level, Object heatMapManager, List<Candidate> candidates) {
+        candidates.sort(Comparator.comparingDouble(Candidate::score).reversed());
         int removed = 0;
         int maxBlocks = TrueImpactConfig.SUBLEVEL_FRACTURE_MAX_BLOCKS.get();
-        Object heatMapManager = heatMapManager(subLevel);
         for (Candidate candidate : candidates) {
             if (removed >= maxBlocks) {
                 break;
@@ -92,10 +153,10 @@ public final class SubLevelFracture {
             notifyRemoved(heatMapManager, candidate.pos());
             removed++;
         }
-        TrueImpactPerformance.recordFracture(startedAt, scan.checkedBlocks(), candidates.size(), removed);
+        return removed;
     }
 
-    private static CandidateScan candidates(ServerLevel level, FractureSnapshot snapshot, BlockPos center, Vector3d normal, double fracturePower) {
+    private static CandidateScan candidates(FractureSnapshot snapshot, BlockPos center, Vector3d normal, double fracturePower) {
         List<Candidate> result = new ArrayList<>();
         int radius = (int) Math.ceil(TrueImpactConfig.SUBLEVEL_FRACTURE_RADIUS.get());
         double radiusSquared = TrueImpactConfig.SUBLEVEL_FRACTURE_RADIUS.get() * TrueImpactConfig.SUBLEVEL_FRACTURE_RADIUS.get();
@@ -131,7 +192,7 @@ public final class SubLevelFracture {
             double impactFocus = impactFocus(offset.distanceSquared());
             double fatigueDamage = fracturePower * structure.seamWeakness() * impactFocus;
             double breakThreshold = Math.max(resistance, 1.0);
-            double crackRatio = BlockDamageAccumulator.damageRatio(level, pos, breakThreshold);
+            double crackRatio = snapshot.damageRatio(pos);
             double crackBonus = 1.0 + crackRatio * TrueImpactConfig.SUBLEVEL_FRACTURE_CRACK_BONUS_SCALE.get();
             double spreadBonus = 1.0 + structure.weakPlaneSpread() * TrueImpactConfig.SUBLEVEL_FRACTURE_WEAK_PLANE_SPREAD.get();
             double score = fatigueDamage * crackBonus * spreadBonus / breakThreshold;
@@ -275,23 +336,29 @@ public final class SubLevelFracture {
     private record CandidateScan(List<Candidate> candidates, int checkedBlocks) {
     }
 
+    private record PendingFracture(String dimension, Object heatMapManager, CandidateScan scan, long startedAt) {
+    }
+
     private record Offset(int x, int y, int z, double distanceSquared) {
     }
 
     private static final class FractureSnapshot implements StructuralStrengthAnalyzer.BlockLookup {
         private final Map<Long, BlockState> states;
         private final Map<Long, BlockMaterial> materials;
+        private final Map<Long, Double> damageRatios;
         private final Set<Long> glueEntities;
 
-        private FractureSnapshot(Map<Long, BlockState> states, Map<Long, BlockMaterial> materials, Set<Long> glueEntities) {
+        private FractureSnapshot(Map<Long, BlockState> states, Map<Long, BlockMaterial> materials, Map<Long, Double> damageRatios, Set<Long> glueEntities) {
             this.states = states;
             this.materials = materials;
+            this.damageRatios = damageRatios;
             this.glueEntities = glueEntities;
         }
 
         private static FractureSnapshot capture(ServerLevel level, BlockPos center, int radius) {
             Map<Long, BlockState> states = new HashMap<>();
             Map<Long, BlockMaterial> materials = new HashMap<>();
+            Map<Long, Double> damageRatios = new HashMap<>();
             Set<Long> glueEntities = new HashSet<>();
             BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
             for (int x = -radius; x <= radius; x++) {
@@ -302,13 +369,21 @@ public final class SubLevelFracture {
                         BlockState state = level.getBlockState(pos);
                         states.put(key, state);
                         materials.put(key, new BlockMaterial(state.getDestroySpeed(level, pos), state.getBlock().getExplosionResistance()));
+                        if (!state.isAir() && state.getDestroySpeed(level, pos) >= 0.0f) {
+                            double hardness = Math.max(0.05, state.getDestroySpeed(level, pos));
+                            double blast = Math.max(0.0, state.getBlock().getExplosionResistance());
+                            double breakThreshold = Math.max(TrueImpactConfig.BASE_STRENGTH.get()
+                                    + hardness * TrueImpactConfig.HARDNESS_STRENGTH_FACTOR.get()
+                                    + blast * TrueImpactConfig.BLAST_STRENGTH_FACTOR.get(), 1.0);
+                            damageRatios.put(key, BlockDamageAccumulator.damageRatio(level, pos, breakThreshold));
+                        }
                         if (StructuralStrengthAnalyzer.hasGlueEntity(level, pos)) {
                             glueEntities.add(key);
                         }
                     }
                 }
             }
-            return new FractureSnapshot(states, materials, glueEntities);
+            return new FractureSnapshot(states, materials, damageRatios, glueEntities);
         }
 
         @Override
@@ -326,6 +401,10 @@ public final class SubLevelFracture {
             return material == null ? 0.0 : material.blastResistance();
         }
 
+        private double damageRatio(BlockPos pos) {
+            return damageRatios.getOrDefault(pos.asLong(), 0.0);
+        }
+
         @Override
         public boolean hasGlueEntity(BlockPos pos) {
             return glueEntities.contains(pos.asLong());
@@ -333,5 +412,14 @@ public final class SubLevelFracture {
     }
 
     private record BlockMaterial(float destroySpeed, float blastResistance) {
+    }
+
+    private static final class FractureThreadFactory implements ThreadFactory {
+        @Override
+        public Thread newThread(Runnable runnable) {
+            Thread thread = new Thread(runnable, "Sable True Impact Fracture Worker");
+            thread.setDaemon(true);
+            return thread;
+        }
     }
 }
