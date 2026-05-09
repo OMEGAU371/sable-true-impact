@@ -23,7 +23,8 @@ public final class SubLevelFracture {
     }
 
     public static void tryFracture(Object subLevel, Vector3d localPoint, Vector3d normal, double forceAmount) {
-        if (!TrueImpactConfig.ENABLE_SUBLEVEL_FRACTURE.get()
+        if (!TrueImpactConfig.ENABLE_TRUE_IMPACT.get()
+                || !TrueImpactConfig.ENABLE_SUBLEVEL_FRACTURE.get()
                 || subLevel == null
                 || forceAmount < TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_THRESHOLD.get()
                 || TrueImpactConfig.SUBLEVEL_FRACTURE_MAX_BLOCKS.get() <= 0) {

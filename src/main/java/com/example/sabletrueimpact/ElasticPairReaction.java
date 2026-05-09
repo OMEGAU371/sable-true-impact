@@ -33,7 +33,9 @@ public final class ElasticPairReaction {
     }
 
     public static void apply(int sceneId, Int2ObjectMap<?> activeSubLevels, double[] collisions) {
-        if (!TrueImpactConfig.ENABLE_PAIR_REACTION.get() || collisions.length == 0) {
+        if (!TrueImpactConfig.ENABLE_TRUE_IMPACT.get()
+                || !TrueImpactConfig.ENABLE_PAIR_REACTION.get()
+                || collisions.length == 0) {
             return;
         }
 

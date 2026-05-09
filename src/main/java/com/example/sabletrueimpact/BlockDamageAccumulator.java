@@ -17,7 +17,10 @@ public final class BlockDamageAccumulator {
     }
 
     public static boolean apply(ServerLevel level, BlockPos pos, double damage, double breakThreshold, int crackId) {
-        if (!TrueImpactConfig.ENABLE_CUMULATIVE_BLOCK_DAMAGE.get() || damage <= 0.0 || breakThreshold <= 0.0) {
+        if (!TrueImpactConfig.ENABLE_TRUE_IMPACT.get()
+                || !TrueImpactConfig.ENABLE_CUMULATIVE_BLOCK_DAMAGE.get()
+                || damage <= 0.0
+                || breakThreshold <= 0.0) {
             return false;
         }
 
@@ -46,7 +49,7 @@ public final class BlockDamageAccumulator {
     }
 
     public static double damageRatio(ServerLevel level, BlockPos pos, double breakThreshold) {
-        if (breakThreshold <= 0.0) {
+        if (!TrueImpactConfig.ENABLE_TRUE_IMPACT.get() || breakThreshold <= 0.0) {
             return 0.0;
         }
         cleanup(level.getGameTime());

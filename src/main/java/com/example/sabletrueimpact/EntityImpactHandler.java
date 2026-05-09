@@ -25,7 +25,9 @@ public final class EntityImpactHandler {
 
     @SubscribeEvent
     public static void onLevelTick(LevelTickEvent.Post event) {
-        if (!TrueImpactConfig.ENABLE_ENTITY_IMPACT_DAMAGE.get() || !(event.getLevel() instanceof ServerLevel level)) {
+        if (!TrueImpactConfig.ENABLE_TRUE_IMPACT.get()
+                || !TrueImpactConfig.ENABLE_ENTITY_IMPACT_DAMAGE.get()
+                || !(event.getLevel() instanceof ServerLevel level)) {
             return;
         }
         try {

@@ -58,6 +58,18 @@ serverconfig/sabletrueimpact-server.toml
 
 Existing worlds keep their old config values. Delete or edit the server config after updating if you want new defaults.
 
+Useful feature switches:
+
+- `enableTrueImpact`: master switch for all added behavior.
+- `impact.enableCracks`: visual cracks and cumulative crack marks.
+- `impact.enableBlockBreaking`: direct impact block breaking.
+- `impact.enableCrackPropagation`: crack spread from catastrophic hits.
+- `terrainImpact.enableTerrainImpactDamage`: Sable sub-level damage against normal terrain.
+- `entityImpact.enableEntityImpactDamage`: damage dealt to living entities.
+- `subLevelFracture.enableSubLevelFracture`: internal fracture of Sable physical structures.
+- `pairReaction.enablePairReaction`: elastic pair-collision counter impulse.
+- `cumulativeDamage.enableCumulativeBlockDamage`: repeated crack-level hits accumulate until breakage.
+
 ## Safety
 
 This mod intentionally changes physical collision outcomes and can break terrain, split structures, and damage entities. Back up worlds before testing.

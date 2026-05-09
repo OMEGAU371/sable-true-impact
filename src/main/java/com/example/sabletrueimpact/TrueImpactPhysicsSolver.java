@@ -22,7 +22,9 @@ public class TrueImpactPhysicsSolver {
         @Override
         public BlockSubLevelCollisionCallback.CollisionResult sable$onCollision(BlockPos pos, Vector3d hitPos, double impactVelocity) {
             SubLevelPhysicsSystem system = SubLevelPhysicsSystem.getCurrentlySteppingSystem();
-            if (system == null || impactVelocity < TrueImpactConfig.MIN_EFFECT_VELOCITY.get()) {
+            if (!TrueImpactConfig.ENABLE_TRUE_IMPACT.get()
+                    || system == null
+                    || impactVelocity < TrueImpactConfig.MIN_EFFECT_VELOCITY.get()) {
                 return BlockSubLevelCollisionCallback.CollisionResult.NONE;
             }
 

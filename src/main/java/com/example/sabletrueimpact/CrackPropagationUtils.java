@@ -14,7 +14,10 @@ import java.util.Set;
 public class CrackPropagationUtils {
 
     public static void propagateCracks(ServerLevel level, BlockPos originPos, Block originBlock, double initialEnergy) {
-        if (initialEnergy <= TrueImpactConfig.PROPAGATION_MIN_ENERGY.get()) return; // Not enough energy to propagate
+        if (!TrueImpactConfig.ENABLE_TRUE_IMPACT.get()
+                || !TrueImpactConfig.ENABLE_CRACKS.get()
+                || !TrueImpactConfig.ENABLE_CRACK_PROPAGATION.get()
+                || initialEnergy <= TrueImpactConfig.PROPAGATION_MIN_ENERGY.get()) return; // Not enough energy to propagate
         
         Queue<PropagationNode> queue = new ArrayDeque<>();
         Set<BlockPos> visited = new HashSet<>();

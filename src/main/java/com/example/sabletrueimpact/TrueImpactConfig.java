@@ -5,6 +5,7 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 public final class TrueImpactConfig {
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
 
+    public static final ModConfigSpec.BooleanValue ENABLE_TRUE_IMPACT;
     public static final ModConfigSpec.DoubleValue MIN_EFFECT_VELOCITY;
     public static final ModConfigSpec.DoubleValue MIN_BREAK_VELOCITY;
     public static final ModConfigSpec.DoubleValue MIN_PROPAGATION_VELOCITY;
@@ -97,6 +98,9 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec SPEC;
 
     static {
+        ENABLE_TRUE_IMPACT = BUILDER.comment("Master switch for all Sable True Impact behavior. If false, the mod keeps loading but adds no impact damage, cracks, fracture, entity damage, or reaction effects.")
+                .define("enableTrueImpact", true);
+
         BUILDER.push("impact");
         MIN_EFFECT_VELOCITY = BUILDER.comment("Impacts below this speed do nothing. Raise this if tiny falls still leave marks.")
                 .defineInRange("minEffectVelocity", 3.0, 0.0, 1000.0);
