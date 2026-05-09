@@ -12,6 +12,7 @@ public class TrueImpactMod {
 
     public TrueImpactMod(IEventBus modEventBus, ModContainer modContainer) {
         modContainer.registerConfig(ModConfig.Type.SERVER, TrueImpactConfig.SPEC);
+        NeoForge.EVENT_BUS.register(ExplosionImpactHandler.class);
         NeoForge.EVENT_BUS.register(EntityImpactHandler.class);
         NeoForge.EVENT_BUS.register(SubLevelFracture.class);
         NeoForge.EVENT_BUS.register(TrueImpactPerformance.class);

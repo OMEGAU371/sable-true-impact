@@ -104,6 +104,11 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.DoubleValue SUBLEVEL_FRACTURE_BEAM_STRENGTH;
     public static final ModConfigSpec.DoubleValue SUBLEVEL_FRACTURE_CONTINUOUS_SEAM_WEAKNESS;
     public static final ModConfigSpec.DoubleValue SUBLEVEL_FRACTURE_WEAK_PLANE_SPREAD;
+    public static final ModConfigSpec.BooleanValue ENABLE_EXPLOSION_IMPACT_FRACTURE;
+    public static final ModConfigSpec.DoubleValue EXPLOSION_IMPACT_FORCE_SCALE;
+    public static final ModConfigSpec.DoubleValue EXPLOSION_IMPACT_RADIUS_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue EXPLOSION_IMPACT_CONFINEMENT_SCALE;
+    public static final ModConfigSpec.IntValue EXPLOSION_IMPACT_MAX_SUBLEVELS;
     public static final ModConfigSpec.BooleanValue ENABLE_CUMULATIVE_BLOCK_DAMAGE;
     public static final ModConfigSpec.DoubleValue CUMULATIVE_BLOCK_DAMAGE_SCALE;
     public static final ModConfigSpec.IntValue CUMULATIVE_BLOCK_DAMAGE_DECAY_TICKS;
@@ -311,6 +316,19 @@ public final class TrueImpactConfig {
                 .defineInRange("subLevelFractureContinuousSeamWeakness", 1.7, 0.0, 1000.0);
         SUBLEVEL_FRACTURE_WEAK_PLANE_SPREAD = BUILDER.comment("How much likely fracture planes increase fracture chance in nearby aligned blocks.")
                 .defineInRange("subLevelFractureWeakPlaneSpread", 0.55, 0.0, 1000.0);
+        BUILDER.pop();
+
+        BUILDER.push("explosionImpact");
+        ENABLE_EXPLOSION_IMPACT_FRACTURE = BUILDER.comment("If true, explosions send pressure waves into nearby Sable physical structures, causing cracks and internal fracture.")
+                .define("enableExplosionImpactFracture", true);
+        EXPLOSION_IMPACT_FORCE_SCALE = BUILDER.comment("Scales explosion radius and distance into fracture force. Raise for more dramatic blast separation.")
+                .defineInRange("explosionImpactForceScale", 165.0, 0.0, 1000000.0);
+        EXPLOSION_IMPACT_RADIUS_MULTIPLIER = BUILDER.comment("How far explosions search for Sable physical structures, as a multiplier of explosion radius.")
+                .defineInRange("explosionImpactRadiusMultiplier", 1.65, 0.0, 32.0);
+        EXPLOSION_IMPACT_CONFINEMENT_SCALE = BUILDER.comment("Extra blast pressure in enclosed spaces. 0 disables confinement bonus.")
+                .defineInRange("explosionImpactConfinementScale", 1.4, 0.0, 100.0);
+        EXPLOSION_IMPACT_MAX_SUBLEVELS = BUILDER.comment("Maximum nearby Sable physical structures processed by one explosion.")
+                .defineInRange("explosionImpactMaxSubLevels", 32, 1, 1000000);
         BUILDER.pop();
 
         BUILDER.push("cumulativeDamage");
