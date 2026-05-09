@@ -96,6 +96,8 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.DoubleValue CUMULATIVE_BLOCK_DAMAGE_SCALE;
     public static final ModConfigSpec.IntValue CUMULATIVE_BLOCK_DAMAGE_DECAY_TICKS;
     public static final ModConfigSpec.IntValue CUMULATIVE_BLOCK_DAMAGE_MAX_ENTRIES;
+    public static final ModConfigSpec.BooleanValue ENABLE_PERFORMANCE_LOGGING;
+    public static final ModConfigSpec.IntValue PERFORMANCE_LOG_INTERVAL_TICKS;
 
     public static final ModConfigSpec SPEC;
 
@@ -283,6 +285,13 @@ public final class TrueImpactConfig {
                 .defineInRange("cumulativeBlockDamageDecayTicks", 600, 20, 72000);
         CUMULATIVE_BLOCK_DAMAGE_MAX_ENTRIES = BUILDER.comment("Safety cap for remembered damaged blocks.")
                 .defineInRange("cumulativeBlockDamageMaxEntries", 4096, 128, 1000000);
+        BUILDER.pop();
+
+        BUILDER.push("performance");
+        ENABLE_PERFORMANCE_LOGGING = BUILDER.comment("If true, logs periodic Sable True Impact performance counters. Keep false for normal gameplay.")
+                .define("enablePerformanceLogging", false);
+        PERFORMANCE_LOG_INTERVAL_TICKS = BUILDER.comment("How often performance counters are logged when enablePerformanceLogging is true.")
+                .defineInRange("performanceLogIntervalTicks", 200, 20, 72000);
         BUILDER.pop();
 
         SPEC = BUILDER.build();

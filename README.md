@@ -71,6 +71,8 @@ Useful feature switches:
 - `subLevelFracture.enableSubLevelFracture`: internal fracture of Sable physical structures.
 - `pairReaction.enablePairReaction`: elastic pair-collision counter impulse.
 - `cumulativeDamage.enableCumulativeBlockDamage`: repeated crack-level hits accumulate until breakage.
+- `performance.enablePerformanceLogging`: periodic low-level counters for collision, fracture, and entity scan cost.
+- `performance.performanceLogIntervalTicks`: logging interval when performance logging is enabled.
 
 ## Safety
 

@@ -34,6 +34,10 @@ public final class EntityImpactHandler {
         if (interval > 1 && level.getGameTime() % interval != 0L) {
             return;
         }
+        long startedAt = TrueImpactPerformance.start();
+        int scannedSubLevels = 0;
+        int candidateEntities = 0;
+        int hits = 0;
         try {
             Object container = GET_CONTAINER.invoke(null, level);
             if (container == null) {
@@ -44,18 +48,24 @@ public final class EntityImpactHandler {
                 return;
             }
             for (Object subLevel : subLevels) {
-                damageEntitiesNearSubLevel(level, subLevel);
+                scannedSubLevels++;
+                EntityScanResult result = damageEntitiesNearSubLevel(level, subLevel);
+                candidateEntities += result.candidates();
+                hits += result.hits();
             }
             cleanup(level.getGameTime());
         } catch (ReflectiveOperationException | RuntimeException ignored) {
+        } finally {
+            TrueImpactPerformance.recordEntityScan(startedAt, scannedSubLevels, candidateEntities, hits);
+            TrueImpactPerformance.maybeLog(level);
         }
     }
 
-    private static void damageEntitiesNearSubLevel(ServerLevel level, Object subLevel) throws ReflectiveOperationException {
+    private static EntityScanResult damageEntitiesNearSubLevel(ServerLevel level, Object subLevel) throws ReflectiveOperationException {
         Vector3d velocity = velocity(subLevel);
         double speed = velocity.length();
         if (speed < TrueImpactConfig.ENTITY_IMPACT_MIN_SPEED.get()) {
-            return;
+            return EntityScanResult.EMPTY;
         }
 
         double mass = Math.min(TrueImpactConfig.MAX_EFFECTIVE_MASS.get(),
@@ -63,7 +73,10 @@ public final class EntityImpactHandler {
 
         AABB bounds = bounds(subLevel);
         AABB contactBounds = bounds.inflate(TrueImpactConfig.ENTITY_MOVING_IMPACT_CONTACT_MARGIN.get());
+        int candidates = 0;
+        int hits = 0;
         for (LivingEntity entity : level.getEntitiesOfClass(LivingEntity.class, contactBounds, entity -> entity.isAlive() && !entity.isSpectator())) {
+            candidates++;
             if (isStandingOnSubLevel(entity.getBoundingBox(), bounds, velocity)) {
                 continue;
             }
@@ -95,8 +108,10 @@ public final class EntityImpactHandler {
             float damage = (float) (maxDamage <= 0.0 ? baseDamage : Math.min(maxDamage, baseDamage));
             if (damage >= TrueImpactConfig.ENTITY_IMPACT_MIN_DAMAGE.get() && entity.hurt(level.damageSources().cramming(), damage)) {
                 LAST_HIT_TICK.put(key, now);
+                hits++;
             }
         }
+        return new EntityScanResult(candidates, hits);
     }
 
     private static boolean isStandingOnSubLevel(AABB entityBounds, AABB subLevelBounds, Vector3d subLevelVelocity) {
@@ -188,5 +203,9 @@ public final class EntityImpactHandler {
     }
 
     private record EntityHitKey(UUID entityId, int subLevelId) {
+    }
+
+    private record EntityScanResult(int candidates, int hits) {
+        private static final EntityScanResult EMPTY = new EntityScanResult(0, 0);
     }
 }

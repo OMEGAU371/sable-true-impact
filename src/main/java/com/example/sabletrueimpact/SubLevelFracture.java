@@ -30,6 +30,7 @@ public final class SubLevelFracture {
                 || TrueImpactConfig.SUBLEVEL_FRACTURE_MAX_BLOCKS.get() <= 0) {
             return;
         }
+        long startedAt = TrueImpactPerformance.start();
 
         ServerLevel level = level(subLevel);
         if (level == null) {
@@ -51,7 +52,8 @@ public final class SubLevelFracture {
             planeNormal.normalize();
         }
 
-        List<Candidate> candidates = candidates(level, center, planeNormal, fracturePower);
+        CandidateScan scan = candidates(level, center, planeNormal, fracturePower);
+        List<Candidate> candidates = scan.candidates();
         candidates.sort(Comparator.comparingDouble(Candidate::score).reversed());
 
         int removed = 0;
@@ -84,12 +86,14 @@ public final class SubLevelFracture {
             notifyRemoved(heatMapManager, candidate.pos());
             removed++;
         }
+        TrueImpactPerformance.recordFracture(startedAt, scan.checkedBlocks(), candidates.size(), removed);
     }
 
-    private static List<Candidate> candidates(ServerLevel level, BlockPos center, Vector3d normal, double fracturePower) {
+    private static CandidateScan candidates(ServerLevel level, BlockPos center, Vector3d normal, double fracturePower) {
         List<Candidate> result = new ArrayList<>();
         int radius = (int) Math.ceil(TrueImpactConfig.SUBLEVEL_FRACTURE_RADIUS.get());
         double radiusSquared = TrueImpactConfig.SUBLEVEL_FRACTURE_RADIUS.get() * TrueImpactConfig.SUBLEVEL_FRACTURE_RADIUS.get();
+        int checked = 0;
 
         for (int x = -radius; x <= radius; x++) {
             for (int y = -radius; y <= radius; y++) {
@@ -98,6 +102,7 @@ public final class SubLevelFracture {
                     if (distanceSquared > radiusSquared) {
                         continue;
                     }
+                    checked++;
                     BlockPos pos = center.offset(x, y, z);
                     BlockState state = level.getBlockState(pos);
                     if (state.isAir() || state.is(Blocks.BEDROCK) || state.getDestroySpeed(level, pos) < 0.0f
@@ -125,7 +130,7 @@ public final class SubLevelFracture {
                 }
             }
         }
-        return result;
+        return new CandidateScan(result, checked);
     }
 
     private static double impactFocus(double distanceSquared) {
@@ -236,5 +241,8 @@ public final class SubLevelFracture {
     }
 
     private record Candidate(BlockPos pos, double score, double fatigueDamage, double breakThreshold) {
+    }
+
+    private record CandidateScan(List<Candidate> candidates, int checkedBlocks) {
     }
 }

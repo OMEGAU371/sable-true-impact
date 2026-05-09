@@ -38,6 +38,7 @@ public final class ElasticPairReaction {
                 || collisions.length == 0) {
             return;
         }
+        TrueImpactPerformance.recordCollisionBatch(collisions.length / 15);
 
         Vector3d localPointA = new Vector3d();
         Vector3d localPointB = new Vector3d();
@@ -100,7 +101,6 @@ public final class ElasticPairReaction {
 
     private static void applyTerrainImpact(Object subLevel, Vector3d localPoint, Vector3d terrainPoint, Vector3d normal, double forceAmount) {
         if (!TrueImpactConfig.ENABLE_TERRAIN_IMPACT_DAMAGE.get()
-                || !TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.get()
                 || forceAmount < TrueImpactConfig.TERRAIN_IMPACT_FORCE_THRESHOLD.get()
                 || isForgivenStepContact(terrainPoint, normal)
                 || (TrueImpactConfig.ELASTIC_BLOCKS_BREAK_BLOCKS.get() == false && isElasticSubLevel(subLevel))) {
@@ -110,12 +110,14 @@ public final class ElasticPairReaction {
         if (level == null) {
             return;
         }
+        SubLevelFracture.tryFracture(subLevel, localPoint, normal, forceAmount);
         double mass = Math.min(TrueImpactConfig.TERRAIN_IMPACT_MAX_EFFECTIVE_MASS.get(),
                 Math.pow(Math.max(mass(subLevel), 1.0), TrueImpactConfig.TERRAIN_IMPACT_MASS_EXPONENT.get()));
         double energy = forceAmount * mass * TrueImpactConfig.TERRAIN_IMPACT_DAMAGE_SCALE.get() * TrueImpactConfig.DAMAGE_SCALE.get();
-        BlockPos center = BlockPos.containing(terrainPoint.x, terrainPoint.y, terrainPoint.z);
-        SubLevelFracture.tryFracture(subLevel, localPoint, normal, forceAmount);
-        damageTerrain(level, center, normal, energy);
+        if (TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.get()) {
+            BlockPos center = BlockPos.containing(terrainPoint.x, terrainPoint.y, terrainPoint.z);
+            damageTerrain(level, center, normal, energy);
+        }
         damageEntities(level, new Vec3(terrainPoint.x, terrainPoint.y, terrainPoint.z), energy);
     }
 
