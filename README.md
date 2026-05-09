@@ -64,7 +64,7 @@ Useful feature switches:
 - `enableTrueImpact`: master switch for all added behavior.
 - `impact.enableCracks`: visual cracks and cumulative crack marks.
 - `impact.enableBlockBreaking`: direct impact block breaking.
-- `impact.movingStructuresBreakBlocks`: whether moving physical structures may break or cumulatively damage normal world blocks. Defaults to `false`.
+- `impact.movingStructuresBreakBlocks`: whether moving Sable physical structures may break or cumulatively damage normal world blocks. Defaults to `true`.
 - `impact.impactVelocityExponent`: velocity exponent for block impact damage. Values above `2.0` make fast impacts much more destructive.
 - `impact.enableCrackPropagation`: crack spread from catastrophic hits.
 - `terrainImpact.enableTerrainImpactDamage`: Sable sub-level damage against normal terrain.

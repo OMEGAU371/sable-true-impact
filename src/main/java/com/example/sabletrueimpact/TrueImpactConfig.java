@@ -146,8 +146,8 @@ public final class TrueImpactConfig {
                 .defineInRange("reactionResponseScale", 0.75, 0.0, 10.0);
         REACTION_YIELD_LIMIT = BUILDER.comment("Yield below this value prefers reaction force over block breaking. Raise for less terrain damage.")
                 .defineInRange("reactionYieldLimit", 18.0, 0.0, 1000.0);
-        MOVING_STRUCTURES_BREAK_BLOCKS = BUILDER.comment("If false, moving physical structures cannot break or cumulatively damage normal world blocks. Internal sublevel fracture can still split the moving structure.")
-                .define("movingStructuresBreakBlocks", false);
+        MOVING_STRUCTURES_BREAK_BLOCKS = BUILDER.comment("If true, moving Sable physical structures can break or cumulatively damage normal world blocks. Internal sublevel fracture can still split the moving structure either way.")
+                .define("movingStructuresBreakBlocks", true);
         LOW_FRICTION_DAMAGE_REDUCTION = BUILDER.comment("How strongly low-friction/glancing materials reduce damage.")
                 .defineInRange("lowFrictionDamageReduction", 0.35, 0.0, 1.0);
         FRAGILE_DAMAGE_MULTIPLIER = BUILDER.comment("Extra damage multiplier for blocks tagged fragile by Sable.")
