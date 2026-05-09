@@ -47,7 +47,11 @@ public final class EntityImpactHandler {
             if (!(allSubLevels instanceof Iterable<?> subLevels)) {
                 return;
             }
+            int maxSubLevels = TrueImpactConfig.ENTITY_IMPACT_MAX_SUBLEVELS_PER_SCAN.get();
             for (Object subLevel : subLevels) {
+                if (scannedSubLevels >= maxSubLevels) {
+                    break;
+                }
                 scannedSubLevels++;
                 EntityScanResult result = damageEntitiesNearSubLevel(level, subLevel);
                 candidateEntities += result.candidates();

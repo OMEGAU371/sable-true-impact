@@ -34,6 +34,8 @@ public final class SubLevelFracture {
     private static final ExecutorService FRACTURE_EXECUTOR = Executors.newSingleThreadExecutor(new FractureThreadFactory());
     private static final ConcurrentLinkedQueue<PendingFracture> COMPLETED_FRACTURES = new ConcurrentLinkedQueue<>();
     private static final AtomicInteger QUEUED_ASYNC_JOBS = new AtomicInteger();
+    private static final Map<FractureKey, Long> LAST_FRACTURE_TICK = new ConcurrentHashMap<>();
+    private static final Map<String, TickBudget> FRACTURE_BUDGETS = new ConcurrentHashMap<>();
 
     private SubLevelFracture() {
     }
@@ -50,6 +52,9 @@ public final class SubLevelFracture {
 
         ServerLevel level = level(subLevel);
         if (level == null) {
+            return;
+        }
+        if (!claimFractureBudget(level, subLevel)) {
             return;
         }
 
@@ -82,6 +87,38 @@ public final class SubLevelFracture {
         CandidateScan scan = candidates(snapshot, center, planeNormal, fracturePower);
         int removed = applyCandidates(level, heatMapManager, scan.candidates());
         TrueImpactPerformance.recordFracture(startedAt, scan.checkedBlocks(), scan.candidates().size(), removed);
+    }
+
+    private static boolean claimFractureBudget(ServerLevel level, Object subLevel) {
+        long tick = level.getGameTime();
+        String dimension = level.dimension().location().toString();
+        TickBudget budget = FRACTURE_BUDGETS.computeIfAbsent(dimension, ignored -> new TickBudget(Long.MIN_VALUE, 0));
+        synchronized (budget) {
+            if (budget.tick != tick) {
+                budget.tick = tick;
+                budget.used = 0;
+            }
+            if (budget.used >= TrueImpactConfig.SUBLEVEL_FRACTURE_MAX_ATTEMPTS_PER_TICK.get()) {
+                return false;
+            }
+            FractureKey key = new FractureKey(dimension, System.identityHashCode(subLevel));
+            long cooldown = TrueImpactConfig.SUBLEVEL_FRACTURE_COOLDOWN_TICKS.get();
+            Long lastTick = LAST_FRACTURE_TICK.get(key);
+            if (cooldown > 0 && lastTick != null && lastTick + cooldown > tick) {
+                return false;
+            }
+            LAST_FRACTURE_TICK.put(key, tick);
+            budget.used++;
+            cleanupFractureCooldowns(tick);
+            return true;
+        }
+    }
+
+    private static void cleanupFractureCooldowns(long tick) {
+        if (tick % 200L != 0L) {
+            return;
+        }
+        LAST_FRACTURE_TICK.entrySet().removeIf(entry -> tick - entry.getValue() > 1200L);
     }
 
     @SubscribeEvent
@@ -354,6 +391,19 @@ public final class SubLevelFracture {
     }
 
     private record Offset(int x, int y, int z, double distanceSquared) {
+    }
+
+    private record FractureKey(String dimension, int subLevelId) {
+    }
+
+    private static final class TickBudget {
+        private long tick;
+        private int used;
+
+        private TickBudget(long tick, int used) {
+            this.tick = tick;
+            this.used = used;
+        }
     }
 
     private static final class FractureSnapshot implements StructuralStrengthAnalyzer.BlockLookup {

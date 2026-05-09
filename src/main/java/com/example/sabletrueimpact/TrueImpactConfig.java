@@ -74,6 +74,7 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.DoubleValue ENTITY_IMPACT_MIN_SPEED;
     public static final ModConfigSpec.IntValue ENTITY_IMPACT_COOLDOWN_TICKS;
     public static final ModConfigSpec.IntValue ENTITY_IMPACT_SCAN_INTERVAL_TICKS;
+    public static final ModConfigSpec.IntValue ENTITY_IMPACT_MAX_SUBLEVELS_PER_SCAN;
     public static final ModConfigSpec.BooleanValue ENABLE_SUBLEVEL_FRACTURE;
     public static final ModConfigSpec.DoubleValue SUBLEVEL_FRACTURE_FORCE_THRESHOLD;
     public static final ModConfigSpec.DoubleValue SUBLEVEL_FRACTURE_FORCE_SCALE;
@@ -82,6 +83,8 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.IntValue SUBLEVEL_FRACTURE_MAX_BLOCKS;
     public static final ModConfigSpec.IntValue SUBLEVEL_FRACTURE_MAX_CANDIDATE_CHECKS;
     public static final ModConfigSpec.IntValue SUBLEVEL_FRACTURE_MAX_CANDIDATES;
+    public static final ModConfigSpec.IntValue SUBLEVEL_FRACTURE_COOLDOWN_TICKS;
+    public static final ModConfigSpec.IntValue SUBLEVEL_FRACTURE_MAX_ATTEMPTS_PER_TICK;
     public static final ModConfigSpec.BooleanValue ENABLE_ASYNC_FRACTURE_ANALYSIS;
     public static final ModConfigSpec.IntValue ASYNC_FRACTURE_MAX_QUEUED_JOBS;
     public static final ModConfigSpec.IntValue ASYNC_FRACTURE_MAX_APPLIED_JOBS_PER_TICK;
@@ -244,6 +247,8 @@ public final class TrueImpactConfig {
                 .defineInRange("entityImpactCooldownTicks", 20, 0, 200);
         ENTITY_IMPACT_SCAN_INTERVAL_TICKS = BUILDER.comment("How often direct moving sublevel entity damage scans run. 1 = every tick, 2 = every other tick. Raise for better server performance.")
                 .defineInRange("entityImpactScanIntervalTicks", 2, 1, 200);
+        ENTITY_IMPACT_MAX_SUBLEVELS_PER_SCAN = BUILDER.comment("Maximum moving Sable sublevels checked for direct entity damage per scan. Lower this if worlds with many physical structures stutter.")
+                .defineInRange("entityImpactMaxSubLevelsPerScan", 96, 1, 1000000);
         BUILDER.pop();
 
         BUILDER.push("subLevelFracture");
@@ -263,6 +268,10 @@ public final class TrueImpactConfig {
                 .defineInRange("subLevelFractureMaxCandidateChecks", 384, 1, 1000000);
         SUBLEVEL_FRACTURE_MAX_CANDIDATES = BUILDER.comment("Maximum fracture candidates kept for sorting and chance checks. Lower this if impacts stutter when many blocks are nearby.")
                 .defineInRange("subLevelFractureMaxCandidates", 96, 1, 1000000);
+        SUBLEVEL_FRACTURE_COOLDOWN_TICKS = BUILDER.comment("Minimum ticks between expensive fracture scans for the same Sable physical structure. Raise this for large-structure performance.")
+                .defineInRange("subLevelFractureCooldownTicks", 4, 0, 200);
+        SUBLEVEL_FRACTURE_MAX_ATTEMPTS_PER_TICK = BUILDER.comment("Global cap for fracture scans started per server tick per dimension. Extra collision points skip fracture to protect TPS.")
+                .defineInRange("subLevelFractureMaxAttemptsPerTick", 8, 1, 1000000);
         ENABLE_ASYNC_FRACTURE_ANALYSIS = BUILDER.comment("Experimental: compute fracture candidates on a background thread after the world snapshot is captured on the server thread. Final block changes still run on the server thread.")
                 .define("enableAsyncFractureAnalysis", false);
         ASYNC_FRACTURE_MAX_QUEUED_JOBS = BUILDER.comment("Maximum pending async fracture jobs. New async jobs are skipped when the queue is full to protect server TPS.")
