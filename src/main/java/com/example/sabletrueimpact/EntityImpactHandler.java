@@ -30,6 +30,10 @@ public final class EntityImpactHandler {
                 || !(event.getLevel() instanceof ServerLevel level)) {
             return;
         }
+        int interval = TrueImpactConfig.ENTITY_IMPACT_SCAN_INTERVAL_TICKS.get();
+        if (interval > 1 && level.getGameTime() % interval != 0L) {
+            return;
+        }
         try {
             Object container = GET_CONTAINER.invoke(null, level);
             if (container == null) {

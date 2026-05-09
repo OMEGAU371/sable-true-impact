@@ -12,9 +12,15 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import org.joml.Vector3d;
 
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 
 public final class StructuralStrengthAnalyzer {
+    private static long glueCacheTick = Long.MIN_VALUE;
+    private static String glueCacheDimension = "";
+    private static final Map<Long, Boolean> GLUE_ENTITY_CACHE = new HashMap<>();
+
     private StructuralStrengthAnalyzer() {
     }
 
@@ -190,6 +196,14 @@ public final class StructuralStrengthAnalyzer {
     }
 
     private static boolean hasGlueEntity(ServerLevel level, BlockPos pos) {
+        resetGlueCacheIfNeeded(level);
+        long key = pos.asLong();
+        Boolean cached = GLUE_ENTITY_CACHE.get(key);
+        if (cached != null) {
+            return cached;
+        }
+
+        boolean result = false;
         AABB box = new AABB(pos).inflate(0.08);
         for (Entity entity : level.getEntities((Entity) null, box, entity -> true)) {
             ResourceLocation id = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
@@ -199,10 +213,23 @@ public final class StructuralStrengthAnalyzer {
             String path = id.getPath().toLowerCase(Locale.ROOT);
             String namespace = id.getNamespace().toLowerCase(Locale.ROOT);
             if (path.contains("glue") || path.contains("adhesive") || namespace.contains("aeronautics") && path.contains("honey")) {
-                return true;
+                result = true;
+                break;
             }
         }
-        return false;
+        GLUE_ENTITY_CACHE.put(key, result);
+        return result;
+    }
+
+    private static void resetGlueCacheIfNeeded(ServerLevel level) {
+        long tick = level.getGameTime();
+        String dimension = level.dimension().location().toString();
+        if (tick == glueCacheTick && dimension.equals(glueCacheDimension)) {
+            return;
+        }
+        glueCacheTick = tick;
+        glueCacheDimension = dimension;
+        GLUE_ENTITY_CACHE.clear();
     }
 
     public record Result(double seamWeakness, double connectionStrength, double weakPlaneSpread) {

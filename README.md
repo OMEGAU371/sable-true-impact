@@ -67,6 +67,7 @@ Useful feature switches:
 - `impact.enableCrackPropagation`: crack spread from catastrophic hits.
 - `terrainImpact.enableTerrainImpactDamage`: Sable sub-level damage against normal terrain.
 - `entityImpact.enableEntityImpactDamage`: damage dealt to living entities.
+- `entityImpact.entityImpactScanIntervalTicks`: direct entity impact scan interval. Higher values reduce CPU load.
 - `subLevelFracture.enableSubLevelFracture`: internal fracture of Sable physical structures.
 - `pairReaction.enablePairReaction`: elastic pair-collision counter impulse.
 - `cumulativeDamage.enableCumulativeBlockDamage`: repeated crack-level hits accumulate until breakage.

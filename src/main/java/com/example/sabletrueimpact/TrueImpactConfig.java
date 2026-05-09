@@ -71,6 +71,7 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.DoubleValue ENTITY_STANDING_MAX_UPWARD_SPEED;
     public static final ModConfigSpec.DoubleValue ENTITY_IMPACT_MIN_SPEED;
     public static final ModConfigSpec.IntValue ENTITY_IMPACT_COOLDOWN_TICKS;
+    public static final ModConfigSpec.IntValue ENTITY_IMPACT_SCAN_INTERVAL_TICKS;
     public static final ModConfigSpec.BooleanValue ENABLE_SUBLEVEL_FRACTURE;
     public static final ModConfigSpec.DoubleValue SUBLEVEL_FRACTURE_FORCE_THRESHOLD;
     public static final ModConfigSpec.DoubleValue SUBLEVEL_FRACTURE_FORCE_SCALE;
@@ -227,6 +228,8 @@ public final class TrueImpactConfig {
                 .defineInRange("entityImpactMinSpeed", 4.0, 0.0, 1000.0);
         ENTITY_IMPACT_COOLDOWN_TICKS = BUILDER.comment("Per entity/sublevel hit cooldown to avoid damage every tick while pinned.")
                 .defineInRange("entityImpactCooldownTicks", 20, 0, 200);
+        ENTITY_IMPACT_SCAN_INTERVAL_TICKS = BUILDER.comment("How often direct moving sublevel entity damage scans run. 1 = every tick, 2 = every other tick. Raise for better server performance.")
+                .defineInRange("entityImpactScanIntervalTicks", 2, 1, 200);
         BUILDER.pop();
 
         BUILDER.push("subLevelFracture");
