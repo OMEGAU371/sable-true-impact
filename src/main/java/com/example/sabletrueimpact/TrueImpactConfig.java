@@ -10,6 +10,7 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.DoubleValue MIN_BREAK_VELOCITY;
     public static final ModConfigSpec.DoubleValue MIN_PROPAGATION_VELOCITY;
     public static final ModConfigSpec.DoubleValue DAMAGE_SCALE;
+    public static final ModConfigSpec.DoubleValue IMPACT_VELOCITY_EXPONENT;
     public static final ModConfigSpec.DoubleValue RESTITUTION_DAMAGE_REDUCTION;
     public static final ModConfigSpec.DoubleValue RESTITUTION_BREAK_VELOCITY_MULTIPLIER;
     public static final ModConfigSpec.DoubleValue ELASTIC_SHATTER_VELOCITY;
@@ -51,6 +52,7 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.BooleanValue ENABLE_TERRAIN_IMPACT_DAMAGE;
     public static final ModConfigSpec.DoubleValue TERRAIN_IMPACT_DAMAGE_SCALE;
     public static final ModConfigSpec.DoubleValue TERRAIN_IMPACT_FORCE_THRESHOLD;
+    public static final ModConfigSpec.DoubleValue TERRAIN_IMPACT_FORCE_EXPONENT;
     public static final ModConfigSpec.DoubleValue TERRAIN_IMPACT_MASS_EXPONENT;
     public static final ModConfigSpec.DoubleValue TERRAIN_IMPACT_MAX_EFFECTIVE_MASS;
     public static final ModConfigSpec.DoubleValue TERRAIN_STEP_CONTACT_FORGIVENESS;
@@ -75,6 +77,7 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.BooleanValue ENABLE_SUBLEVEL_FRACTURE;
     public static final ModConfigSpec.DoubleValue SUBLEVEL_FRACTURE_FORCE_THRESHOLD;
     public static final ModConfigSpec.DoubleValue SUBLEVEL_FRACTURE_FORCE_SCALE;
+    public static final ModConfigSpec.DoubleValue SUBLEVEL_FRACTURE_FORCE_EXPONENT;
     public static final ModConfigSpec.DoubleValue SUBLEVEL_FRACTURE_RADIUS;
     public static final ModConfigSpec.IntValue SUBLEVEL_FRACTURE_MAX_BLOCKS;
     public static final ModConfigSpec.IntValue SUBLEVEL_FRACTURE_MAX_CANDIDATE_CHECKS;
@@ -119,6 +122,8 @@ public final class TrueImpactConfig {
                 .defineInRange("minPropagationVelocity", 18.0, 0.0, 1000.0);
         DAMAGE_SCALE = BUILDER.comment("Global damage multiplier. Lower is more realistic/conservative, higher is more cinematic.")
                 .defineInRange("damageScale", 0.055, 0.0, 1000.0);
+        IMPACT_VELOCITY_EXPONENT = BUILDER.comment("Velocity exponent for normal block-vs-sublevel impact energy. 2.0 is classic kinetic-energy scaling; higher values make high-speed impacts much more destructive.")
+                .defineInRange("impactVelocityExponent", 2.0, 0.0, 8.0);
         RESTITUTION_DAMAGE_REDUCTION = BUILDER.comment("How strongly Sable restitution reduces impact damage. 1.0 means restitution 0.5 roughly halves damage.")
                 .defineInRange("restitutionDamageReduction", 1.2, 0.0, 10.0);
         RESTITUTION_BREAK_VELOCITY_MULTIPLIER = BUILDER.comment("Elastic blocks require higher speed before they can break or strongly damage other blocks.")
@@ -195,6 +200,8 @@ public final class TrueImpactConfig {
         TERRAIN_IMPACT_DAMAGE_SCALE = BUILDER.defineInRange("terrainImpactDamageScale", 0.00016, 0.0, 1000.0);
         TERRAIN_IMPACT_FORCE_THRESHOLD = BUILDER.comment("Terrain impacts below this force are treated as rolling/sliding contact and do not damage terrain.")
                 .defineInRange("terrainImpactForceThreshold", 900.0, 0.0, 1000000000.0);
+        TERRAIN_IMPACT_FORCE_EXPONENT = BUILDER.comment("Exponent applied to terrain collision force above the threshold. 1.0 keeps current linear force scaling; higher values make violent impacts dig much harder.")
+                .defineInRange("terrainImpactForceExponent", 1.0, 0.0, 8.0);
         TERRAIN_IMPACT_MASS_EXPONENT = BUILDER.comment("Separate mass exponent for terrain damage. Lower than global massExponent so normal vehicles crack terrain before breaking it.")
                 .defineInRange("terrainImpactMassExponent", 0.7, 0.0, 2.0);
         TERRAIN_IMPACT_MAX_EFFECTIVE_MASS = BUILDER.comment("Separate effective mass cap for terrain damage.")
@@ -246,6 +253,8 @@ public final class TrueImpactConfig {
                 .defineInRange("subLevelFractureForceThreshold", 420.0, 0.0, 1000000000.0);
         SUBLEVEL_FRACTURE_FORCE_SCALE = BUILDER.comment("Scales raw collision force into fracture damage.")
                 .defineInRange("subLevelFractureForceScale", 0.052, 0.0, 1000.0);
+        SUBLEVEL_FRACTURE_FORCE_EXPONENT = BUILDER.comment("Exponent applied to collision force above the fracture threshold. 1.0 keeps current linear behavior; higher values make high-speed/high-force crashes split structures much more aggressively.")
+                .defineInRange("subLevelFractureForceExponent", 1.0, 0.0, 8.0);
         SUBLEVEL_FRACTURE_RADIUS = BUILDER.comment("Maximum radius around the impact point scanned for weak connections.")
                 .defineInRange("subLevelFractureRadius", 4.0, 0.0, 32.0);
         SUBLEVEL_FRACTURE_MAX_BLOCKS = BUILDER.comment("Maximum internal blocks removed by one fracture event.")

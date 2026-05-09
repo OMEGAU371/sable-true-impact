@@ -65,11 +65,14 @@ Useful feature switches:
 - `impact.enableCracks`: visual cracks and cumulative crack marks.
 - `impact.enableBlockBreaking`: direct impact block breaking.
 - `impact.movingStructuresBreakBlocks`: whether moving physical structures may break or cumulatively damage normal world blocks. Defaults to `false`.
+- `impact.impactVelocityExponent`: velocity exponent for block impact damage. Values above `2.0` make fast impacts much more destructive.
 - `impact.enableCrackPropagation`: crack spread from catastrophic hits.
 - `terrainImpact.enableTerrainImpactDamage`: Sable sub-level damage against normal terrain.
+- `terrainImpact.terrainImpactForceExponent`: force exponent for terrain impact damage. Values above `1.0` make violent impacts dig harder.
 - `entityImpact.enableEntityImpactDamage`: damage dealt to living entities.
 - `entityImpact.entityImpactScanIntervalTicks`: direct entity impact scan interval. Higher values reduce CPU load.
 - `subLevelFracture.enableSubLevelFracture`: internal fracture of Sable physical structures.
+- `subLevelFracture.subLevelFractureForceExponent`: force exponent for internal structure fracture. Values above `1.0` make high-force crashes split structures more aggressively.
 - `subLevelFracture.subLevelFractureMaxCandidateChecks`: maximum nearby positions inspected by one fracture event.
 - `subLevelFracture.subLevelFractureMaxCandidates`: maximum fracture candidates kept for sorting and chance checks.
 - `subLevelFracture.enableAsyncFractureAnalysis`: experimental background fracture candidate calculation. World reads and block changes still run on the server thread.

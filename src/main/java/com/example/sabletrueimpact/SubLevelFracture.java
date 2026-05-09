@@ -54,7 +54,12 @@ public final class SubLevelFracture {
         }
 
         BlockPos center = BlockPos.containing(localPoint.x, localPoint.y, localPoint.z);
-        double fracturePower = (forceAmount - TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_THRESHOLD.get())
+        double scaledForce = scaledForceAboveThreshold(
+                forceAmount,
+                TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_THRESHOLD.get(),
+                TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_EXPONENT.get()
+        );
+        double fracturePower = (scaledForce - TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_THRESHOLD.get())
                 * TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_SCALE.get()
                 * structureMultiplier(subLevel, localPoint);
         if (fracturePower <= 0.0) {
@@ -203,6 +208,15 @@ public final class SubLevelFracture {
 
     private static int radiusForSnapshot() {
         return (int) Math.ceil(TrueImpactConfig.SUBLEVEL_FRACTURE_RADIUS.get()) + 2;
+    }
+
+    private static double scaledForceAboveThreshold(double forceAmount, double threshold, double exponent) {
+        if (exponent == 1.0 || forceAmount <= 0.0) {
+            return forceAmount;
+        }
+        double reference = Math.max(threshold, 1.0);
+        double normalized = Math.max(forceAmount / reference, 0.0);
+        return forceAmount * Math.pow(normalized, exponent - 1.0);
     }
 
     private static List<Offset> offsets(int radius) {

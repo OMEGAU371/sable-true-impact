@@ -113,7 +113,8 @@ public final class ElasticPairReaction {
         SubLevelFracture.tryFracture(subLevel, localPoint, normal, forceAmount);
         double mass = Math.min(TrueImpactConfig.TERRAIN_IMPACT_MAX_EFFECTIVE_MASS.get(),
                 Math.pow(Math.max(mass(subLevel), 1.0), TrueImpactConfig.TERRAIN_IMPACT_MASS_EXPONENT.get()));
-        double energy = forceAmount * mass * TrueImpactConfig.TERRAIN_IMPACT_DAMAGE_SCALE.get() * TrueImpactConfig.DAMAGE_SCALE.get();
+        double force = scaledForce(forceAmount, TrueImpactConfig.TERRAIN_IMPACT_FORCE_THRESHOLD.get(), TrueImpactConfig.TERRAIN_IMPACT_FORCE_EXPONENT.get());
+        double energy = force * mass * TrueImpactConfig.TERRAIN_IMPACT_DAMAGE_SCALE.get() * TrueImpactConfig.DAMAGE_SCALE.get();
         if (TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.get()) {
             BlockPos center = BlockPos.containing(terrainPoint.x, terrainPoint.y, terrainPoint.z);
             damageTerrain(level, center, normal, energy);
@@ -127,6 +128,15 @@ public final class ElasticPairReaction {
         }
         double yInBlock = terrainPoint.y - Math.floor(terrainPoint.y);
         return 1.0 - yInBlock <= TrueImpactConfig.TERRAIN_STEP_CONTACT_FORGIVENESS.get();
+    }
+
+    private static double scaledForce(double forceAmount, double threshold, double exponent) {
+        if (exponent == 1.0 || forceAmount <= 0.0) {
+            return forceAmount;
+        }
+        double reference = Math.max(threshold, 1.0);
+        double normalized = Math.max(forceAmount / reference, 0.0);
+        return forceAmount * Math.pow(normalized, exponent - 1.0);
     }
 
     private static void damageEntities(ServerLevel level, Vec3 impactPoint, double energy) {

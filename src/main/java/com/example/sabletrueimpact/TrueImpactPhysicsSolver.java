@@ -118,7 +118,8 @@ public class TrueImpactPhysicsSolver {
             double reboundFactor = Math.max(0.05, 1.0 - restitution * TrueImpactConfig.RESTITUTION_DAMAGE_REDUCTION.get());
             double frictionFactor = 1.0 - ((1.0 - Math.min(1.0, friction)) * TrueImpactConfig.LOW_FRICTION_DAMAGE_REDUCTION.get());
             double fragileFactor = fragile ? TrueImpactConfig.FRAGILE_DAMAGE_MULTIPLIER.get() : 1.0;
-            double kineticEnergy = 0.5 * effectiveMass * (impactVelocity * impactVelocity) * angleMultiplier
+            double velocityEnergy = Math.pow(Math.max(impactVelocity, 0.0), TrueImpactConfig.IMPACT_VELOCITY_EXPONENT.get());
+            double kineticEnergy = 0.5 * effectiveMass * velocityEnergy * angleMultiplier
                     * reboundFactor * frictionFactor * fragileFactor * TrueImpactConfig.DAMAGE_SCALE.get();
             
             double yieldRatio = kineticEnergy / structuralIntegrity;
