@@ -146,7 +146,10 @@ public class TrueImpactPhysicsSolver {
                         reactionMotion(pos, hitPos, impactVelocity, Math.max(yieldRatio, 1.0), restitution), false);
             }
 
-            if (TrueImpactConfig.ENABLE_BLOCK_BREAKING.get()
+            boolean canBreakWorldBlocks = TrueImpactConfig.ENABLE_BLOCK_BREAKING.get()
+                    && TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.get();
+
+            if (canBreakWorldBlocks
                     && impactVelocity >= elasticPropagationVelocity
                     && yieldRatio >= TrueImpactConfig.PROPAGATION_YIELD_THRESHOLD.get()) {
                 // Catastrophic
@@ -155,7 +158,7 @@ public class TrueImpactPhysicsSolver {
                     CrackPropagationUtils.propagateCracks(level, pos, state.getBlock(), kineticEnergy * TrueImpactConfig.PROPAGATION_ENERGY_SCALE.get());
                 }
                 return new BlockSubLevelCollisionCallback.CollisionResult(new org.joml.Vector3d(), true);
-            } else if (TrueImpactConfig.ENABLE_BLOCK_BREAKING.get()
+            } else if (canBreakWorldBlocks
                     && impactVelocity >= elasticBreakVelocity
                     && yieldRatio > TrueImpactConfig.HEAVY_BREAK_YIELD_THRESHOLD.get()) {
                 if (yieldRatio < TrueImpactConfig.REACTION_YIELD_LIMIT.get()) {
@@ -165,19 +168,21 @@ public class TrueImpactPhysicsSolver {
                 // Medium break
                 level.destroyBlock(pos, true);
                 return new BlockSubLevelCollisionCallback.CollisionResult(new org.joml.Vector3d(), true);
-            } else if (TrueImpactConfig.ENABLE_BLOCK_BREAKING.get()
+            } else if (canBreakWorldBlocks
                     && impactVelocity >= elasticBreakVelocity
                     && yieldRatio > TrueImpactConfig.BREAK_YIELD_THRESHOLD.get()
                     && impactVelocity * yieldRatio > elasticBreakVelocity * (TrueImpactConfig.BREAK_YIELD_THRESHOLD.get() + 1.5)) {
                 return new BlockSubLevelCollisionCallback.CollisionResult(
                         reactionMotion(pos, hitPos, impactVelocity, yieldRatio, restitution), false);
-            } else if (TrueImpactConfig.ENABLE_BLOCK_BREAKING.get()
+            } else if (canBreakWorldBlocks
                     && impactVelocity >= elasticBreakVelocity
                     && yieldRatio > TrueImpactConfig.BREAK_YIELD_THRESHOLD.get()) {
                 // Gentle break
                 return new BlockSubLevelCollisionCallback.CollisionResult(
                         reactionMotion(pos, hitPos, impactVelocity, yieldRatio, restitution), false);
-            } else if (TrueImpactConfig.ENABLE_CRACKS.get() && yieldRatio > TrueImpactConfig.CRACK_YIELD_THRESHOLD.get()) {
+            } else if (TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.get()
+                    && TrueImpactConfig.ENABLE_CRACKS.get()
+                    && yieldRatio > TrueImpactConfig.CRACK_YIELD_THRESHOLD.get()) {
                 // Cracks
                 int crackProgress = (int) Math.min(5, ((yieldRatio - TrueImpactConfig.CRACK_YIELD_THRESHOLD.get()) / 1.25) * 6);
                 boolean broke = BlockDamageAccumulator.apply(

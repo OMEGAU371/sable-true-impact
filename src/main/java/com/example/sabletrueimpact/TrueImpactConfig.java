@@ -21,6 +21,7 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.DoubleValue BOUNCE_RESPONSE_THRESHOLD;
     public static final ModConfigSpec.DoubleValue REACTION_RESPONSE_SCALE;
     public static final ModConfigSpec.DoubleValue REACTION_YIELD_LIMIT;
+    public static final ModConfigSpec.BooleanValue MOVING_STRUCTURES_BREAK_BLOCKS;
     public static final ModConfigSpec.DoubleValue LOW_FRICTION_DAMAGE_REDUCTION;
     public static final ModConfigSpec.DoubleValue FRAGILE_DAMAGE_MULTIPLIER;
     public static final ModConfigSpec.DoubleValue MASS_EXPONENT;
@@ -132,6 +133,8 @@ public final class TrueImpactConfig {
                 .defineInRange("reactionResponseScale", 0.75, 0.0, 10.0);
         REACTION_YIELD_LIMIT = BUILDER.comment("Yield below this value prefers reaction force over block breaking. Raise for less terrain damage.")
                 .defineInRange("reactionYieldLimit", 18.0, 0.0, 1000.0);
+        MOVING_STRUCTURES_BREAK_BLOCKS = BUILDER.comment("If false, moving physical structures cannot break or cumulatively damage normal world blocks. Internal sublevel fracture can still split the moving structure.")
+                .define("movingStructuresBreakBlocks", false);
         LOW_FRICTION_DAMAGE_REDUCTION = BUILDER.comment("How strongly low-friction/glancing materials reduce damage.")
                 .defineInRange("lowFrictionDamageReduction", 0.35, 0.0, 1.0);
         FRAGILE_DAMAGE_MULTIPLIER = BUILDER.comment("Extra damage multiplier for blocks tagged fragile by Sable.")

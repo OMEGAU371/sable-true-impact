@@ -100,6 +100,7 @@ public final class ElasticPairReaction {
 
     private static void applyTerrainImpact(Object subLevel, Vector3d localPoint, Vector3d terrainPoint, Vector3d normal, double forceAmount) {
         if (!TrueImpactConfig.ENABLE_TERRAIN_IMPACT_DAMAGE.get()
+                || !TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.get()
                 || forceAmount < TrueImpactConfig.TERRAIN_IMPACT_FORCE_THRESHOLD.get()
                 || isForgivenStepContact(terrainPoint, normal)
                 || (TrueImpactConfig.ELASTIC_BLOCKS_BREAK_BLOCKS.get() == false && isElasticSubLevel(subLevel))) {
