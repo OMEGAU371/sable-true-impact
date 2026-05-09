@@ -16,6 +16,7 @@ public final class TrueImpactPerformance {
     private static long fractureCandidateChecks;
     private static long fractureCandidates;
     private static long fractureRemovedBlocks;
+    private static long fractureSkippedBudget;
     private static long fractureNanos;
     private static long entityScanTicks;
     private static long entitySubLevels;
@@ -56,6 +57,13 @@ public final class TrueImpactPerformance {
         fractureNanos += elapsed(startedAt);
     }
 
+    public static void recordFractureSkippedBudget() {
+        if (!TrueImpactConfig.ENABLE_PERFORMANCE_LOGGING.get()) {
+            return;
+        }
+        fractureSkippedBudget++;
+    }
+
     public static void recordEntityScan(long startedAt, int subLevels, int candidates, int hits) {
         if (!TrueImpactConfig.ENABLE_PERFORMANCE_LOGGING.get()) {
             return;
@@ -78,13 +86,14 @@ public final class TrueImpactPerformance {
         }
         lastLogTick = tick;
 
-        LOGGER.info("True Impact perf: collisionBatches={}, collisionRecords={}, fractureAttempts={}, fractureChecked={}, fractureCandidates={}, fractureRemoved={}, fractureMs={}, entityScanTicks={}, entitySubLevels={}, entityCandidates={}, entityHits={}, entityMs={}",
+        LOGGER.info("True Impact perf: collisionBatches={}, collisionRecords={}, fractureAttempts={}, fractureChecked={}, fractureCandidates={}, fractureRemoved={}, fractureSkippedBudget={}, fractureMs={}, entityScanTicks={}, entitySubLevels={}, entityCandidates={}, entityHits={}, entityMs={}",
                 collisionBatches,
                 collisionRecords,
                 fractureAttempts,
                 fractureCandidateChecks,
                 fractureCandidates,
                 fractureRemovedBlocks,
+                fractureSkippedBudget,
                 nanosToMillis(fractureNanos),
                 entityScanTicks,
                 entitySubLevels,
@@ -109,6 +118,7 @@ public final class TrueImpactPerformance {
         fractureCandidateChecks = 0L;
         fractureCandidates = 0L;
         fractureRemovedBlocks = 0L;
+        fractureSkippedBudget = 0L;
         fractureNanos = 0L;
         entityScanTicks = 0L;
         entitySubLevels = 0L;

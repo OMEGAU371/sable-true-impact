@@ -55,6 +55,7 @@ public final class SubLevelFracture {
             return;
         }
         if (!claimFractureBudget(level, subLevel)) {
+            TrueImpactPerformance.recordFractureSkippedBudget();
             return;
         }
 
@@ -244,7 +245,8 @@ public final class SubLevelFracture {
     }
 
     private static int radiusForSnapshot() {
-        return (int) Math.ceil(TrueImpactConfig.SUBLEVEL_FRACTURE_RADIUS.get()) + 2;
+        return (int) Math.ceil(TrueImpactConfig.SUBLEVEL_FRACTURE_RADIUS.get())
+                + TrueImpactConfig.SUBLEVEL_FRACTURE_SNAPSHOT_PADDING.get();
     }
 
     private static double scaledForceAboveThreshold(double forceAmount, double threshold, double exponent) {

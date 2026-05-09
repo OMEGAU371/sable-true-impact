@@ -85,6 +85,7 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.IntValue SUBLEVEL_FRACTURE_MAX_CANDIDATES;
     public static final ModConfigSpec.IntValue SUBLEVEL_FRACTURE_COOLDOWN_TICKS;
     public static final ModConfigSpec.IntValue SUBLEVEL_FRACTURE_MAX_ATTEMPTS_PER_TICK;
+    public static final ModConfigSpec.IntValue SUBLEVEL_FRACTURE_SNAPSHOT_PADDING;
     public static final ModConfigSpec.BooleanValue ENABLE_ASYNC_FRACTURE_ANALYSIS;
     public static final ModConfigSpec.IntValue ASYNC_FRACTURE_MAX_QUEUED_JOBS;
     public static final ModConfigSpec.IntValue ASYNC_FRACTURE_MAX_APPLIED_JOBS_PER_TICK;
@@ -272,6 +273,8 @@ public final class TrueImpactConfig {
                 .defineInRange("subLevelFractureCooldownTicks", 4, 0, 200);
         SUBLEVEL_FRACTURE_MAX_ATTEMPTS_PER_TICK = BUILDER.comment("Global cap for fracture scans started per server tick per dimension. Extra collision points skip fracture to protect TPS.")
                 .defineInRange("subLevelFractureMaxAttemptsPerTick", 8, 1, 1000000);
+        SUBLEVEL_FRACTURE_SNAPSHOT_PADDING = BUILDER.comment("Extra block padding captured around fracture candidates for structural analysis. 1 is faster, 2 is more detailed.")
+                .defineInRange("subLevelFractureSnapshotPadding", 1, 0, 4);
         ENABLE_ASYNC_FRACTURE_ANALYSIS = BUILDER.comment("Experimental: compute fracture candidates on a background thread after the world snapshot is captured on the server thread. Final block changes still run on the server thread.")
                 .define("enableAsyncFractureAnalysis", false);
         ASYNC_FRACTURE_MAX_QUEUED_JOBS = BUILDER.comment("Maximum pending async fracture jobs. New async jobs are skipped when the queue is full to protect server TPS.")
