@@ -69,6 +69,8 @@ Useful feature switches:
 - `entityImpact.enableEntityImpactDamage`: damage dealt to living entities.
 - `entityImpact.entityImpactScanIntervalTicks`: direct entity impact scan interval. Higher values reduce CPU load.
 - `subLevelFracture.enableSubLevelFracture`: internal fracture of Sable physical structures.
+- `subLevelFracture.subLevelFractureMaxCandidateChecks`: maximum nearby positions inspected by one fracture event.
+- `subLevelFracture.subLevelFractureMaxCandidates`: maximum fracture candidates kept for sorting and chance checks.
 - `pairReaction.enablePairReaction`: elastic pair-collision counter impulse.
 - `cumulativeDamage.enableCumulativeBlockDamage`: repeated crack-level hits accumulate until breakage.
 - `performance.enablePerformanceLogging`: periodic low-level counters for collision, fracture, and entity scan cost.

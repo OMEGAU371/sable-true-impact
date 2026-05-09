@@ -10,6 +10,8 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 public final class SubLevelFracture {
     private static final Method GET_LEVEL = findMethod("dev.ryanhcode.sable.sublevel.ServerSubLevel", "getLevel");
@@ -18,6 +20,7 @@ public final class SubLevelFracture {
     private static final Method GET_MASS = findMethod("dev.ryanhcode.sable.api.physics.mass.MassData", "getMass");
     private static final Method GET_CENTER_OF_MASS = findMethod("dev.ryanhcode.sable.api.physics.mass.MassData", "getCenterOfMass");
     private static final Method ON_SOLID_REMOVED = findMethod("dev.ryanhcode.sable.sublevel.plot.heat.SubLevelHeatMapManager", "onSolidRemoved", BlockPos.class);
+    private static final Map<Integer, List<Offset>> OFFSET_CACHE = new HashMap<>();
 
     private SubLevelFracture() {
     }
@@ -93,44 +96,62 @@ public final class SubLevelFracture {
         List<Candidate> result = new ArrayList<>();
         int radius = (int) Math.ceil(TrueImpactConfig.SUBLEVEL_FRACTURE_RADIUS.get());
         double radiusSquared = TrueImpactConfig.SUBLEVEL_FRACTURE_RADIUS.get() * TrueImpactConfig.SUBLEVEL_FRACTURE_RADIUS.get();
+        int maxChecks = TrueImpactConfig.SUBLEVEL_FRACTURE_MAX_CANDIDATE_CHECKS.get();
+        int maxCandidates = TrueImpactConfig.SUBLEVEL_FRACTURE_MAX_CANDIDATES.get();
         int checked = 0;
 
+        for (Offset offset : offsets(radius)) {
+            if (checked >= maxChecks || result.size() >= maxCandidates) {
+                break;
+            }
+            if (offset.distanceSquared() > radiusSquared) {
+                continue;
+            }
+            checked++;
+            BlockPos pos = center.offset(offset.x(), offset.y(), offset.z());
+            BlockState state = level.getBlockState(pos);
+            if (state.isAir() || state.is(Blocks.BEDROCK) || state.getDestroySpeed(level, pos) < 0.0f
+                    || StructuralStrengthAnalyzer.isAdhesiveBlock(state)) {
+                continue;
+            }
+            StructuralStrengthAnalyzer.Result structure = StructuralStrengthAnalyzer.analyze(level, pos, state, normal);
+            if (structure.seamWeakness() <= 0.0) {
+                continue;
+            }
+            double hardness = Math.max(0.05, state.getDestroySpeed(level, pos));
+            double blast = Math.max(0.0, state.getBlock().getExplosionResistance());
+            double resistance = (TrueImpactConfig.BASE_STRENGTH.get()
+                    + hardness * TrueImpactConfig.HARDNESS_STRENGTH_FACTOR.get()
+                    + blast * TrueImpactConfig.BLAST_STRENGTH_FACTOR.get())
+                    * structure.connectionStrength();
+            double impactFocus = impactFocus(offset.distanceSquared());
+            double fatigueDamage = fracturePower * structure.seamWeakness() * impactFocus;
+            double breakThreshold = Math.max(resistance, 1.0);
+            double crackRatio = BlockDamageAccumulator.damageRatio(level, pos, breakThreshold);
+            double crackBonus = 1.0 + crackRatio * TrueImpactConfig.SUBLEVEL_FRACTURE_CRACK_BONUS_SCALE.get();
+            double spreadBonus = 1.0 + structure.weakPlaneSpread() * TrueImpactConfig.SUBLEVEL_FRACTURE_WEAK_PLANE_SPREAD.get();
+            double score = fatigueDamage * crackBonus * spreadBonus / breakThreshold;
+            result.add(new Candidate(pos.immutable(), score, fatigueDamage, breakThreshold));
+        }
+        return new CandidateScan(result, checked);
+    }
+
+    private static List<Offset> offsets(int radius) {
+        return OFFSET_CACHE.computeIfAbsent(radius, SubLevelFracture::buildOffsets);
+    }
+
+    private static List<Offset> buildOffsets(int radius) {
+        List<Offset> offsets = new ArrayList<>();
         for (int x = -radius; x <= radius; x++) {
             for (int y = -radius; y <= radius; y++) {
                 for (int z = -radius; z <= radius; z++) {
                     double distanceSquared = x * x + y * y + z * z;
-                    if (distanceSquared > radiusSquared) {
-                        continue;
-                    }
-                    checked++;
-                    BlockPos pos = center.offset(x, y, z);
-                    BlockState state = level.getBlockState(pos);
-                    if (state.isAir() || state.is(Blocks.BEDROCK) || state.getDestroySpeed(level, pos) < 0.0f
-                            || StructuralStrengthAnalyzer.isAdhesiveBlock(state)) {
-                        continue;
-                    }
-                    StructuralStrengthAnalyzer.Result structure = StructuralStrengthAnalyzer.analyze(level, pos, state, normal);
-                    if (structure.seamWeakness() <= 0.0) {
-                        continue;
-                    }
-                    double hardness = Math.max(0.05, state.getDestroySpeed(level, pos));
-                    double blast = Math.max(0.0, state.getBlock().getExplosionResistance());
-                    double resistance = (TrueImpactConfig.BASE_STRENGTH.get()
-                            + hardness * TrueImpactConfig.HARDNESS_STRENGTH_FACTOR.get()
-                            + blast * TrueImpactConfig.BLAST_STRENGTH_FACTOR.get())
-                            * structure.connectionStrength();
-                    double impactFocus = impactFocus(distanceSquared);
-                    double fatigueDamage = fracturePower * structure.seamWeakness() * impactFocus;
-                    double breakThreshold = Math.max(resistance, 1.0);
-                    double crackRatio = BlockDamageAccumulator.damageRatio(level, pos, breakThreshold);
-                    double crackBonus = 1.0 + crackRatio * TrueImpactConfig.SUBLEVEL_FRACTURE_CRACK_BONUS_SCALE.get();
-                    double spreadBonus = 1.0 + structure.weakPlaneSpread() * TrueImpactConfig.SUBLEVEL_FRACTURE_WEAK_PLANE_SPREAD.get();
-                    double score = fatigueDamage * crackBonus * spreadBonus / breakThreshold;
-                    result.add(new Candidate(pos.immutable(), score, fatigueDamage, breakThreshold));
+                    offsets.add(new Offset(x, y, z, distanceSquared));
                 }
             }
         }
-        return new CandidateScan(result, checked);
+        offsets.sort(Comparator.comparingDouble(Offset::distanceSquared));
+        return List.copyOf(offsets);
     }
 
     private static double impactFocus(double distanceSquared) {
@@ -244,5 +265,8 @@ public final class SubLevelFracture {
     }
 
     private record CandidateScan(List<Candidate> candidates, int checkedBlocks) {
+    }
+
+    private record Offset(int x, int y, int z, double distanceSquared) {
     }
 }
