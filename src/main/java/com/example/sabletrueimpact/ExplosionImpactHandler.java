@@ -38,6 +38,10 @@ public final class ExplosionImpactHandler {
         if (radius <= 0.0) {
             return;
         }
+        long startedAt = TrueImpactPerformance.start();
+        int rays = 0;
+        int hits = 0;
+        int fractures = 0;
 
         try {
             Object container = GET_CONTAINER.invoke(null, level);
@@ -50,11 +54,14 @@ public final class ExplosionImpactHandler {
                 return;
             }
             WaveScan scan = scanShockwave(level, center, radius, searchRadius, nearby);
+            rays = scan.rays();
+            hits = scan.hits().size();
             double confinement = 1.0 + scan.blockedRatio() * TrueImpactConfig.EXPLOSION_IMPACT_CONFINEMENT_SCALE.get();
             int processed = 0;
             int maxSubLevels = TrueImpactConfig.EXPLOSION_IMPACT_MAX_SUBLEVELS.get();
-            for (Object subLevel : subLevels(container)) {
-                WaveHit hit = scan.hits().get(subLevel);
+            for (SubLevelEntry entry : nearby) {
+                Object subLevel = entry.subLevel();
+                WaveHit hit = scan.hits().get(entry.subLevel());
                 if (hit == null) {
                     continue;
                 }
@@ -72,8 +79,11 @@ public final class ExplosionImpactHandler {
                 }
                 SubLevelFracture.tryFracture(subLevel, localPoint, normal, force);
                 processed++;
+                fractures++;
             }
         } catch (ReflectiveOperationException | RuntimeException ignored) {
+        } finally {
+            TrueImpactPerformance.recordExplosionImpact(startedAt, rays, hits, fractures);
         }
     }
 
@@ -91,7 +101,7 @@ public final class ExplosionImpactHandler {
                 blocked++;
             }
         }
-        return new WaveScan(hits, blocked / (double) Math.max(samples, 1));
+        return new WaveScan(hits, blocked / (double) Math.max(samples, 1), samples);
     }
 
     private static RayResult traceRay(ServerLevel level, Vec3 center, Vec3 direction, double radius, double stepSize, int steps, List<SubLevelEntry> subLevels, Map<Object, WaveHit> hits) {
@@ -193,7 +203,7 @@ public final class ExplosionImpactHandler {
     private record WaveHit(Vec3 point, Vector3d direction, double pressure) {
     }
 
-    private record WaveScan(Map<Object, WaveHit> hits, double blockedRatio) {
+    private record WaveScan(Map<Object, WaveHit> hits, double blockedRatio, int rays) {
     }
 
     private record RayResult(boolean blocked) {

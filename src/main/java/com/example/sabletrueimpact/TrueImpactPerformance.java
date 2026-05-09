@@ -23,6 +23,11 @@ public final class TrueImpactPerformance {
     private static long entityCandidates;
     private static long entityHits;
     private static long entityNanos;
+    private static long explosionEvents;
+    private static long explosionRays;
+    private static long explosionHits;
+    private static long explosionFractures;
+    private static long explosionNanos;
 
     private TrueImpactPerformance() {
     }
@@ -75,6 +80,17 @@ public final class TrueImpactPerformance {
         entityNanos += elapsed(startedAt);
     }
 
+    public static void recordExplosionImpact(long startedAt, int rays, int hits, int fractures) {
+        if (!TrueImpactConfig.ENABLE_PERFORMANCE_LOGGING.get()) {
+            return;
+        }
+        explosionEvents++;
+        explosionRays += Math.max(rays, 0);
+        explosionHits += Math.max(hits, 0);
+        explosionFractures += Math.max(fractures, 0);
+        explosionNanos += elapsed(startedAt);
+    }
+
     public static void maybeLog(ServerLevel level) {
         if (!TrueImpactConfig.ENABLE_PERFORMANCE_LOGGING.get()) {
             return;
@@ -86,7 +102,7 @@ public final class TrueImpactPerformance {
         }
         lastLogTick = tick;
 
-        LOGGER.info("True Impact perf: collisionBatches={}, collisionRecords={}, fractureAttempts={}, fractureChecked={}, fractureCandidates={}, fractureRemoved={}, fractureSkippedBudget={}, fractureMs={}, entityScanTicks={}, entitySubLevels={}, entityCandidates={}, entityHits={}, entityMs={}",
+        LOGGER.info("True Impact perf: collisionBatches={}, collisionRecords={}, fractureAttempts={}, fractureChecked={}, fractureCandidates={}, fractureRemoved={}, fractureSkippedBudget={}, fractureMs={}, entityScanTicks={}, entitySubLevels={}, entityCandidates={}, entityHits={}, entityMs={}, explosionEvents={}, explosionRays={}, explosionHits={}, explosionFractures={}, explosionMs={}",
                 collisionBatches,
                 collisionRecords,
                 fractureAttempts,
@@ -99,7 +115,12 @@ public final class TrueImpactPerformance {
                 entitySubLevels,
                 entityCandidates,
                 entityHits,
-                nanosToMillis(entityNanos));
+                nanosToMillis(entityNanos),
+                explosionEvents,
+                explosionRays,
+                explosionHits,
+                explosionFractures,
+                nanosToMillis(explosionNanos));
         reset();
     }
 
@@ -125,5 +146,10 @@ public final class TrueImpactPerformance {
         entityCandidates = 0L;
         entityHits = 0L;
         entityNanos = 0L;
+        explosionEvents = 0L;
+        explosionRays = 0L;
+        explosionHits = 0L;
+        explosionFractures = 0L;
+        explosionNanos = 0L;
     }
 }
