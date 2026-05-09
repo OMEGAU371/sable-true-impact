@@ -1,25 +1,67 @@
+# Sable True Impact
 
-Installation information
-=======
+Sable True Impact is an experimental NeoForge add-on for Sable that adds impact damage, cumulative cracking, entity impact damage, and structural fracture behavior to Sable physical sub-levels.
 
-This template repository can be directly cloned to get you started with a new
-mod. Simply create a new repository cloned from this one, by following the
-instructions provided by [GitHub](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template).
+It is designed for Minecraft 1.21.1, NeoForge, and Sable 1.2.2+.
 
-Once you have your clone, simply open the repository in the IDE of your choice. The usual recommendation for an IDE is either IntelliJ IDEA or Eclipse.
+## Features
 
-If at any point you are missing libraries in your IDE, or you've run into problems you can
-run `gradlew --refresh-dependencies` to refresh the local cache. `gradlew clean` to reset everything 
-{this does not affect your code} and then start the process again.
+- Impact-based terrain damage using collision force, material hardness, blast resistance, mass, and support.
+- Cumulative block cracking before full block breakage.
+- Structural fracture for Sable sub-levels, using Sable's native splitting system.
+- Local structural strength analysis:
+  - straight mixed-material seams are more likely to split,
+  - checkerboard/interlocked materials resist fracture,
+  - beams, girders, frames, supports, and chassis-like blocks strengthen local structure,
+  - Create super glue entities and honey/sticky/glue-like blocks greatly reinforce connections.
+- Entity impact damage based on relative closing speed, with standing-on-vehicle filtering to avoid hurting riders.
+- Step-contact forgiveness so vehicles do not easily destroy terrain when driving over small height differences.
+- Server-side TOML configuration for damage, fracture, terrain protection, entity damage, and structure-strength tuning.
 
-Mapping Names:
-============
-By default, the MDK is configured to use the official mapping names from Mojang for methods and fields 
-in the Minecraft codebase. These names are covered by a specific license. All modders should be aware of this
-license. For the latest license text, refer to the mapping file itself, or the reference copy here:
-https://github.com/NeoForged/NeoForm/blob/main/Mojang.md
+## Dependencies
 
-Additional Resources: 
-==========
-Community Documentation: https://docs.neoforged.net/  
-NeoForged Discord: https://discord.neoforged.net/
+Required at runtime:
+
+- Minecraft 1.21.1
+- NeoForge 21.1.x
+- Sable 1.2.2 or newer
+
+Optional integrations are detected by block/entity identifiers, including Create super glue, honey, stickers, girders, beams, frames, and similar support blocks.
+
+## Building
+
+This repository does not redistribute Sable's jar. To build locally, place the Sable jar here:
+
+```text
+libs/sable-neoforge-1.21.1-1.2.2.jar
+```
+
+Then run:
+
+```powershell
+.\gradlew.bat build
+```
+
+The built mod jar will be in:
+
+```text
+build/libs/
+```
+
+## Configuration
+
+Server configuration is generated at:
+
+```text
+serverconfig/sabletrueimpact-server.toml
+```
+
+Existing worlds keep their old config values. Delete or edit the server config after updating if you want new defaults.
+
+## Safety
+
+This mod intentionally changes physical collision outcomes and can break terrain, split structures, and damage entities. Back up worlds before testing.
+
+## Disclaimer
+
+This is an unofficial add-on for Sable. It is not affiliated with or endorsed by Sable's original author.

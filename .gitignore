@@ -38,3 +38,7 @@ run/
 **/src/generated/**/.cache/
 repo/
 !**/src/**/repo/
+
+### Local analysis and third-party jars ###
+.analysis/
+libs/*.jar

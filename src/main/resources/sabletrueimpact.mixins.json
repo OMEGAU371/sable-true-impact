@@ -1,0 +1,17 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.example.sabletrueimpact.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "refmap": "sabletrueimpact.refmap.json",
+  "mixins": [
+    "BlockMixin",
+    "RapierPhysicsPipelineMixin",
+    "SableCollisionMixin"
+  ],
+  "client": [
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
