@@ -14,6 +14,7 @@ It is designed for Minecraft 1.21.1, NeoForge, and Sable 1.2.2+.
   - checkerboard/interlocked materials resist fracture,
   - beams, girders, frames, supports, and chassis-like blocks strengthen local structure,
   - Create super glue entities and honey/sticky/glue-like blocks greatly reinforce connections.
+- Fracture analysis is internally split into a local world snapshot and a pure candidate calculation step, preparing the system for safe async analysis later.
 - Entity impact damage based on relative closing speed, with standing-on-vehicle filtering to avoid hurting riders.
 - Step-contact forgiveness so vehicles do not easily destroy terrain when driving over small height differences.
 - Server-side TOML configuration for damage, fracture, terrain protection, entity damage, and structure-strength tuning.

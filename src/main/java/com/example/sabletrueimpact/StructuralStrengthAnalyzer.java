@@ -24,8 +24,18 @@ public final class StructuralStrengthAnalyzer {
     private StructuralStrengthAnalyzer() {
     }
 
+    public interface BlockLookup {
+        BlockState getBlockState(BlockPos pos);
+
+        boolean hasGlueEntity(BlockPos pos);
+    }
+
     public static Result analyze(ServerLevel level, BlockPos pos, BlockState state, Vector3d impactNormal) {
-        if (isAdhesiveBlock(state) || hasGlueEntity(level, pos)) {
+        return analyze(new LevelBlockLookup(level), pos, state, impactNormal);
+    }
+
+    public static Result analyze(BlockLookup lookup, BlockPos pos, BlockState state, Vector3d impactNormal) {
+        if (isAdhesiveBlock(state) || lookup.hasGlueEntity(pos)) {
             return new Result(0.0, TrueImpactConfig.SUBLEVEL_FRACTURE_STICKY_RESISTANCE.get(), 0.0);
         }
 
@@ -41,12 +51,12 @@ public final class StructuralStrengthAnalyzer {
         Direction strongestWeakDirection = null;
         for (Direction direction : Direction.values()) {
             BlockPos neighborPos = pos.relative(direction);
-            BlockState neighbor = level.getBlockState(neighborPos);
+            BlockState neighbor = lookup.getBlockState(neighborPos);
             if (neighbor.isAir()) {
                 continue;
             }
             faceConnections++;
-            if (isAdhesiveBlock(neighbor) || hasGlueEntity(level, neighborPos)) {
+            if (isAdhesiveBlock(neighbor) || lookup.hasGlueEntity(neighborPos)) {
                 adhesiveNeighbors++;
                 continue;
             }
@@ -67,8 +77,8 @@ public final class StructuralStrengthAnalyzer {
             double materialFactor = sameBlock ? 1.0 / Math.max(TrueImpactConfig.SUBLEVEL_FRACTURE_SAME_BLOCK_RESISTANCE.get(), 1.0) : 1.0;
             double seam = materialFactor * planeFactor * frictionFactor;
 
-            double continuity = continuousSeam(level, pos, state, direction);
-            double interlock = interlockAround(level, pos, state, direction);
+            double continuity = continuousSeam(lookup, pos, state, direction);
+            double interlock = interlockAround(lookup, pos, state, direction);
             seam *= (1.0 + continuity * TrueImpactConfig.SUBLEVEL_FRACTURE_CONTINUOUS_SEAM_WEAKNESS.get());
             seam /= (1.0 + interlock * TrueImpactConfig.SUBLEVEL_FRACTURE_INTERLOCK_STRENGTH.get());
             if (seam > seamWeakness) {
@@ -82,8 +92,8 @@ public final class StructuralStrengthAnalyzer {
         connectionStrength += sameFaceConnections * 0.18;
         connectionStrength += adhesiveNeighbors * TrueImpactConfig.SUBLEVEL_FRACTURE_STICKY_RESISTANCE.get();
         connectionStrength += beamNeighbors * TrueImpactConfig.SUBLEVEL_FRACTURE_BEAM_STRENGTH.get();
-        connectionStrength += diagonalInterlock(level, pos, state) * TrueImpactConfig.SUBLEVEL_FRACTURE_INTERLOCK_STRENGTH.get();
-        connectionStrength += crossBracing(level, pos, state, strongestWeakDirection) * 0.75;
+        connectionStrength += diagonalInterlock(lookup, pos, state) * TrueImpactConfig.SUBLEVEL_FRACTURE_INTERLOCK_STRENGTH.get();
+        connectionStrength += crossBracing(lookup, pos, state, strongestWeakDirection) * 0.75;
 
         if (mixedFaceSeams == 0 && sameFaceConnections > 0) {
             seamWeakness *= 0.6;
@@ -94,7 +104,7 @@ public final class StructuralStrengthAnalyzer {
         return new Result(seamWeakness, Math.max(1.0, connectionStrength), weakPlaneSpread);
     }
 
-    private static double continuousSeam(ServerLevel level, BlockPos pos, BlockState state, Direction direction) {
+    private static double continuousSeam(BlockLookup lookup, BlockPos pos, BlockState state, Direction direction) {
         Direction.Axis axis = direction.getAxis();
         double score = 0.0;
         for (Direction tangent : Direction.values()) {
@@ -102,8 +112,8 @@ public final class StructuralStrengthAnalyzer {
                 continue;
             }
             BlockPos side = pos.relative(tangent);
-            BlockState sideState = level.getBlockState(side);
-            BlockState sideAcross = level.getBlockState(side.relative(direction));
+            BlockState sideState = lookup.getBlockState(side);
+            BlockState sideAcross = lookup.getBlockState(side.relative(direction));
             if (!sideState.isAir() && !sideAcross.isAir()
                     && sideState.getBlock() == state.getBlock()
                     && sideAcross.getBlock() != state.getBlock()) {
@@ -113,15 +123,15 @@ public final class StructuralStrengthAnalyzer {
         return Math.min(1.5, score);
     }
 
-    private static double interlockAround(ServerLevel level, BlockPos pos, BlockState state, Direction direction) {
+    private static double interlockAround(BlockLookup lookup, BlockPos pos, BlockState state, Direction direction) {
         Direction.Axis axis = direction.getAxis();
         double score = 0.0;
         for (Direction tangent : Direction.values()) {
             if (tangent.getAxis() == axis) {
                 continue;
             }
-            BlockState diagonalA = level.getBlockState(pos.relative(direction).relative(tangent));
-            BlockState diagonalB = level.getBlockState(pos.relative(tangent.getOpposite()));
+            BlockState diagonalA = lookup.getBlockState(pos.relative(direction).relative(tangent));
+            BlockState diagonalB = lookup.getBlockState(pos.relative(tangent.getOpposite()));
             if (!diagonalA.isAir() && !diagonalB.isAir()
                     && diagonalA.getBlock() == state.getBlock()
                     && diagonalB.getBlock() != state.getBlock()) {
@@ -131,7 +141,7 @@ public final class StructuralStrengthAnalyzer {
         return Math.min(1.6, score);
     }
 
-    private static double diagonalInterlock(ServerLevel level, BlockPos pos, BlockState state) {
+    private static double diagonalInterlock(BlockLookup lookup, BlockPos pos, BlockState state) {
         double score = 0.0;
         for (int x = -1; x <= 1; x++) {
             for (int y = -1; y <= 1; y++) {
@@ -140,7 +150,7 @@ public final class StructuralStrengthAnalyzer {
                     if (manhattan < 2) {
                         continue;
                     }
-                    BlockState diagonal = level.getBlockState(pos.offset(x, y, z));
+                    BlockState diagonal = lookup.getBlockState(pos.offset(x, y, z));
                     if (!diagonal.isAir() && diagonal.getBlock() == state.getBlock()) {
                         score += 0.08;
                     }
@@ -150,7 +160,7 @@ public final class StructuralStrengthAnalyzer {
         return Math.min(1.5, score);
     }
 
-    private static double crossBracing(ServerLevel level, BlockPos pos, BlockState state, Direction weakDirection) {
+    private static double crossBracing(BlockLookup lookup, BlockPos pos, BlockState state, Direction weakDirection) {
         if (weakDirection == null) {
             return 0.0;
         }
@@ -159,8 +169,8 @@ public final class StructuralStrengthAnalyzer {
             if (direction.getAxis() == weakDirection.getAxis()) {
                 continue;
             }
-            if (isBeamLike(level.getBlockState(pos.relative(direction)))
-                    || isBeamLike(level.getBlockState(pos.relative(direction).relative(weakDirection)))) {
+            if (isBeamLike(lookup.getBlockState(pos.relative(direction)))
+                    || isBeamLike(lookup.getBlockState(pos.relative(direction).relative(weakDirection)))) {
                 score += 0.45;
             }
         }
@@ -195,7 +205,7 @@ public final class StructuralStrengthAnalyzer {
                 || path.contains("chassis");
     }
 
-    private static boolean hasGlueEntity(ServerLevel level, BlockPos pos) {
+    public static boolean hasGlueEntity(ServerLevel level, BlockPos pos) {
         resetGlueCacheIfNeeded(level);
         long key = pos.asLong();
         Boolean cached = GLUE_ENTITY_CACHE.get(key);
@@ -233,5 +243,17 @@ public final class StructuralStrengthAnalyzer {
     }
 
     public record Result(double seamWeakness, double connectionStrength, double weakPlaneSpread) {
+    }
+
+    private record LevelBlockLookup(ServerLevel level) implements BlockLookup {
+        @Override
+        public BlockState getBlockState(BlockPos pos) {
+            return level.getBlockState(pos);
+        }
+
+        @Override
+        public boolean hasGlueEntity(BlockPos pos) {
+            return StructuralStrengthAnalyzer.hasGlueEntity(level, pos);
+        }
     }
 }

@@ -11,7 +11,9 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 public final class SubLevelFracture {
     private static final Method GET_LEVEL = findMethod("dev.ryanhcode.sable.sublevel.ServerSubLevel", "getLevel");
@@ -55,7 +57,8 @@ public final class SubLevelFracture {
             planeNormal.normalize();
         }
 
-        CandidateScan scan = candidates(level, center, planeNormal, fracturePower);
+        FractureSnapshot snapshot = FractureSnapshot.capture(level, center, radiusForSnapshot());
+        CandidateScan scan = candidates(level, snapshot, center, planeNormal, fracturePower);
         List<Candidate> candidates = scan.candidates();
         candidates.sort(Comparator.comparingDouble(Candidate::score).reversed());
 
@@ -92,7 +95,7 @@ public final class SubLevelFracture {
         TrueImpactPerformance.recordFracture(startedAt, scan.checkedBlocks(), candidates.size(), removed);
     }
 
-    private static CandidateScan candidates(ServerLevel level, BlockPos center, Vector3d normal, double fracturePower) {
+    private static CandidateScan candidates(ServerLevel level, FractureSnapshot snapshot, BlockPos center, Vector3d normal, double fracturePower) {
         List<Candidate> result = new ArrayList<>();
         int radius = (int) Math.ceil(TrueImpactConfig.SUBLEVEL_FRACTURE_RADIUS.get());
         double radiusSquared = TrueImpactConfig.SUBLEVEL_FRACTURE_RADIUS.get() * TrueImpactConfig.SUBLEVEL_FRACTURE_RADIUS.get();
@@ -109,17 +112,18 @@ public final class SubLevelFracture {
             }
             checked++;
             BlockPos pos = center.offset(offset.x(), offset.y(), offset.z());
-            BlockState state = level.getBlockState(pos);
-            if (state.isAir() || state.is(Blocks.BEDROCK) || state.getDestroySpeed(level, pos) < 0.0f
+            BlockState state = snapshot.getBlockState(pos);
+            double destroySpeed = snapshot.destroySpeed(pos);
+            if (state.isAir() || state.is(Blocks.BEDROCK) || destroySpeed < 0.0f
                     || StructuralStrengthAnalyzer.isAdhesiveBlock(state)) {
                 continue;
             }
-            StructuralStrengthAnalyzer.Result structure = StructuralStrengthAnalyzer.analyze(level, pos, state, normal);
+            StructuralStrengthAnalyzer.Result structure = StructuralStrengthAnalyzer.analyze(snapshot, pos, state, normal);
             if (structure.seamWeakness() <= 0.0) {
                 continue;
             }
-            double hardness = Math.max(0.05, state.getDestroySpeed(level, pos));
-            double blast = Math.max(0.0, state.getBlock().getExplosionResistance());
+            double hardness = Math.max(0.05, destroySpeed);
+            double blast = Math.max(0.0, snapshot.blastResistance(pos));
             double resistance = (TrueImpactConfig.BASE_STRENGTH.get()
                     + hardness * TrueImpactConfig.HARDNESS_STRENGTH_FACTOR.get()
                     + blast * TrueImpactConfig.BLAST_STRENGTH_FACTOR.get())
@@ -134,6 +138,10 @@ public final class SubLevelFracture {
             result.add(new Candidate(pos.immutable(), score, fatigueDamage, breakThreshold));
         }
         return new CandidateScan(result, checked);
+    }
+
+    private static int radiusForSnapshot() {
+        return (int) Math.ceil(TrueImpactConfig.SUBLEVEL_FRACTURE_RADIUS.get()) + 2;
     }
 
     private static List<Offset> offsets(int radius) {
@@ -268,5 +276,62 @@ public final class SubLevelFracture {
     }
 
     private record Offset(int x, int y, int z, double distanceSquared) {
+    }
+
+    private static final class FractureSnapshot implements StructuralStrengthAnalyzer.BlockLookup {
+        private final Map<Long, BlockState> states;
+        private final Map<Long, BlockMaterial> materials;
+        private final Set<Long> glueEntities;
+
+        private FractureSnapshot(Map<Long, BlockState> states, Map<Long, BlockMaterial> materials, Set<Long> glueEntities) {
+            this.states = states;
+            this.materials = materials;
+            this.glueEntities = glueEntities;
+        }
+
+        private static FractureSnapshot capture(ServerLevel level, BlockPos center, int radius) {
+            Map<Long, BlockState> states = new HashMap<>();
+            Map<Long, BlockMaterial> materials = new HashMap<>();
+            Set<Long> glueEntities = new HashSet<>();
+            BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+            for (int x = -radius; x <= radius; x++) {
+                for (int y = -radius; y <= radius; y++) {
+                    for (int z = -radius; z <= radius; z++) {
+                        pos.set(center.getX() + x, center.getY() + y, center.getZ() + z);
+                        long key = pos.asLong();
+                        BlockState state = level.getBlockState(pos);
+                        states.put(key, state);
+                        materials.put(key, new BlockMaterial(state.getDestroySpeed(level, pos), state.getBlock().getExplosionResistance()));
+                        if (StructuralStrengthAnalyzer.hasGlueEntity(level, pos)) {
+                            glueEntities.add(key);
+                        }
+                    }
+                }
+            }
+            return new FractureSnapshot(states, materials, glueEntities);
+        }
+
+        @Override
+        public BlockState getBlockState(BlockPos pos) {
+            return states.getOrDefault(pos.asLong(), Blocks.AIR.defaultBlockState());
+        }
+
+        private double destroySpeed(BlockPos pos) {
+            BlockMaterial material = materials.get(pos.asLong());
+            return material == null ? 0.0 : material.destroySpeed();
+        }
+
+        private double blastResistance(BlockPos pos) {
+            BlockMaterial material = materials.get(pos.asLong());
+            return material == null ? 0.0 : material.blastResistance();
+        }
+
+        @Override
+        public boolean hasGlueEntity(BlockPos pos) {
+            return glueEntities.contains(pos.asLong());
+        }
+    }
+
+    private record BlockMaterial(float destroySpeed, float blastResistance) {
     }
 }
