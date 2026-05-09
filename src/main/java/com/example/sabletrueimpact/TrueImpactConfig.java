@@ -109,6 +109,8 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.DoubleValue EXPLOSION_IMPACT_RADIUS_MULTIPLIER;
     public static final ModConfigSpec.DoubleValue EXPLOSION_IMPACT_CONFINEMENT_SCALE;
     public static final ModConfigSpec.IntValue EXPLOSION_IMPACT_MAX_SUBLEVELS;
+    public static final ModConfigSpec.IntValue EXPLOSION_IMPACT_RAY_SAMPLES;
+    public static final ModConfigSpec.DoubleValue EXPLOSION_IMPACT_RAY_STEP;
     public static final ModConfigSpec.BooleanValue ENABLE_CUMULATIVE_BLOCK_DAMAGE;
     public static final ModConfigSpec.DoubleValue CUMULATIVE_BLOCK_DAMAGE_SCALE;
     public static final ModConfigSpec.IntValue CUMULATIVE_BLOCK_DAMAGE_DECAY_TICKS;
@@ -329,6 +331,10 @@ public final class TrueImpactConfig {
                 .defineInRange("explosionImpactConfinementScale", 1.4, 0.0, 100.0);
         EXPLOSION_IMPACT_MAX_SUBLEVELS = BUILDER.comment("Maximum nearby Sable physical structures processed by one explosion.")
                 .defineInRange("explosionImpactMaxSubLevels", 32, 1, 1000000);
+        EXPLOSION_IMPACT_RAY_SAMPLES = BUILDER.comment("Invisible shockwave ray count used to detect enclosed blasts and impacted Sable structures. Higher is more accurate but costs more CPU.")
+                .defineInRange("explosionImpactRaySamples", 48, 6, 512);
+        EXPLOSION_IMPACT_RAY_STEP = BUILDER.comment("Distance advanced per shockwave ray sample step. Lower is more precise but costs more CPU.")
+                .defineInRange("explosionImpactRayStep", 0.75, 0.1, 4.0);
         BUILDER.pop();
 
         BUILDER.push("cumulativeDamage");

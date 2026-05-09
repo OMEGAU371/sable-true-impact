@@ -1,7 +1,6 @@
 package com.example.sabletrueimpact;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
@@ -12,7 +11,11 @@ import net.neoforged.neoforge.event.level.ExplosionEvent;
 import org.joml.Vector3d;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Map;
 
 public final class ExplosionImpactHandler {
     private static final Method GET_CONTAINER = findMethod("dev.ryanhcode.sable.api.sublevel.SubLevelContainer", "getContainer", Level.class);
@@ -36,40 +39,34 @@ public final class ExplosionImpactHandler {
             return;
         }
 
-        double searchRadius = radius * TrueImpactConfig.EXPLOSION_IMPACT_RADIUS_MULTIPLIER.get();
-        double confinement = confinementMultiplier(level, center, radius);
-        int processed = 0;
-        int maxSubLevels = TrueImpactConfig.EXPLOSION_IMPACT_MAX_SUBLEVELS.get();
-
         try {
             Object container = GET_CONTAINER.invoke(null, level);
             if (container == null) {
                 return;
             }
+            double searchRadius = radius * TrueImpactConfig.EXPLOSION_IMPACT_RADIUS_MULTIPLIER.get();
+            List<SubLevelEntry> nearby = nearbySubLevels(container, center, searchRadius);
+            if (nearby.isEmpty()) {
+                return;
+            }
+            WaveScan scan = scanShockwave(level, center, radius, searchRadius, nearby);
+            double confinement = 1.0 + scan.blockedRatio() * TrueImpactConfig.EXPLOSION_IMPACT_CONFINEMENT_SCALE.get();
+            int processed = 0;
+            int maxSubLevels = TrueImpactConfig.EXPLOSION_IMPACT_MAX_SUBLEVELS.get();
             for (Object subLevel : subLevels(container)) {
+                WaveHit hit = scan.hits().get(subLevel);
+                if (hit == null) {
+                    continue;
+                }
                 if (processed >= maxSubLevels) {
                     break;
                 }
-                AABB bounds = bounds(subLevel);
-                Vec3 closest = closestPoint(bounds, center);
-                double distance = closest.distanceTo(center);
-                if (distance > searchRadius) {
-                    continue;
-                }
-
-                double falloff = 1.0 - distance / Math.max(searchRadius, 0.001);
-                double nearField = 1.0 / (distance * distance + 1.0);
-                double force = radius * radius
-                        * TrueImpactConfig.EXPLOSION_IMPACT_FORCE_SCALE.get()
-                        * (0.35 + falloff * 0.65)
-                        * (1.0 + nearField)
-                        * confinement;
+                double force = hit.pressure() * confinement;
                 if (force < TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_THRESHOLD.get()) {
                     continue;
                 }
-
-                Vector3d localPoint = new Vector3d(closest.x, closest.y, closest.z);
-                Vector3d normal = new Vector3d(closest.x - center.x, closest.y - center.y, closest.z - center.z);
+                Vector3d localPoint = new Vector3d(hit.point().x, hit.point().y, hit.point().z);
+                Vector3d normal = new Vector3d(hit.direction());
                 if (normal.lengthSquared() < 1.0E-8) {
                     normal.set(0.0, 1.0, 0.0);
                 }
@@ -80,36 +77,76 @@ public final class ExplosionImpactHandler {
         }
     }
 
-    private static double confinementMultiplier(ServerLevel level, Vec3 center, double radius) {
-        double scale = TrueImpactConfig.EXPLOSION_IMPACT_CONFINEMENT_SCALE.get();
-        if (scale <= 0.0) {
-            return 1.0;
-        }
+    private static WaveScan scanShockwave(ServerLevel level, Vec3 center, double radius, double searchRadius, List<SubLevelEntry> subLevels) {
+        Map<Object, WaveHit> hits = new IdentityHashMap<>();
         int blocked = 0;
-        for (Direction direction : Direction.values()) {
-            if (isBlocked(level, center, direction, radius)) {
+        int samples = TrueImpactConfig.EXPLOSION_IMPACT_RAY_SAMPLES.get();
+        double stepSize = TrueImpactConfig.EXPLOSION_IMPACT_RAY_STEP.get();
+        int steps = Math.max(1, (int) Math.ceil(searchRadius / stepSize));
+
+        for (int ray = 0; ray < samples; ray++) {
+            Vec3 direction = rayDirection(ray, samples);
+            RayResult result = traceRay(level, center, direction, radius, stepSize, steps, subLevels, hits);
+            if (result.blocked()) {
                 blocked++;
             }
         }
-        double enclosed = blocked / 6.0;
-        return 1.0 + enclosed * scale;
+        return new WaveScan(hits, blocked / (double) Math.max(samples, 1));
     }
 
-    private static boolean isBlocked(ServerLevel level, Vec3 center, Direction direction, double radius) {
-        int steps = Math.max(1, (int) Math.ceil(radius));
+    private static RayResult traceRay(ServerLevel level, Vec3 center, Vec3 direction, double radius, double stepSize, int steps, List<SubLevelEntry> subLevels, Map<Object, WaveHit> hits) {
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         for (int step = 1; step <= steps; step++) {
-            pos.set(
-                    center.x + direction.getStepX() * step,
-                    center.y + direction.getStepY() * step,
-                    center.z + direction.getStepZ() * step
-            );
+            double distance = step * stepSize;
+            Vec3 point = center.add(direction.scale(distance));
+            pos.set(point.x, point.y, point.z);
+            for (SubLevelEntry entry : subLevels) {
+                if (!entry.bounds().contains(point)) {
+                    continue;
+                }
+                double falloff = 1.0 - distance / Math.max(radius * TrueImpactConfig.EXPLOSION_IMPACT_RADIUS_MULTIPLIER.get(), 0.001);
+                double nearField = 1.0 / (distance * distance + 1.0);
+                double pressure = radius * radius
+                        * TrueImpactConfig.EXPLOSION_IMPACT_FORCE_SCALE.get()
+                        * (0.35 + Math.max(0.0, falloff) * 0.65)
+                        * (1.0 + nearField);
+                hits.merge(entry.subLevel(), new WaveHit(point, new Vector3d(direction.x, direction.y, direction.z), pressure), ExplosionImpactHandler::strongerHit);
+                return RayResult.BLOCKED;
+            }
             BlockState state = level.getBlockState(pos);
             if (!state.isAir() && state.getDestroySpeed(level, pos) >= 0.0f) {
-                return true;
+                return RayResult.BLOCKED;
             }
         }
-        return false;
+        return RayResult.ESCAPED;
+    }
+
+    private static WaveHit strongerHit(WaveHit first, WaveHit second) {
+        return first.pressure() >= second.pressure() ? first : second;
+    }
+
+    private static List<SubLevelEntry> nearbySubLevels(Object container, Vec3 center, double searchRadius) throws ReflectiveOperationException {
+        List<SubLevelEntry> nearby = new ArrayList<>();
+        int maxSubLevels = TrueImpactConfig.EXPLOSION_IMPACT_MAX_SUBLEVELS.get();
+        for (Object subLevel : subLevels(container)) {
+            if (nearby.size() >= maxSubLevels) {
+                break;
+            }
+            AABB bounds = bounds(subLevel);
+            Vec3 closest = closestPoint(bounds, center);
+            if (closest.distanceTo(center) <= searchRadius) {
+                nearby.add(new SubLevelEntry(subLevel, bounds));
+            }
+        }
+        return nearby;
+    }
+
+    private static Vec3 rayDirection(int index, int samples) {
+        double goldenAngle = Math.PI * (3.0 - Math.sqrt(5.0));
+        double y = 1.0 - (index + 0.5) * 2.0 / samples;
+        double radius = Math.sqrt(Math.max(0.0, 1.0 - y * y));
+        double theta = index * goldenAngle;
+        return new Vec3(Math.cos(theta) * radius, y, Math.sin(theta) * radius);
     }
 
     private static Iterable<?> subLevels(Object container) throws ReflectiveOperationException {
@@ -148,5 +185,19 @@ public final class ExplosionImpactHandler {
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException("Missing Sable method " + className + "#" + methodName, e);
         }
+    }
+
+    private record SubLevelEntry(Object subLevel, AABB bounds) {
+    }
+
+    private record WaveHit(Vec3 point, Vector3d direction, double pressure) {
+    }
+
+    private record WaveScan(Map<Object, WaveHit> hits, double blockedRatio) {
+    }
+
+    private record RayResult(boolean blocked) {
+        private static final RayResult BLOCKED = new RayResult(true);
+        private static final RayResult ESCAPED = new RayResult(false);
     }
 }
