@@ -182,13 +182,13 @@ public final class TrueImpactConfig {
                 .defineInRange("maxEffectiveMass", 100.0, 1.0, 100000.0);
         SOFT_BLOCK_STRENGTH_MULTIPLIER = BUILDER.comment("Extra strength multiplier for soft blocks like dirt/grass. 1.0 keeps soil softer than wood and stone.")
                 .defineInRange("softBlockStrengthMultiplier", 1.0, 1.0, 1000.0);
-        HARDNESS_STRENGTH_FACTOR = BUILDER.defineInRange("hardnessStrengthFactor", 18.0, 0.0, 1000.0);
-        BLAST_STRENGTH_FACTOR = BUILDER.defineInRange("blastStrengthFactor", 4.5, 0.0, 1000.0);
+        HARDNESS_STRENGTH_FACTOR = BUILDER.defineInRange("hardnessStrengthFactor", 28.0, 0.0, 1000.0);
+        BLAST_STRENGTH_FACTOR = BUILDER.defineInRange("blastStrengthFactor", 7.0, 0.0, 1000.0);
         BASE_STRENGTH = BUILDER.comment("Flat base strength. Keep this low enough that material hardness still matters.")
-                .defineInRange("baseStrength", 7.0, 0.0, 1000.0);
-        CRACK_YIELD_THRESHOLD = BUILDER.defineInRange("crackYieldThreshold", 0.85, 0.0, 1000.0);
-        BREAK_YIELD_THRESHOLD = BUILDER.defineInRange("breakYieldThreshold", 6.5, 0.0, 1000.0);
-        HEAVY_BREAK_YIELD_THRESHOLD = BUILDER.defineInRange("heavyBreakYieldThreshold", 11.0, 0.0, 1000.0);
+                .defineInRange("baseStrength", 12.0, 0.0, 1000.0);
+        CRACK_YIELD_THRESHOLD = BUILDER.defineInRange("crackYieldThreshold", 1.15, 0.0, 1000.0);
+        BREAK_YIELD_THRESHOLD = BUILDER.defineInRange("breakYieldThreshold", 9.5, 0.0, 1000.0);
+        HEAVY_BREAK_YIELD_THRESHOLD = BUILDER.defineInRange("heavyBreakYieldThreshold", 16.0, 0.0, 1000.0);
         PROPAGATION_YIELD_THRESHOLD = BUILDER.defineInRange("propagationYieldThreshold", 22.0, 0.0, 1000.0);
         ENABLE_CRACKS = BUILDER.define("enableCracks", true);
         ENABLE_BLOCK_BREAKING = BUILDER.define("enableBlockBreaking", true);
@@ -232,7 +232,7 @@ public final class TrueImpactConfig {
                 .defineInRange("terrainStepContactForgiveness", 0.22, 0.0, 1.0);
         TERRAIN_STEP_SIDE_NORMAL_THRESHOLD = BUILDER.comment("Contacts with vertical normal component below this are considered side contacts for step forgiveness.")
                 .defineInRange("terrainStepSideNormalThreshold", 0.35, 0.0, 1.0);
-        TERRAIN_IMPACT_BREAK_YIELD = BUILDER.defineInRange("terrainImpactBreakYield", 3.25, 0.0, 1000.0);
+        TERRAIN_IMPACT_BREAK_YIELD = BUILDER.defineInRange("terrainImpactBreakYield", 5.0, 0.0, 1000.0);
         TERRAIN_IMPACT_MAX_BLOCKS = BUILDER.comment("Maximum terrain blocks broken by one terrain impact collision.")
                 .defineInRange("terrainImpactMaxBlocks", 4, 0, 10000);
         BUILDER.pop();
@@ -274,7 +274,7 @@ public final class TrueImpactConfig {
         ENABLE_SUBLEVEL_FRACTURE = BUILDER.comment("Experimental: very strong impacts can cut weak internal connections so Sable's native splitter creates new sublevels.")
                 .define("enableSubLevelFracture", true);
         SUBLEVEL_FRACTURE_FORCE_THRESHOLD = BUILDER.comment("Minimum collision force before internal sublevel fracture is considered. Raise this if vehicles split too easily.")
-                .defineInRange("subLevelFractureForceThreshold", 420.0, 0.0, 1000000000.0);
+                .defineInRange("subLevelFractureForceThreshold", 620.0, 0.0, 1000000000.0);
         SUBLEVEL_FRACTURE_FORCE_SCALE = BUILDER.comment("Scales raw collision force into fracture damage.")
                 .defineInRange("subLevelFractureForceScale", 0.052, 0.0, 1000.0);
         SUBLEVEL_FRACTURE_FORCE_EXPONENT = BUILDER.comment("Exponent applied to collision force above the fracture threshold. 1.0 keeps current linear behavior; higher values make high-speed/high-force crashes split structures much more aggressively.")
@@ -320,7 +320,7 @@ public final class TrueImpactConfig {
         SUBLEVEL_FRACTURE_CRACK_BONUS_SCALE = BUILDER.comment("How much existing cumulative crack damage increases fracture chance.")
                 .defineInRange("subLevelFractureCrackBonusScale", 3.0, 0.0, 1000.0);
         SUBLEVEL_FRACTURE_FATIGUE_SCALE = BUILDER.comment("How much near-miss fracture force is stored as cumulative block damage/cracks.")
-                .defineInRange("subLevelFractureFatigueScale", 0.35, 0.0, 1000.0);
+                .defineInRange("subLevelFractureFatigueScale", 0.22, 0.0, 1000.0);
         SUBLEVEL_FRACTURE_INTERLOCK_STRENGTH = BUILDER.comment("Strength multiplier from checkerboard/interlocked mixed-material neighbors.")
                 .defineInRange("subLevelFractureInterlockStrength", 1.8, 0.0, 1000.0);
         SUBLEVEL_FRACTURE_BEAM_STRENGTH = BUILDER.comment("Strength multiplier from beam/girder/frame/support blocks near a candidate fracture.")
@@ -364,11 +364,11 @@ public final class TrueImpactConfig {
         DEFAULT_MATERIAL_BRITTLENESS = BUILDER.comment("Default brittleness multiplier. Lower means impact over-stress accumulates damage more slowly.")
                 .defineInRange("defaultMaterialBrittleness", 1.0, 0.0, 1000000.0);
         NETHERITE_STRENGTH_MULTIPLIER = BUILDER.comment("Netherite block strength multiplier. High strength means larger force is needed before meaningful damage.")
-                .defineInRange("netheriteStrengthMultiplier", 8.0, 0.0, 1000000.0);
+                .defineInRange("netheriteStrengthMultiplier", 14.0, 0.0, 1000000.0);
         NETHERITE_TOUGHNESS_MULTIPLIER = BUILDER.comment("Netherite block toughness multiplier. High toughness means repeated over-stress is needed before breaking.")
-                .defineInRange("netheriteToughnessMultiplier", 18.0, 0.0, 1000000.0);
+                .defineInRange("netheriteToughnessMultiplier", 48.0, 0.0, 1000000.0);
         NETHERITE_BRITTLENESS = BUILDER.comment("Netherite brittleness multiplier. Lower means it absorbs impact without quickly turning that impact into cracks.")
-                .defineInRange("netheriteBrittleness", 0.06, 0.0, 1000000.0);
+                .defineInRange("netheriteBrittleness", 0.018, 0.0, 1000000.0);
         BUILDER.pop();
 
         BUILDER.push("client");
@@ -379,7 +379,7 @@ public final class TrueImpactConfig {
         BUILDER.push("cumulativeDamage");
         ENABLE_CUMULATIVE_BLOCK_DAMAGE = BUILDER.comment("Accumulates repeated crack-level hits until the block breaks.")
                 .define("enableCumulativeBlockDamage", true);
-        CUMULATIVE_BLOCK_DAMAGE_SCALE = BUILDER.defineInRange("cumulativeBlockDamageScale", 1.0, 0.0, 1000.0);
+        CUMULATIVE_BLOCK_DAMAGE_SCALE = BUILDER.defineInRange("cumulativeBlockDamageScale", 0.65, 0.0, 1000.0);
         CUMULATIVE_BLOCK_DAMAGE_DECAY_TICKS = BUILDER.comment("Ticks before stored block damage expires if the block is not hit again.")
                 .defineInRange("cumulativeBlockDamageDecayTicks", 600, 20, 72000);
         CUMULATIVE_BLOCK_DAMAGE_MAX_ENTRIES = BUILDER.comment("Safety cap for remembered damaged blocks.")
