@@ -32,6 +32,14 @@ public final class MaterialImpactProperties {
         return baseStrength * strengthMultiplier(state) * toughnessMultiplier(state);
     }
 
+    public static double displayStrength(BlockState state, double baseStrength) {
+        return baseStrength * strengthMultiplier(state);
+    }
+
+    public static double displayToughness(BlockState state, double baseStrength) {
+        return baseStrength * toughnessMultiplier(state);
+    }
+
     public static double fatigueDamage(BlockState state, double damage) {
         return damage * brittleness(state);
     }

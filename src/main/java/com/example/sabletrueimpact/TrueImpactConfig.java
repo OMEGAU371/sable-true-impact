@@ -121,6 +121,7 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.DoubleValue NETHERITE_STRENGTH_MULTIPLIER;
     public static final ModConfigSpec.DoubleValue NETHERITE_TOUGHNESS_MULTIPLIER;
     public static final ModConfigSpec.DoubleValue NETHERITE_BRITTLENESS;
+    public static final ModConfigSpec.BooleanValue ENABLE_GOGGLES_BLOCK_TOOLTIP;
     public static final ModConfigSpec.BooleanValue ENABLE_CUMULATIVE_BLOCK_DAMAGE;
     public static final ModConfigSpec.DoubleValue CUMULATIVE_BLOCK_DAMAGE_SCALE;
     public static final ModConfigSpec.IntValue CUMULATIVE_BLOCK_DAMAGE_DECAY_TICKS;
@@ -368,6 +369,11 @@ public final class TrueImpactConfig {
                 .defineInRange("netheriteToughnessMultiplier", 18.0, 0.0, 1000000.0);
         NETHERITE_BRITTLENESS = BUILDER.comment("Netherite brittleness multiplier. Lower means it absorbs impact without quickly turning that impact into cracks.")
                 .defineInRange("netheriteBrittleness", 0.06, 0.0, 1000000.0);
+        BUILDER.pop();
+
+        BUILDER.push("client");
+        ENABLE_GOGGLES_BLOCK_TOOLTIP = BUILDER.comment("Client-side helper: when wearing Create: Aeronautics aviator goggles, block item tooltips show Sable and True Impact material data.")
+                .define("enableGogglesBlockTooltip", true);
         BUILDER.pop();
 
         BUILDER.push("cumulativeDamage");

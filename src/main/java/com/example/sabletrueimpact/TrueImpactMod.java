@@ -1,9 +1,11 @@
 package com.example.sabletrueimpact;
 
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.api.distmarker.Dist;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
+import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.common.NeoForge;
 
 @Mod(TrueImpactMod.MODID)
@@ -16,5 +18,8 @@ public class TrueImpactMod {
         NeoForge.EVENT_BUS.register(EntityImpactHandler.class);
         NeoForge.EVENT_BUS.register(SubLevelFracture.class);
         NeoForge.EVENT_BUS.register(TrueImpactPerformance.class);
+        if (FMLEnvironment.dist == Dist.CLIENT) {
+            NeoForge.EVENT_BUS.register(GogglesBlockTooltipHandler.class);
+        }
     }
 }
