@@ -189,13 +189,15 @@ public final class ElasticPairReaction {
             if (state.getDestroySpeed(level, pos) < 1.0f) {
                 strength *= TrueImpactConfig.SOFT_BLOCK_STRENGTH_MULTIPLIER.get();
             }
-            strength = MaterialImpactProperties.breakThreshold(state, strength);
-            double yield = localEnergy / Math.max(strength, 1.0);
+            double materialStrength = Math.max(MaterialImpactProperties.displayStrength(state, strength), 1.0);
+            double materialToughness = Math.max(MaterialImpactProperties.displayToughness(state, strength), materialStrength);
+            double overStress = Math.max(0.0, localEnergy - materialStrength);
+            double yield = localEnergy / materialStrength;
             if (yield >= TrueImpactConfig.TERRAIN_IMPACT_BREAK_YIELD.get()) {
                 level.destroyBlock(pos, true);
                 broken++;
-                double remaining = (localEnergy - strength) * 0.55;
-                if (remaining > strength * 0.25) {
+                double remaining = overStress * 0.55;
+                if (remaining > materialStrength * 0.25) {
                     for (Direction dir : Direction.values()) {
                         BlockPos next = pos.relative(dir).immutable();
                         if (!visited.add(next)) {
@@ -211,8 +213,8 @@ public final class ElasticPairReaction {
                 boolean broke = BlockDamageAccumulator.apply(
                         level,
                         pos,
-                        MaterialImpactProperties.fatigueDamage(state, localEnergy),
-                        strength * TrueImpactConfig.TERRAIN_IMPACT_BREAK_YIELD.get(),
+                        MaterialImpactProperties.fatigueDamage(state, overStress),
+                        materialToughness * TrueImpactConfig.TERRAIN_IMPACT_BREAK_YIELD.get(),
                         pos.hashCode() * 17
                 );
                 if (broke) {

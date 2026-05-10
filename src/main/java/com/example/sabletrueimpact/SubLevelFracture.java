@@ -231,11 +231,19 @@ public final class SubLevelFracture {
             double baseResistance = (TrueImpactConfig.BASE_STRENGTH.get()
                     + hardness * TrueImpactConfig.HARDNESS_STRENGTH_FACTOR.get()
                     + blast * TrueImpactConfig.BLAST_STRENGTH_FACTOR.get());
-            double resistance = MaterialImpactProperties.breakThreshold(state, baseResistance)
-                    * structure.connectionStrength();
+            double connectionStrength = structure.connectionStrength();
+            double materialStrength = Math.max(MaterialImpactProperties.displayStrength(state, baseResistance) * connectionStrength, 1.0);
+            double materialToughness = Math.max(
+                    MaterialImpactProperties.displayToughness(state, baseResistance) * connectionStrength,
+                    materialStrength);
             double impactFocus = impactFocus(offset.distanceSquared());
-            double fatigueDamage = MaterialImpactProperties.fatigueDamage(state, fracturePower * structure.seamWeakness() * impactFocus);
-            double breakThreshold = Math.max(resistance, 1.0);
+            double rawStress = fracturePower * structure.seamWeakness() * impactFocus;
+            double overStress = rawStress - materialStrength;
+            if (overStress <= 0.0) {
+                continue;
+            }
+            double fatigueDamage = MaterialImpactProperties.fatigueDamage(state, overStress);
+            double breakThreshold = Math.max(materialToughness, 1.0);
             double crackRatio = snapshot.damageRatio(pos);
             double crackBonus = 1.0 + crackRatio * TrueImpactConfig.SUBLEVEL_FRACTURE_CRACK_BONUS_SCALE.get();
             double spreadBonus = 1.0 + structure.weakPlaneSpread() * TrueImpactConfig.SUBLEVEL_FRACTURE_WEAK_PLANE_SPREAD.get();
@@ -442,7 +450,12 @@ public final class SubLevelFracture {
                             double baseThreshold = TrueImpactConfig.BASE_STRENGTH.get()
                                     + hardness * TrueImpactConfig.HARDNESS_STRENGTH_FACTOR.get()
                                     + blast * TrueImpactConfig.BLAST_STRENGTH_FACTOR.get();
-                            double breakThreshold = Math.max(MaterialImpactProperties.breakThreshold(state, baseThreshold), 1.0);
+                            double breakThreshold = Math.max(
+                                    Math.max(
+                                            MaterialImpactProperties.displayStrength(state, baseThreshold),
+                                            MaterialImpactProperties.displayToughness(state, baseThreshold)
+                                    ),
+                                    1.0);
                             damageRatios.put(key, BlockDamageAccumulator.damageRatio(level, pos, breakThreshold));
                         }
                         if (StructuralStrengthAnalyzer.hasGlueEntity(level, pos)) {
