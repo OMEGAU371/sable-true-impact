@@ -227,7 +227,7 @@ public final class TrueImpactConfig {
                 .define("enableTerrainImpactDamage", true);
         TERRAIN_IMPACT_DAMAGE_SCALE = BUILDER.defineInRange("terrainImpactDamageScale", 0.00016, 0.0, 1000.0);
         TERRAIN_IMPACT_FORCE_THRESHOLD = BUILDER.comment("Terrain impacts below this force are treated as rolling/sliding contact and do not damage terrain.")
-                .defineInRange("terrainImpactForceThreshold", 900.0, 0.0, 1000000000.0);
+                .defineInRange("terrainImpactForceThreshold", 2200.0, 0.0, 1000000000.0);
         TERRAIN_IMPACT_FORCE_EXPONENT = BUILDER.comment("Exponent applied to terrain collision force above the threshold. 1.0 keeps current linear force scaling; higher values make violent impacts dig much harder.")
                 .defineInRange("terrainImpactForceExponent", 1.0, 0.0, 8.0);
         TERRAIN_IMPACT_MASS_EXPONENT = BUILDER.comment("Separate mass exponent for terrain damage. Lower than global massExponent so normal vehicles crack terrain before breaking it.")
@@ -238,7 +238,7 @@ public final class TrueImpactConfig {
                 .defineInRange("terrainStepContactForgiveness", 0.22, 0.0, 1.0);
         TERRAIN_STEP_SIDE_NORMAL_THRESHOLD = BUILDER.comment("Contacts with vertical normal component below this are considered side contacts for step forgiveness.")
                 .defineInRange("terrainStepSideNormalThreshold", 0.35, 0.0, 1.0);
-        TERRAIN_IMPACT_BREAK_YIELD = BUILDER.defineInRange("terrainImpactBreakYield", 5.0, 0.0, 1000.0);
+        TERRAIN_IMPACT_BREAK_YIELD = BUILDER.defineInRange("terrainImpactBreakYield", 8.5, 0.0, 1000.0);
         TERRAIN_IMPACT_MAX_BLOCKS = BUILDER.comment("Maximum terrain blocks broken by one terrain impact collision.")
                 .defineInRange("terrainImpactMaxBlocks", 4, 0, 10000);
         BUILDER.pop();
