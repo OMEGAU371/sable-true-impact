@@ -111,6 +111,16 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.IntValue EXPLOSION_IMPACT_MAX_SUBLEVELS;
     public static final ModConfigSpec.IntValue EXPLOSION_IMPACT_RAY_SAMPLES;
     public static final ModConfigSpec.DoubleValue EXPLOSION_IMPACT_RAY_STEP;
+    public static final ModConfigSpec.BooleanValue ENABLE_EXPLOSION_IMPULSE;
+    public static final ModConfigSpec.DoubleValue EXPLOSION_IMPULSE_SCALE;
+    public static final ModConfigSpec.DoubleValue EXPLOSION_MAX_IMPULSE;
+    public static final ModConfigSpec.BooleanValue ENABLE_MATERIAL_TOUGHNESS;
+    public static final ModConfigSpec.DoubleValue DEFAULT_MATERIAL_STRENGTH_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue DEFAULT_MATERIAL_TOUGHNESS_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue DEFAULT_MATERIAL_BRITTLENESS;
+    public static final ModConfigSpec.DoubleValue NETHERITE_STRENGTH_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue NETHERITE_TOUGHNESS_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue NETHERITE_BRITTLENESS;
     public static final ModConfigSpec.BooleanValue ENABLE_CUMULATIVE_BLOCK_DAMAGE;
     public static final ModConfigSpec.DoubleValue CUMULATIVE_BLOCK_DAMAGE_SCALE;
     public static final ModConfigSpec.IntValue CUMULATIVE_BLOCK_DAMAGE_DECAY_TICKS;
@@ -335,6 +345,29 @@ public final class TrueImpactConfig {
                 .defineInRange("explosionImpactRaySamples", 48, 6, 512);
         EXPLOSION_IMPACT_RAY_STEP = BUILDER.comment("Distance advanced per shockwave ray sample step. Lower is more precise but costs more CPU.")
                 .defineInRange("explosionImpactRayStep", 0.75, 0.1, 4.0);
+        ENABLE_EXPLOSION_IMPULSE = BUILDER.comment("If true, shockwave hits push Sable physical structures away from the explosion center.")
+                .define("enableExplosionImpulse", true);
+        EXPLOSION_IMPULSE_SCALE = BUILDER.comment("Converts shockwave pressure into outward impulse. Raise for more dramatic flying debris.")
+                .defineInRange("explosionImpulseScale", 0.018, 0.0, 1000.0);
+        EXPLOSION_MAX_IMPULSE = BUILDER.comment("Caps outward impulse from one explosion hit per Sable physical structure.")
+                .defineInRange("explosionMaxImpulse", 80.0, 0.0, 1000000.0);
+        BUILDER.pop();
+
+        BUILDER.push("materialToughness");
+        ENABLE_MATERIAL_TOUGHNESS = BUILDER.comment("If true, selected materials receive separate strength, toughness, and brittleness multipliers.")
+                .define("enableMaterialToughness", true);
+        DEFAULT_MATERIAL_STRENGTH_MULTIPLIER = BUILDER.comment("Default material strength multiplier for blocks without an override.")
+                .defineInRange("defaultMaterialStrengthMultiplier", 1.0, 0.0, 1000000.0);
+        DEFAULT_MATERIAL_TOUGHNESS_MULTIPLIER = BUILDER.comment("Default material toughness multiplier for blocks without an override.")
+                .defineInRange("defaultMaterialToughnessMultiplier", 1.0, 0.0, 1000000.0);
+        DEFAULT_MATERIAL_BRITTLENESS = BUILDER.comment("Default brittleness multiplier. Lower means impact over-stress accumulates damage more slowly.")
+                .defineInRange("defaultMaterialBrittleness", 1.0, 0.0, 1000000.0);
+        NETHERITE_STRENGTH_MULTIPLIER = BUILDER.comment("Netherite block strength multiplier. High strength means larger force is needed before meaningful damage.")
+                .defineInRange("netheriteStrengthMultiplier", 8.0, 0.0, 1000000.0);
+        NETHERITE_TOUGHNESS_MULTIPLIER = BUILDER.comment("Netherite block toughness multiplier. High toughness means repeated over-stress is needed before breaking.")
+                .defineInRange("netheriteToughnessMultiplier", 18.0, 0.0, 1000000.0);
+        NETHERITE_BRITTLENESS = BUILDER.comment("Netherite brittleness multiplier. Lower means it absorbs impact without quickly turning that impact into cracks.")
+                .defineInRange("netheriteBrittleness", 0.06, 0.0, 1000000.0);
         BUILDER.pop();
 
         BUILDER.push("cumulativeDamage");

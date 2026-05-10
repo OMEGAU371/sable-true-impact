@@ -10,6 +10,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.level.ExplosionEvent;
 import org.joml.Vector3d;
 
+import dev.ryanhcode.sable.physics.impl.rapier.Rapier3D;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -21,6 +22,9 @@ public final class ExplosionImpactHandler {
     private static final Method GET_CONTAINER = findMethod("dev.ryanhcode.sable.api.sublevel.SubLevelContainer", "getContainer", Level.class);
     private static final Method GET_ALL_SUBLEVELS = findMethod("dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer", "getAllSubLevels");
     private static final Method BOUNDING_BOX = findMethod("dev.ryanhcode.sable.sublevel.SubLevel", "boundingBox");
+    private static final Method GET_MASS_TRACKER = findMethod("dev.ryanhcode.sable.sublevel.ServerSubLevel", "getMassTracker");
+    private static final Method GET_CENTER_OF_MASS = findMethod("dev.ryanhcode.sable.api.physics.mass.MassData", "getCenterOfMass");
+    private static final java.lang.reflect.Field RUNTIME_ID_FIELD = findField("dev.ryanhcode.sable.sublevel.ServerSubLevel", "runtimeId");
 
     private ExplosionImpactHandler() {
     }
@@ -78,6 +82,7 @@ public final class ExplosionImpactHandler {
                     normal.set(0.0, 1.0, 0.0);
                 }
                 SubLevelFracture.tryFracture(subLevel, localPoint, normal, force);
+                applyExplosionImpulse(level, subLevel, normal, force);
                 processed++;
                 fractures++;
             }
@@ -187,6 +192,57 @@ public final class ExplosionImpactHandler {
         return ((Number) method.invoke(target)).doubleValue();
     }
 
+    private static void applyExplosionImpulse(ServerLevel level, Object subLevel, Vector3d normal, double force) {
+        if (!TrueImpactConfig.ENABLE_EXPLOSION_IMPULSE.get() || normal.lengthSquared() < 1.0E-8) {
+            return;
+        }
+        Integer runtimeId = runtimeId(subLevel);
+        Vector3d centerOfMass = centerOfMass(subLevel);
+        if (runtimeId == null || centerOfMass == null) {
+            return;
+        }
+        double impulse = Math.min(TrueImpactConfig.EXPLOSION_MAX_IMPULSE.get(), force * TrueImpactConfig.EXPLOSION_IMPULSE_SCALE.get());
+        if (impulse <= 0.0) {
+            return;
+        }
+        Vector3d outward = new Vector3d(normal).normalize().mul(impulse);
+        Rapier3D.applyForce(
+                Rapier3D.getID(level),
+                runtimeId,
+                0.0,
+                0.0,
+                0.0,
+                outward.x,
+                outward.y,
+                outward.z,
+                true
+        );
+    }
+
+    private static Vector3d centerOfMass(Object subLevel) {
+        try {
+            Object massTracker = GET_MASS_TRACKER.invoke(subLevel);
+            Object center = GET_CENTER_OF_MASS.invoke(massTracker);
+            if (center == null) {
+                return null;
+            }
+            Method x = center.getClass().getMethod("x");
+            Method y = center.getClass().getMethod("y");
+            Method z = center.getClass().getMethod("z");
+            return new Vector3d(((Number) x.invoke(center)).doubleValue(), ((Number) y.invoke(center)).doubleValue(), ((Number) z.invoke(center)).doubleValue());
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            return null;
+        }
+    }
+
+    private static Integer runtimeId(Object subLevel) {
+        try {
+            return ((Number) RUNTIME_ID_FIELD.get(subLevel)).intValue();
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            return null;
+        }
+    }
+
     private static Method findMethod(String className, String methodName, Class<?>... parameterTypes) {
         try {
             Method method = Class.forName(className).getMethod(methodName, parameterTypes);
@@ -194,6 +250,16 @@ public final class ExplosionImpactHandler {
             return method;
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException("Missing Sable method " + className + "#" + methodName, e);
+        }
+    }
+
+    private static java.lang.reflect.Field findField(String className, String fieldName) {
+        try {
+            java.lang.reflect.Field field = Class.forName(className).getDeclaredField(fieldName);
+            field.setAccessible(true);
+            return field;
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Missing Sable field " + className + "#" + fieldName, e);
         }
     }
 

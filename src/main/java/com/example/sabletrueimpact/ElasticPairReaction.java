@@ -189,6 +189,7 @@ public final class ElasticPairReaction {
             if (state.getDestroySpeed(level, pos) < 1.0f) {
                 strength *= TrueImpactConfig.SOFT_BLOCK_STRENGTH_MULTIPLIER.get();
             }
+            strength = MaterialImpactProperties.breakThreshold(state, strength);
             double yield = localEnergy / Math.max(strength, 1.0);
             if (yield >= TrueImpactConfig.TERRAIN_IMPACT_BREAK_YIELD.get()) {
                 level.destroyBlock(pos, true);
@@ -210,7 +211,7 @@ public final class ElasticPairReaction {
                 boolean broke = BlockDamageAccumulator.apply(
                         level,
                         pos,
-                        localEnergy,
+                        MaterialImpactProperties.fatigueDamage(state, localEnergy),
                         strength * TrueImpactConfig.TERRAIN_IMPACT_BREAK_YIELD.get(),
                         pos.hashCode() * 17
                 );
