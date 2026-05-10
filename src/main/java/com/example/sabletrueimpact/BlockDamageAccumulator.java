@@ -5,13 +5,13 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class BlockDamageAccumulator {
-    private static final Map<DamageKey, DamageRecord> DAMAGE = new HashMap<>();
-    private static long lastCleanupTick = 0L;
+    private static final Map<DamageKey, DamageRecord> DAMAGE = new ConcurrentHashMap<>();
+    private static volatile long lastCleanupTick = 0L;
 
     private BlockDamageAccumulator() {
     }

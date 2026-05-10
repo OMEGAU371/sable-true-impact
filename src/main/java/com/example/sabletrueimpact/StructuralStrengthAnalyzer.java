@@ -36,7 +36,7 @@ public final class StructuralStrengthAnalyzer {
 
     public static Result analyze(BlockLookup lookup, BlockPos pos, BlockState state, Vector3d impactNormal) {
         if (isAdhesiveBlock(state) || lookup.hasGlueEntity(pos)) {
-            return new Result(0.0, TrueImpactConfig.SUBLEVEL_FRACTURE_STICKY_RESISTANCE.get(), 0.0);
+            return new Result(1.0, TrueImpactConfig.SUBLEVEL_FRACTURE_STICKY_RESISTANCE.get(), 0.0);
         }
 
         double seamWeakness = 0.0;

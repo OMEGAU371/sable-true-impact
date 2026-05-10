@@ -85,9 +85,11 @@ public final class SubLevelFracture {
             submitAsync(level, snapshot, center, planeNormal, fracturePower, heatMapManager, startedAt);
             return;
         }
-        CandidateScan scan = candidates(snapshot, center, planeNormal, fracturePower);
-        int removed = applyCandidates(level, heatMapManager, scan.candidates());
-        TrueImpactPerformance.recordFracture(startedAt, scan.checkedBlocks(), scan.candidates().size(), removed);
+        level.getServer().execute(() -> {
+            CandidateScan scan = candidates(snapshot, center, planeNormal, fracturePower);
+            int removed = applyCandidates(level, heatMapManager, scan.candidates());
+            TrueImpactPerformance.recordFracture(startedAt, scan.checkedBlocks(), scan.candidates().size(), removed);
+        });
     }
 
     private static boolean claimFractureBudget(ServerLevel level, Object subLevel) {

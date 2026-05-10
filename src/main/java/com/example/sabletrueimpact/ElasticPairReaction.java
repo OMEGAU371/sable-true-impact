@@ -66,7 +66,6 @@ public final class ElasticPairReaction {
             if (subLevelA == null ^ subLevelB == null) {
                 applyTerrainImpact(subLevelA != null ? subLevelA : subLevelB,
                         subLevelA != null ? localPointA : localPointB,
-                        subLevelA != null ? localPointB : localPointA,
                         subLevelA != null ? normalA : normalB,
                         forceAmount);
                 continue;
@@ -98,16 +97,32 @@ public final class ElasticPairReaction {
 
             applyImpulse(sceneId, subLevelA, localPointA, normalA, impulse);
             applyImpulse(sceneId, subLevelB, localPointB, normalB, impulse);
+
+            Vector3d rotationPointA = rotationPoint(subLevelA);
+            if (rotationPointA != null) {
+                Vector3d globalPoint = new Vector3d(localPointA).add(rotationPointA);
+                tryImpactExplosion(level(subLevelA), globalPoint, forceAmount, Math.max(mass(subLevelA), mass(subLevelB)));
+            }
         }
     }
 
-    private static void applyTerrainImpact(Object subLevel, Vector3d localPoint, Vector3d terrainPoint, Vector3d normal, double forceAmount) {
+    private static void applyTerrainImpact(Object subLevel, Vector3d localPoint, Vector3d normal, double forceAmount) {
         if (!TrueImpactConfig.ENABLE_TERRAIN_IMPACT_DAMAGE.get()
                 || forceAmount < TrueImpactConfig.TERRAIN_IMPACT_FORCE_THRESHOLD.get()
-                || isForgivenStepContact(terrainPoint, normal)
                 || (TrueImpactConfig.ELASTIC_BLOCKS_BREAK_BLOCKS.get() == false && isElasticSubLevel(subLevel))) {
             return;
         }
+        
+        Vector3d rotationPoint = rotationPoint(subLevel);
+        if (rotationPoint == null) {
+            return;
+        }
+        Vector3d globalPoint = new Vector3d(localPoint).add(rotationPoint);
+
+        if (isForgivenStepContact(globalPoint, normal)) {
+            return;
+        }
+
         ServerLevel level = level(subLevel);
         if (level == null) {
             return;
@@ -118,10 +133,11 @@ public final class ElasticPairReaction {
         double force = scaledForce(forceAmount, TrueImpactConfig.TERRAIN_IMPACT_FORCE_THRESHOLD.get(), TrueImpactConfig.TERRAIN_IMPACT_FORCE_EXPONENT.get());
         double energy = force * mass * TrueImpactConfig.TERRAIN_IMPACT_DAMAGE_SCALE.get() * TrueImpactConfig.DAMAGE_SCALE.get();
         if (TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.get()) {
-            BlockPos center = BlockPos.containing(terrainPoint.x, terrainPoint.y, terrainPoint.z);
+            BlockPos center = BlockPos.containing(globalPoint.x, globalPoint.y, globalPoint.z);
             damageTerrain(level, center, normal, energy);
         }
-        damageEntities(level, new Vec3(terrainPoint.x, terrainPoint.y, terrainPoint.z), energy);
+        damageEntities(level, new Vec3(globalPoint.x, globalPoint.y, globalPoint.z), energy);
+        tryImpactExplosion(level, globalPoint, forceAmount, mass(subLevel));
     }
 
     private static boolean isForgivenStepContact(Vector3d terrainPoint, Vector3d normal) {
@@ -163,67 +179,97 @@ public final class ElasticPairReaction {
     }
 
     private static void damageTerrain(ServerLevel level, BlockPos center, Vector3d normal, double energy) {
-        PriorityQueue<TerrainNode> queue = new PriorityQueue<>(Comparator.comparingDouble(TerrainNode::cost));
-        Set<BlockPos> visited = new HashSet<>();
-        Vector3d direction = new Vector3d(normal);
-        if (direction.lengthSquared() < 1.0E-8) {
-            direction.set(0.0, -1.0, 0.0);
-        } else {
-            direction.normalize();
-        }
-        queue.add(new TerrainNode(center.immutable(), energy, 0.0));
-        visited.add(center.immutable());
-        int broken = 0;
+        level.getServer().execute(() -> {
+            PriorityQueue<TerrainNode> queue = new PriorityQueue<>(Comparator.comparingDouble(TerrainNode::cost));
+            Set<BlockPos> visited = new HashSet<>();
+            Vector3d direction = new Vector3d(normal);
+            if (direction.lengthSquared() < 1.0E-8) {
+                direction.set(0.0, -1.0, 0.0);
+            } else {
+                direction.normalize();
+            }
+            queue.add(new TerrainNode(center.immutable(), energy, 0.0));
+            visited.add(center.immutable());
+            int broken = 0;
 
-        while (!queue.isEmpty() && broken < TrueImpactConfig.TERRAIN_IMPACT_MAX_BLOCKS.get()) {
-            TerrainNode node = queue.poll();
-            BlockPos pos = node.pos();
-            double localEnergy = node.energy();
-            BlockState state = level.getBlockState(pos);
-            if (state.isAir() || state.getDestroySpeed(level, pos) < 0.0f || state.is(Blocks.BEDROCK)) {
-                continue;
-            }
-            double strength = (state.getDestroySpeed(level, pos) * TrueImpactConfig.HARDNESS_STRENGTH_FACTOR.get())
-                    + (state.getBlock().getExplosionResistance() * TrueImpactConfig.BLAST_STRENGTH_FACTOR.get())
-                    + TrueImpactConfig.BASE_STRENGTH.get();
-            if (state.getDestroySpeed(level, pos) < 1.0f) {
-                strength *= TrueImpactConfig.SOFT_BLOCK_STRENGTH_MULTIPLIER.get();
-            }
-            double materialStrength = Math.max(MaterialImpactProperties.displayStrength(state, strength), 1.0);
-            double materialToughness = Math.max(MaterialImpactProperties.displayToughness(state, strength), materialStrength);
-            double overStress = Math.max(0.0, localEnergy - materialStrength);
-            double yield = localEnergy / materialStrength;
-            if (yield >= TrueImpactConfig.TERRAIN_IMPACT_BREAK_YIELD.get()) {
-                level.destroyBlock(pos, true);
-                broken++;
-                double remaining = overStress * 0.55;
-                if (remaining > materialStrength * 0.25) {
-                    for (Direction dir : Direction.values()) {
-                        BlockPos next = pos.relative(dir).immutable();
-                        if (!visited.add(next)) {
-                            continue;
+            while (!queue.isEmpty() && broken < TrueImpactConfig.TERRAIN_IMPACT_MAX_BLOCKS.get()) {
+                TerrainNode node = queue.poll();
+                BlockPos pos = node.pos();
+                double localEnergy = node.energy();
+                BlockState state = level.getBlockState(pos);
+                if (state.isAir() || state.getDestroySpeed(level, pos) < 0.0f || state.is(Blocks.BEDROCK)) {
+                    continue;
+                }
+                double strength = (state.getDestroySpeed(level, pos) * TrueImpactConfig.HARDNESS_STRENGTH_FACTOR.get())
+                        + (state.getBlock().getExplosionResistance() * TrueImpactConfig.BLAST_STRENGTH_FACTOR.get())
+                        + TrueImpactConfig.BASE_STRENGTH.get();
+                if (state.getDestroySpeed(level, pos) < 1.0f) {
+                    strength *= TrueImpactConfig.SOFT_BLOCK_STRENGTH_MULTIPLIER.get();
+                }
+                double materialStrength = Math.max(MaterialImpactProperties.displayStrength(state, strength), 1.0);
+                double materialToughness = Math.max(MaterialImpactProperties.displayToughness(state, strength), materialStrength);
+                double overStress = Math.max(0.0, localEnergy - materialStrength);
+                double yield = localEnergy / materialStrength;
+                if (yield >= TrueImpactConfig.TERRAIN_IMPACT_BREAK_YIELD.get()) {
+                    level.destroyBlock(pos, true);
+                    broken++;
+                    double remaining = overStress * 0.55;
+                    if (remaining > materialStrength * 0.25) {
+                        for (Direction dir : Direction.values()) {
+                            BlockPos next = pos.relative(dir).immutable();
+                            if (!visited.add(next)) {
+                                continue;
+                            }
+                            Vector3d step = new Vector3d(dir.getStepX(), dir.getStepY(), dir.getStepZ());
+                            double directionalBias = 1.0 + Math.max(0.0, step.dot(direction)) * 0.75;
+                            double cost = node.cost() + 1.0 / directionalBias;
+                            queue.add(new TerrainNode(next, remaining * directionalBias, cost));
                         }
-                        Vector3d step = new Vector3d(dir.getStepX(), dir.getStepY(), dir.getStepZ());
-                        double directionalBias = 1.0 + Math.max(0.0, step.dot(direction)) * 0.75;
-                        double cost = node.cost() + 1.0 / directionalBias;
-                        queue.add(new TerrainNode(next, remaining * directionalBias, cost));
+                    }
+                } else if (TrueImpactConfig.ENABLE_CRACKS.get() && yield > TrueImpactConfig.CRACK_YIELD_THRESHOLD.get()) {
+                    boolean broke = BlockDamageAccumulator.apply(
+                            level,
+                            pos,
+                            MaterialImpactProperties.fatigueDamage(state, overStress),
+                            materialToughness * TrueImpactConfig.TERRAIN_IMPACT_BREAK_YIELD.get(),
+                            pos.hashCode() * 17
+                    );
+                    if (broke) {
+                        broken++;
+                    } else {
+                        level.destroyBlockProgress(pos.hashCode() * 17, pos, (int) Math.min(5, yield * 3.0));
                     }
                 }
-            } else if (TrueImpactConfig.ENABLE_CRACKS.get() && yield > TrueImpactConfig.CRACK_YIELD_THRESHOLD.get()) {
-                boolean broke = BlockDamageAccumulator.apply(
-                        level,
-                        pos,
-                        MaterialImpactProperties.fatigueDamage(state, overStress),
-                        materialToughness * TrueImpactConfig.TERRAIN_IMPACT_BREAK_YIELD.get(),
-                        pos.hashCode() * 17
-                );
-                if (broke) {
-                    broken++;
-                } else {
-                    level.destroyBlockProgress(pos.hashCode() * 17, pos, (int) Math.min(5, yield * 3.0));
-                }
             }
+        });
+    }
+
+    private static void tryImpactExplosion(ServerLevel level, Vector3d point, double force, double mass) {
+        if (!TrueImpactConfig.ENABLE_IMPACT_EXPLOSIONS.get()
+                || force < TrueImpactConfig.IMPACT_EXPLOSION_FORCE_THRESHOLD.get()
+                || mass < TrueImpactConfig.IMPACT_EXPLOSION_MASS_THRESHOLD.get()) {
+            return;
         }
+
+        double rawRadius = Math.sqrt(force * mass) * TrueImpactConfig.IMPACT_EXPLOSION_SCALE.get();
+        float radius = (float) Math.min(TrueImpactConfig.IMPACT_EXPLOSION_MAX_RADIUS.get(), rawRadius);
+
+        if (radius < 1.0f) {
+            return;
+        }
+
+        boolean fire = level.getRandom().nextDouble() < TrueImpactConfig.IMPACT_EXPLOSION_FIRE_CHANCE.get();
+        level.getServer().execute(() -> {
+            level.explode(
+                    null,
+                    null,
+                    null,
+                    point.x, point.y, point.z,
+                    radius,
+                    fire,
+                    Level.ExplosionInteraction.BLOCK
+            );
+        });
     }
 
     private record TerrainNode(BlockPos pos, double energy, double cost) {
