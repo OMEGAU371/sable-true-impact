@@ -48,11 +48,11 @@ public final class GogglesBlockTooltipHandler {
         double brittleness = MaterialImpactProperties.brittleness(state);
 
         event.getToolTip().add(Component.literal("Sable True Impact").withStyle(ChatFormatting.DARK_AQUA));
-        event.getToolTip().add(line("Mass", "%.2f kg / %.0f g", mass, mass * 1000.0));
+        event.getToolTip().add(line("Mass", "%.2f kpg", mass));
         event.getToolTip().add(line("Friction", "%.2f", friction));
         event.getToolTip().add(line("Restitution", "%.2f", restitution));
-        event.getToolTip().add(line("Strength", "%.1f N", strength));
-        event.getToolTip().add(line("Toughness", "%.1f N*s", toughness));
+        event.getToolTip().add(line("Strength", "%.1f pN", strength));
+        event.getToolTip().add(line("Toughness", "%.1f pN*s", toughness));
         event.getToolTip().add(line("Brittleness", "%.2f", brittleness));
     }
 
