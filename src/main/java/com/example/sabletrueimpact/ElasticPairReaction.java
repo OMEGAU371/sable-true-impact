@@ -28,6 +28,8 @@ public final class ElasticPairReaction {
     private static final Method GET_MASS_TRACKER_METHOD = findMethod("dev.ryanhcode.sable.sublevel.ServerSubLevel", "getMassTracker");
     private static final Method GET_MASS_METHOD = findMethod("dev.ryanhcode.sable.api.physics.mass.MassData", "getMass");
     private static final Method GET_CENTER_OF_MASS_METHOD = findMethod("dev.ryanhcode.sable.api.physics.mass.MassData", "getCenterOfMass");
+    private static final Method LOGICAL_POSE_METHOD = findMethod("dev.ryanhcode.sable.sublevel.SubLevel", "logicalPose");
+    private static final Method ROTATION_POINT_METHOD = findMethod("dev.ryanhcode.sable.companion.math.Pose3d", "rotationPoint");
 
     private ElasticPairReaction() {
     }
@@ -256,13 +258,17 @@ public final class ElasticPairReaction {
     }
 
     private static BlockState localState(Object subLevel, Vector3d localPoint, BlockPos.MutableBlockPos blockPos) {
-        blockPos.set(
-                localPoint.x,
-                localPoint.y,
-                localPoint.z
-        );
         ServerLevel level = level(subLevel);
-        return level == null ? net.minecraft.world.level.block.Blocks.STONE.defaultBlockState() : level.getBlockState(blockPos);
+        Vector3d rotationPoint = rotationPoint(subLevel);
+        if (level == null || rotationPoint == null) {
+            return net.minecraft.world.level.block.Blocks.STONE.defaultBlockState();
+        }
+        blockPos.set(
+                localPoint.x + rotationPoint.x,
+                localPoint.y + rotationPoint.y,
+                localPoint.z + rotationPoint.z
+        );
+        return level.getBlockState(blockPos);
     }
 
     private static void applyImpulse(int sceneId, Object subLevel, Vector3d localPoint, Vector3d normal, double impulse) {
@@ -321,6 +327,19 @@ public final class ElasticPairReaction {
             Method y = center.getClass().getMethod("y");
             Method z = center.getClass().getMethod("z");
             return new Vector3d(((Number) x.invoke(center)).doubleValue(), ((Number) y.invoke(center)).doubleValue(), ((Number) z.invoke(center)).doubleValue());
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            return null;
+        }
+    }
+
+    private static Vector3d rotationPoint(Object subLevel) {
+        try {
+            Object pose = LOGICAL_POSE_METHOD.invoke(subLevel);
+            Object rotationPoint = ROTATION_POINT_METHOD.invoke(pose);
+            Method x = rotationPoint.getClass().getMethod("x");
+            Method y = rotationPoint.getClass().getMethod("y");
+            Method z = rotationPoint.getClass().getMethod("z");
+            return new Vector3d(((Number) x.invoke(rotationPoint)).doubleValue(), ((Number) y.invoke(rotationPoint)).doubleValue(), ((Number) z.invoke(rotationPoint)).doubleValue());
         } catch (ReflectiveOperationException | RuntimeException e) {
             return null;
         }
