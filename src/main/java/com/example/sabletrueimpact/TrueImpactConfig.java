@@ -6,6 +6,10 @@ public final class TrueImpactConfig {
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
 
     public static final ModConfigSpec.BooleanValue ENABLE_TRUE_IMPACT;
+    public static final ModConfigSpec.DoubleValue GLOBAL_STRENGTH_SCALE;
+    public static final ModConfigSpec.BooleanValue ENABLE_SOIL_COMPACTION;
+    public static final ModConfigSpec.DoubleValue SOIL_COMPACTION_MIN_VELOCITY;
+    public static final ModConfigSpec.DoubleValue SOIL_COMPACTION_MAX_VELOCITY;
     public static final ModConfigSpec.DoubleValue MIN_EFFECT_VELOCITY;
     public static final ModConfigSpec.DoubleValue MIN_BREAK_VELOCITY;
     public static final ModConfigSpec.DoubleValue MIN_PROPAGATION_VELOCITY;
@@ -140,6 +144,14 @@ public final class TrueImpactConfig {
     static {
         ENABLE_TRUE_IMPACT = BUILDER.comment("Master switch for all Sable True Impact behavior. If false, the mod keeps loading but adds no impact damage, cracks, fracture, entity damage, or reaction effects.")
                 .define("enableTrueImpact", true);
+        GLOBAL_STRENGTH_SCALE = BUILDER.comment("One-knob global strength multiplier. Set to 0.5 for a gentler experience, 2.0 for more destructive impacts. Multiplies all impact damage and fracture power uniformly.")
+                .defineInRange("globalStrengthScale", 1.0, 0.0, 1000.0);
+        ENABLE_SOIL_COMPACTION = BUILDER.comment("If true, light impacts on grass/podzol/mycelium compress the soil into dirt instead of breaking or ignoring the block. Heavy impacts still break the block normally.")
+                .define("enableSoilCompaction", true);
+        SOIL_COMPACTION_MIN_VELOCITY = BUILDER.comment("Minimum impact velocity to trigger soil compaction (grass → dirt). Below this, impacts are too gentle to do anything.")
+                .defineInRange("soilCompactionMinVelocity", 3.0, 0.0, 1000.0);
+        SOIL_COMPACTION_MAX_VELOCITY = BUILDER.comment("Impact velocity above which soil compaction is skipped and the block is treated like any other (broken normally). Below this threshold, grass is pressed into dirt instead.")
+                .defineInRange("soilCompactionMaxVelocity", 14.0, 0.0, 1000.0);
 
         BUILDER.push("impact");
         MIN_EFFECT_VELOCITY = BUILDER.comment("Impacts below this speed do nothing. Raise this if tiny falls still leave marks.")
@@ -149,7 +161,7 @@ public final class TrueImpactConfig {
         MIN_PROPAGATION_VELOCITY = BUILDER.comment("Impacts below this speed cannot spread cracks to nearby blocks.")
                 .defineInRange("minPropagationVelocity", 18.0, 0.0, 1000.0);
         DAMAGE_SCALE = BUILDER.comment("Global damage multiplier. Lower is more realistic/conservative, higher is more cinematic.")
-                .defineInRange("damageScale", 0.055, 0.0, 1000.0);
+                .defineInRange("damageScale", 0.042, 0.0, 1000.0);
         IMPACT_VELOCITY_EXPONENT = BUILDER.comment("Velocity exponent for normal block-vs-sublevel impact energy. 2.0 is classic kinetic-energy scaling; higher values make high-speed impacts much more destructive.")
                 .defineInRange("impactVelocityExponent", 2.0, 0.0, 8.0);
         RESTITUTION_DAMAGE_REDUCTION = BUILDER.comment("How strongly Sable restitution reduces impact damage. 1.0 means restitution 0.5 roughly halves damage.")

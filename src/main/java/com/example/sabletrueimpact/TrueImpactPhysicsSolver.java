@@ -7,16 +7,26 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import org.joml.Vector3d;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import dev.ryanhcode.sable.sublevel.system.SubLevelPhysicsSystem;
+import java.util.Set;
 
 public class TrueImpactPhysicsSolver {
     public static final BlockSubLevelCollisionCallback HARDNESS_CALLBACK = new HardnessFragileCallback();
     private static final TagKey<net.minecraft.world.level.block.Block> SABLE_FRAGILE = TagKey.create(
             Registries.BLOCK, ResourceLocation.fromNamespaceAndPath("sable", "fragile"));
+
+    /** Blocks that can be compacted into dirt by a light impact instead of being broken. */
+    private static final Set<Block> COMPACTABLE_SOIL = Set.of(
+            Blocks.GRASS_BLOCK,
+            Blocks.PODZOL,
+            Blocks.MYCELIUM
+    );
 
     private static class HardnessFragileCallback implements BlockSubLevelCollisionCallback {
         @Override
@@ -39,6 +49,16 @@ public class TrueImpactPhysicsSolver {
             if (hardness < 0.0f) { // Unbreakable
                 return BlockSubLevelCollisionCallback.CollisionResult.NONE;
             }
+
+            // ── Soil compaction: light impact presses grass/podzol/mycelium into dirt ──
+            if (TrueImpactConfig.ENABLE_SOIL_COMPACTION.get()
+                    && COMPACTABLE_SOIL.contains(state.getBlock())
+                    && impactVelocity >= TrueImpactConfig.SOIL_COMPACTION_MIN_VELOCITY.get()
+                    && impactVelocity < TrueImpactConfig.SOIL_COMPACTION_MAX_VELOCITY.get()) {
+                level.setBlock(pos, Blocks.DIRT.defaultBlockState(), 3);
+                return new BlockSubLevelCollisionCallback.CollisionResult(new org.joml.Vector3d(), false);
+            }
+            // ─────────────────────────────────────────────────────────────────────────
 
             float blastResistance = state.getBlock().getExplosionResistance();
             
@@ -120,7 +140,9 @@ public class TrueImpactPhysicsSolver {
             double fragileFactor = fragile ? TrueImpactConfig.FRAGILE_DAMAGE_MULTIPLIER.get() : 1.0;
             double velocityEnergy = Math.pow(Math.max(impactVelocity, 0.0), TrueImpactConfig.IMPACT_VELOCITY_EXPONENT.get());
             double kineticEnergy = 0.5 * effectiveMass * velocityEnergy * angleMultiplier
-                    * reboundFactor * frictionFactor * fragileFactor * TrueImpactConfig.DAMAGE_SCALE.get();
+                    * reboundFactor * frictionFactor * fragileFactor
+                    * TrueImpactConfig.DAMAGE_SCALE.get()
+                    * TrueImpactConfig.GLOBAL_STRENGTH_SCALE.get();
             
             double materialStrength = Math.max(MaterialImpactProperties.displayStrength(state, structuralIntegrity), 1.0);
             double materialToughness = Math.max(MaterialImpactProperties.displayToughness(state, structuralIntegrity), materialStrength);

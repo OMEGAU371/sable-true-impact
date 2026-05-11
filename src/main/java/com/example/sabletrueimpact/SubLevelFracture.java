@@ -67,7 +67,8 @@ public final class SubLevelFracture {
         );
         double fracturePower = (scaledForce - TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_THRESHOLD.get())
                 * TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_SCALE.get()
-                * structureMultiplier(subLevel, localPoint);
+                * structureMultiplier(subLevel, localPoint)
+                * TrueImpactConfig.GLOBAL_STRENGTH_SCALE.get();
         if (fracturePower <= 0.0) {
             return;
         }
