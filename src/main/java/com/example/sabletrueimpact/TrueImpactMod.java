@@ -11,6 +11,7 @@ import net.neoforged.neoforge.common.NeoForge;
 @Mod(TrueImpactMod.MODID)
 public class TrueImpactMod {
     public static final String MODID = "sabletrueimpact";
+    public static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger(MODID);
 
     public TrueImpactMod(IEventBus modEventBus, ModContainer modContainer) {
         modContainer.registerConfig(ModConfig.Type.SERVER, TrueImpactConfig.SPEC);
