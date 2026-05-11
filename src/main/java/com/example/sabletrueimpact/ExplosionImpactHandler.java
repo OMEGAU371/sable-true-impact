@@ -25,8 +25,16 @@ public final class ExplosionImpactHandler {
     private static final Method GET_MASS_TRACKER = findMethod("dev.ryanhcode.sable.sublevel.ServerSubLevel", "getMassTracker");
     private static final Method GET_CENTER_OF_MASS = findMethod("dev.ryanhcode.sable.api.physics.mass.MassData", "getCenterOfMass");
     private static final java.lang.reflect.Field RUNTIME_ID_FIELD = findField("dev.ryanhcode.sable.sublevel.ServerSubLevel", "runtimeId");
-    private static final Method IS_SLEEPING = findMethod("dev.ryanhcode.sable.sublevel.ServerSubLevel", "isSleeping");
-    private static final Method WAKE_UP = findMethod("dev.ryanhcode.sable.sublevel.ServerSubLevel", "wakeUp");
+    private static final Method IS_SLEEPING;
+    private static final Method WAKE_UP;
+
+    static {
+        Method sleeping = null, wakeup = null;
+        try { sleeping = Class.forName("dev.ryanhcode.sable.sublevel.ServerSubLevel").getMethod("isSleeping"); sleeping.setAccessible(true); } catch (Exception ignored) {}
+        try { wakeup  = Class.forName("dev.ryanhcode.sable.sublevel.ServerSubLevel").getMethod("wakeUp");    wakeup.setAccessible(true);   } catch (Exception ignored) {}
+        IS_SLEEPING = sleeping;
+        WAKE_UP = wakeup;
+    }
 
     private ExplosionImpactHandler() {
     }
@@ -155,6 +163,10 @@ public final class ExplosionImpactHandler {
         Iterable<?> all = (Iterable<?>) GET_ALL_SUBLEVELS.invoke(container);
         for (Object sl : all) {
             AABB bounds = (AABB) BOUNDING_BOX.invoke(sl);
+            if (bounds == null) continue;
+            // Guard: skip SubLevels with degenerate/enormous bounds (Sable flags these for removal anyway)
+            double bSize = Math.max(bounds.getXsize(), Math.max(bounds.getYsize(), bounds.getZsize()));
+            if (bSize > 512.0) continue;
             if (bounds.intersects(searchArea)) {
                 nearby.add(new SubLevelEntry(sl, bounds));
             }
@@ -222,11 +234,11 @@ public final class ExplosionImpactHandler {
     }
 
     private static Method findMethod(String cl, String m, Class<?>... params) {
-        try { Method method = Class.forName(cl).getMethod(m, params); method.setAccessible(true); return method; } catch (Exception e) { throw new RuntimeException(e); }
+        try { Method method = Class.forName(cl).getMethod(m, params); method.setAccessible(true); return method; } catch (Exception e) { return null; }
     }
 
     private static java.lang.reflect.Field findField(String cl, String f) {
-        try { java.lang.reflect.Field field = Class.forName(cl).getDeclaredField(f); field.setAccessible(true); return field; } catch (Exception e) { throw new RuntimeException(e); }
+        try { java.lang.reflect.Field field = Class.forName(cl).getDeclaredField(f); field.setAccessible(true); return field; } catch (Exception e) { return null; }
     }
 
     private record WaveHit(Vec3 point, Vector3d direction, double pressure) {}
