@@ -1,8 +1,36 @@
 package com.example.sabletrueimpact;
 
 import net.neoforged.neoforge.common.ModConfigSpec;
+import java.util.Arrays;
+import java.util.List;
 
 public final class TrueImpactConfig {
+    public enum QualityMode {
+        POTATO(32, 2, 4, 1500.0, false, 5),
+        ULTRA_LOW(64, 4, 8, 1200.0, false, 10),
+        LOW(128, 8, 16, 1000.0, true, 20),
+        DEFAULT(256, 16, 32, 800.0, true, 40),
+        HIGH(512, 24, 64, 600.0, true, 80),
+        ULTRA_HIGH(1024, 32, 128, 400.0, true, 150),
+        DESTRUCTION(2048, 64, 256, 100.0, true, 300);
+
+        public final int raySamples;
+        public final int maxSubLevels;
+        public final int maxTerrainBlocks;
+        public final double forceThresholdScale;
+        public final boolean enableCracks;
+        public final int scanLimit;
+
+        QualityMode(int rays, int maxSl, int maxBlocks, double thresholdScale, boolean cracks, int scan) {
+            this.raySamples = rays;
+            this.maxSubLevels = maxSl;
+            this.maxTerrainBlocks = maxBlocks;
+            this.forceThresholdScale = thresholdScale;
+            this.enableCracks = cracks;
+            this.scanLimit = scan;
+        }
+    }
+
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
 
     public static final ModConfigSpec.BooleanValue ENABLE_TRUE_IMPACT;
@@ -140,6 +168,7 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.IntValue CUMULATIVE_BLOCK_DAMAGE_DECAY_TICKS;
     public static final ModConfigSpec.IntValue CUMULATIVE_BLOCK_DAMAGE_MAX_ENTRIES;
     public static final ModConfigSpec.BooleanValue ENABLE_PERFORMANCE_LOGGING;
+    public static final ModConfigSpec.EnumValue<QualityMode> PERFORMANCE_QUALITY_MODE;
     public static final ModConfigSpec.IntValue PERFORMANCE_LOG_INTERVAL_TICKS;
     
     // Distant Horizons Proxy Configs
@@ -331,6 +360,8 @@ public final class TrueImpactConfig {
 
         BUILDER.push("performance");
         ENABLE_PERFORMANCE_LOGGING = BUILDER.define("enablePerformanceLogging", false);
+        PERFORMANCE_QUALITY_MODE = BUILDER.comment("Overall quality and performance impact profile. Potato is safest for servers and low-end PCs.")
+                .defineEnum("qualityMode", QualityMode.DEFAULT);
         PERFORMANCE_LOG_INTERVAL_TICKS = BUILDER.defineInRange("performanceLogIntervalTicks", 200, 20, 72000);
         BUILDER.pop();
         

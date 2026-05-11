@@ -53,16 +53,17 @@ public final class ExplosionImpactHandler {
             Object container = GET_CONTAINER.invoke(null, level);
             if (container == null) return;
             
+            TrueImpactConfig.QualityMode qm = TrueImpactConfig.PERFORMANCE_QUALITY_MODE.get();
             double searchRadius = radius * TrueImpactConfig.EXPLOSION_IMPACT_RADIUS_MULTIPLIER.get();
             List<SubLevelEntry> nearby = nearbySubLevels(container, center, searchRadius);
             if (nearby.isEmpty()) return;
 
-            WaveScan scan = scanShockwave(level, center, radius, searchRadius, nearby);
+            WaveScan scan = scanShockwave(level, center, radius, searchRadius, nearby, qm.raySamples);
             rays = scan.rays();
             hitsCount = scan.hits().size();
             
             double confinement = 1.0 + (scan.blockedRatio() * scan.blockedRatio()) * TrueImpactConfig.EXPLOSION_IMPACT_CONFINEMENT_SCALE.get();
-            int maxSubLevels = TrueImpactConfig.EXPLOSION_IMPACT_MAX_SUBLEVELS.get();
+            int maxSubLevels = qm.maxSubLevels;
             int processed = 0;
 
             for (SubLevelEntry entry : nearby) {
@@ -92,10 +93,9 @@ public final class ExplosionImpactHandler {
         }
     }
 
-    private static WaveScan scanShockwave(ServerLevel level, Vec3 center, double radius, double searchRadius, List<SubLevelEntry> subLevels) {
+    private static WaveScan scanShockwave(ServerLevel level, Vec3 center, double radius, double searchRadius, List<SubLevelEntry> subLevels, int samples) {
         Map<Object, WaveHit> hits = new IdentityHashMap<>();
         int blocked = 0;
-        int samples = TrueImpactConfig.EXPLOSION_IMPACT_RAY_SAMPLES.get();
         double stepSize = TrueImpactConfig.EXPLOSION_IMPACT_RAY_STEP.get();
         int steps = Math.max(1, (int) Math.ceil(searchRadius / stepSize));
 

@@ -245,7 +245,9 @@ public final class ElasticPairReaction {
             visited.add(center.immutable());
             int broken = 0;
 
-            while (!queue.isEmpty() && broken < TrueImpactConfig.TERRAIN_IMPACT_MAX_BLOCKS.get()) {
+            TrueImpactConfig.QualityMode qm = TrueImpactConfig.PERFORMANCE_QUALITY_MODE.get();
+            int maxBlocks = qm.maxTerrainBlocks;
+            while (!queue.isEmpty() && broken < maxBlocks) {
                 TerrainNode node = queue.poll();
                 BlockPos pos = node.pos();
                 BlockState state = level.getBlockState(pos);
