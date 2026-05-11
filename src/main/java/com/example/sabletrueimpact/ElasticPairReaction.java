@@ -337,12 +337,8 @@ public final class ElasticPairReaction {
         if (slA instanceof net.minecraft.world.entity.Entity eA && eA.isRemoved()) return;
         if (slB instanceof net.minecraft.world.entity.Entity eB && eB.isRemoved()) return;
         
-        if (WAKE_UP_METHOD != null) {
-            try {
-                WAKE_UP_METHOD.invoke(slA);
-                WAKE_UP_METHOD.invoke(slB);
-            } catch (Exception ignored) {}
-        }
+        // No more manual wake-up via reflection as it's unreliable across versions.
+        // Rapier3D.applyForce(..., true) handles wake-up internally.
 
         applySingleImpulse(sceneId, slA, localPoint, normal, impulseA);
         applySingleImpulse(sceneId, slB, localPoint, normal, impulseB);
@@ -386,8 +382,20 @@ public final class ElasticPairReaction {
     }
 
     private static Integer runtimeId(Object subLevel) {
+        if (subLevel == null) return null;
         if (subLevel instanceof net.minecraft.world.entity.Entity e && e.isRemoved()) return null;
-        try { return ((Number) RUNTIME_ID_FIELD.get(subLevel)).intValue(); } catch (Exception e) { return null; }
+        
+        // Deep Liveness Check: If the sub-level has extreme coordinates, it's likely being removed by Sable
+        try {
+            Vector3d rp = rotationPoint(subLevel);
+            if (rp == null || !Double.isFinite(rp.x) || !Double.isFinite(rp.y) || !Double.isFinite(rp.z)) return null;
+            if (Math.abs(rp.y) > 20000) return null; // Sanity cap for Y coordinate
+        } catch (Exception ignored) {}
+
+        try { 
+            int rid = ((Number) RUNTIME_ID_FIELD.get(subLevel)).intValue(); 
+            return rid > 0 ? rid : null; 
+        } catch (Exception e) { return null; }
     }
 
     private static double number(Object target, String methodName) throws Exception {
