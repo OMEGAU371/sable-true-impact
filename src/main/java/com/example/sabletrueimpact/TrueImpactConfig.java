@@ -374,7 +374,7 @@ public final class TrueImpactConfig {
 
         BUILDER.push("impactExplosion");
         ENABLE_IMPACT_EXPLOSIONS = BUILDER.comment("If true, massive high-energy crashes can trigger standard Minecraft explosions at the impact point.")
-                .define("enableImpactExplosions", true);
+                .define("enableImpactExplosions", false);
         IMPACT_EXPLOSION_FORCE_THRESHOLD = BUILDER.comment("Minimum collision force (before mass scaling) to trigger an impact explosion.")
                 .defineInRange("impactExplosionForceThreshold", 2500.0, 0.0, 1000000000.0);
         IMPACT_EXPLOSION_MASS_THRESHOLD = BUILDER.comment("Minimum Sable structure mass required to trigger an impact explosion.")
@@ -383,8 +383,8 @@ public final class TrueImpactConfig {
                 .defineInRange("impactExplosionScale", 0.000018, 0.0, 100.0);
         IMPACT_EXPLOSION_MAX_RADIUS = BUILDER.comment("Caps the radius of impact-triggered explosions.")
                 .defineInRange("impactExplosionMaxRadius", 12.0, 0.0, 64.0);
-        IMPACT_EXPLOSION_FIRE_CHANCE = BUILDER.comment("Chance (0.0 to 1.0) that an impact explosion creates fire.")
-                .defineInRange("impactExplosionFireChance", 0.35, 0.0, 1.0);
+        IMPACT_EXPLOSION_FIRE_CHANCE = BUILDER.comment("Chance (0.0 to 1.0) that an impact explosion creates fire. 0.0 disables fire entirely.")
+                .defineInRange("impactExplosionFireChance", 0.0, 0.0, 1.0);
         BUILDER.pop();
 
         BUILDER.push("materialToughness");
