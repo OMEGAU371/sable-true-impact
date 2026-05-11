@@ -18,8 +18,14 @@ import java.util.Set;
 
 public class TrueImpactPhysicsSolver {
     public static final BlockSubLevelCollisionCallback HARDNESS_CALLBACK = new HardnessFragileCallback();
-    private static final TagKey<net.minecraft.world.level.block.Block> SABLE_FRAGILE = TagKey.create(
-            Registries.BLOCK, ResourceLocation.fromNamespaceAndPath("sable", "fragile"));
+    private static TagKey<net.minecraft.world.level.block.Block> fragileTag;
+
+    private static TagKey<net.minecraft.world.level.block.Block> getFragileTag() {
+        if (fragileTag == null) {
+            fragileTag = TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath("sable", "fragile"));
+        }
+        return fragileTag;
+    }
 
     /** Blocks that can be compacted into dirt by a light impact instead of being broken. */
     private static final Set<Block> COMPACTABLE_SOIL = Set.of(
@@ -129,7 +135,7 @@ public class TrueImpactPhysicsSolver {
 
             double restitution = clamp01(PhysicsBlockPropertyHelper.getRestitution(state));
             double friction = Math.max(0.0, PhysicsBlockPropertyHelper.getFriction(state));
-            boolean fragile = state.is(SABLE_FRAGILE);
+            boolean fragile = state.is(getFragileTag());
 
             // Distributed kinetic energy. Sable's restitution/friction are treated as material response:
             // bouncy or low-friction blocks shed more energy into rebound/sliding instead of fracture.

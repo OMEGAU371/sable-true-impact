@@ -17,7 +17,14 @@ import net.neoforged.neoforge.event.entity.player.ItemTooltipEvent;
 import java.util.Locale;
 
 public final class GogglesBlockTooltipHandler {
-    private static final ResourceLocation AERONAUTICS_GOGGLES = ResourceLocation.fromNamespaceAndPath("aeronautics", "aviators_goggles");
+    private static ResourceLocation goggleId;
+
+    private static ResourceLocation getGoggleId() {
+        if (goggleId == null) {
+            goggleId = ResourceLocation.fromNamespaceAndPath("aeronautics", "aviators_goggles");
+        }
+        return goggleId;
+    }
 
     private GogglesBlockTooltipHandler() {
     }
@@ -72,7 +79,7 @@ public final class GogglesBlockTooltipHandler {
         if (stack.isEmpty()) {
             return false;
         }
-        return AERONAUTICS_GOGGLES.equals(BuiltInRegistries.ITEM.getKey(stack.getItem()));
+        return getGoggleId().equals(BuiltInRegistries.ITEM.getKey(stack.getItem()));
     }
 
     private static double safeMass(Player player, BlockState state) {
