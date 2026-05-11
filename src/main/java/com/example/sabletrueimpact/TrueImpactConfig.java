@@ -141,72 +141,59 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.IntValue CUMULATIVE_BLOCK_DAMAGE_MAX_ENTRIES;
     public static final ModConfigSpec.BooleanValue ENABLE_PERFORMANCE_LOGGING;
     public static final ModConfigSpec.IntValue PERFORMANCE_LOG_INTERVAL_TICKS;
+    
+    // Distant Horizons Proxy Configs
+    public static final ModConfigSpec.BooleanValue ENABLE_DH_SUBLEVEL_PROXY_LOD;
+    public static final ModConfigSpec.DoubleValue DH_SUBLEVEL_PROXY_MIN_DISTANCE;
+    public static final ModConfigSpec.DoubleValue DH_SUBLEVEL_PROXY_MAX_DISTANCE;
 
     public static final ModConfigSpec SPEC;
 
     static {
-        ENABLE_TRUE_IMPACT = BUILDER.comment("Master switch for all Sable True Impact behavior. If false, the mod keeps loading but adds no impact damage, cracks, fracture, entity damage, or reaction effects.")
-                .define("enableTrueImpact", true);
-        GLOBAL_STRENGTH_SCALE = BUILDER.comment("One-knob global strength multiplier. Set to 0.5 for a gentler experience, 2.0 for more destructive impacts. Multiplies all impact damage and fracture power uniformly.")
-                .defineInRange("globalStrengthScale", 1.0, 0.0, 1000.0);
-        ENABLE_SOIL_COMPACTION = BUILDER.comment("If true, light impacts on grass/podzol/mycelium compress the soil into dirt instead of breaking or ignoring the block. Heavy impacts still break the block normally.")
-                .define("enableSoilCompaction", true);
-        SOIL_COMPACTION_MIN_VELOCITY = BUILDER.comment("Minimum impact velocity to trigger soil compaction (grass → dirt). Below this, impacts are too gentle to do anything.")
-                .defineInRange("soilCompactionMinVelocity", 3.0, 0.0, 1000.0);
-        SOIL_COMPACTION_MAX_VELOCITY = BUILDER.comment("Impact velocity above which soil compaction is skipped and the block is treated like any other (broken normally). Below this threshold, grass is pressed into dirt instead.")
-                .defineInRange("soilCompactionMaxVelocity", 14.0, 0.0, 1000.0);
+        BUILDER.push("general");
+        ENABLE_TRUE_IMPACT = BUILDER.define("enableTrueImpact", true);
+        GLOBAL_STRENGTH_SCALE = BUILDER.defineInRange("globalStrengthScale", 1.0, 0.0, 1000.0);
+        DAMAGE_SCALE = BUILDER.defineInRange("damageScale", 1.0, 0.0, 1000.0);
+        BUILDER.pop();
 
-        BUILDER.push("impact");
-        MIN_EFFECT_VELOCITY = BUILDER.comment("Impacts below this speed do nothing. Raise this if tiny falls still leave marks.")
-                .defineInRange("minEffectVelocity", 3.0, 0.0, 1000.0);
-        MIN_BREAK_VELOCITY = BUILDER.comment("Impacts below this speed cannot directly break the hit block.")
-                .defineInRange("minBreakVelocity", 12.0, 0.0, 1000.0);
-        MIN_PROPAGATION_VELOCITY = BUILDER.comment("Impacts below this speed cannot spread cracks to nearby blocks.")
-                .defineInRange("minPropagationVelocity", 18.0, 0.0, 1000.0);
-        DAMAGE_SCALE = BUILDER.comment("Global damage multiplier. Lower is more realistic/conservative, higher is more cinematic.")
-                .defineInRange("damageScale", 0.042, 0.0, 1000.0);
-        IMPACT_VELOCITY_EXPONENT = BUILDER.comment("Velocity exponent for normal block-vs-sublevel impact energy. 2.0 is classic kinetic-energy scaling; higher values make high-speed impacts much more destructive.")
-                .defineInRange("impactVelocityExponent", 2.0, 0.0, 8.0);
-        RESTITUTION_DAMAGE_REDUCTION = BUILDER.comment("How strongly Sable restitution reduces impact damage. 1.0 means restitution 0.5 roughly halves damage.")
-                .defineInRange("restitutionDamageReduction", 1.2, 0.0, 10.0);
-        RESTITUTION_BREAK_VELOCITY_MULTIPLIER = BUILDER.comment("Elastic blocks require higher speed before they can break or strongly damage other blocks.")
-                .defineInRange("restitutionBreakVelocityMultiplier", 6.0, 0.0, 20.0);
-        ELASTIC_SHATTER_VELOCITY = BUILDER.comment("Elastic blocks below this speed convert impact into reaction motion instead of breaking or damaging terrain.")
-                .defineInRange("elasticShatterVelocity", 22.0, 0.0, 1000.0);
-        ELASTIC_BLOCKS_BREAK_BLOCKS = BUILDER.comment("If false, blocks with Sable restitution never break terrain through True Impact.")
-                .define("elasticBlocksBreakBlocks", false);
-        ELASTIC_SUBLEVEL_DETECTION_RANGE = BUILDER.comment("When terrain is hit, nearby elastic sublevels in this range suppress terrain damage.")
-                .defineInRange("elasticSubLevelDetectionRange", 8.0, 0.0, 128.0);
-        ELASTIC_SUBLEVEL_SCAN_LIMIT = BUILDER.comment("Maximum blocks scanned per nearby sublevel to detect elastic materials.")
-                .defineInRange("elasticSubLevelScanLimit", 4096, 16, 1000000);
-        PROTECT_NEARBY_SUBLEVEL_IMPACTS = BUILDER.comment("Safety fallback: if true and elastic blocks cannot break blocks, any nearby sublevel impact is converted to reaction motion instead of block damage. This is broad and disables most sublevel impact damage.")
-                .define("protectNearbySubLevelImpacts", false);
-        BOUNCE_RESPONSE_SCALE = BUILDER.comment("How much velocity is returned through Sable's collision callback for elastic blocks.")
-                .defineInRange("bounceResponseScale", 1.15, 0.0, 10.0);
-        BOUNCE_RESPONSE_THRESHOLD = BUILDER.comment("Restitution above this value gets a bounce response instead of normal damage at moderate speeds.")
-                .defineInRange("bounceResponseThreshold", 0.15, 0.0, 1.0);
-        REACTION_RESPONSE_SCALE = BUILDER.comment("Converts moderate would-be block damage into a counter-motion instead of breaking blocks.")
-                .defineInRange("reactionResponseScale", 0.75, 0.0, 10.0);
-        REACTION_YIELD_LIMIT = BUILDER.comment("Yield below this value prefers reaction force over block breaking. Raise for less terrain damage.")
-                .defineInRange("reactionYieldLimit", 18.0, 0.0, 1000.0);
-        MOVING_STRUCTURES_BREAK_BLOCKS = BUILDER.comment("If true, moving Sable physical structures can break or cumulatively damage normal world blocks. Internal sublevel fracture can still split the moving structure either way.")
-                .define("movingStructuresBreakBlocks", true);
-        LOW_FRICTION_DAMAGE_REDUCTION = BUILDER.comment("How strongly low-friction/glancing materials reduce damage.")
-                .defineInRange("lowFrictionDamageReduction", 0.35, 0.0, 1.0);
-        FRAGILE_DAMAGE_MULTIPLIER = BUILDER.comment("Extra damage multiplier for blocks tagged fragile by Sable.")
-                .defineInRange("fragileDamageMultiplier", 1.75, 0.0, 100.0);
-        MASS_EXPONENT = BUILDER.comment("How strongly Sable structure mass affects damage. 1.0 means linear effective mass before the cap.")
-                .defineInRange("massExponent", 1.0, 0.0, 2.0);
-        FALLBACK_IMPACT_MASS = BUILDER.comment("Mass used only when True Impact cannot identify the colliding Sable sublevel. Keep low to avoid tiny objects causing extreme damage.")
-                .defineInRange("fallbackImpactMass", 1.0, 0.01, 100000.0);
-        MAX_EFFECTIVE_MASS = BUILDER.comment("Caps effective mass so huge structures do not erase terrain too easily.")
-                .defineInRange("maxEffectiveMass", 100.0, 1.0, 100000.0);
-        SOFT_BLOCK_STRENGTH_MULTIPLIER = BUILDER.comment("Extra strength multiplier for soft blocks like dirt/grass. 1.0 keeps soil softer than wood and stone.")
-                .defineInRange("softBlockStrengthMultiplier", 1.0, 1.0, 1000.0);
+        BUILDER.push("compaction");
+        ENABLE_SOIL_COMPACTION = BUILDER.define("enableSoilCompaction", true);
+        SOIL_COMPACTION_MIN_VELOCITY = BUILDER.defineInRange("soilCompactionMinVelocity", 4.0, 0.0, 1000.0);
+        SOIL_COMPACTION_MAX_VELOCITY = BUILDER.defineInRange("soilCompactionMaxVelocity", 16.0, 0.0, 1000.0);
+        BUILDER.pop();
+
+        BUILDER.push("thresholds");
+        MIN_EFFECT_VELOCITY = BUILDER.defineInRange("minEffectVelocity", 2.0, 0.0, 1000.0);
+        MIN_BREAK_VELOCITY = BUILDER.defineInRange("minBreakVelocity", 4.5, 0.0, 1000.0);
+        MIN_PROPAGATION_VELOCITY = BUILDER.defineInRange("minPropagationVelocity", 8.0, 0.0, 1000.0);
+        IMPACT_VELOCITY_EXPONENT = BUILDER.defineInRange("impactVelocityExponent", 1.2, 0.1, 10.0);
+        BUILDER.pop();
+
+        BUILDER.push("elasticity");
+        RESTITUTION_DAMAGE_REDUCTION = BUILDER.defineInRange("restitutionDamageReduction", 0.85, 0.0, 1.0);
+        RESTITUTION_BREAK_VELOCITY_MULTIPLIER = BUILDER.defineInRange("restitutionBreakVelocityMultiplier", 1.4, 1.0, 10.0);
+        ELASTIC_SHATTER_VELOCITY = BUILDER.defineInRange("elasticShatterVelocity", 14.0, 0.0, 1000.0);
+        ELASTIC_BLOCKS_BREAK_BLOCKS = BUILDER.define("elasticBlocksBreakBlocks", false);
+        ELASTIC_SUBLEVEL_DETECTION_RANGE = BUILDER.defineInRange("elasticSubLevelDetectionRange", 4.0, 0.0, 32.0);
+        ELASTIC_SUBLEVEL_SCAN_LIMIT = BUILDER.defineInRange("elasticSubLevelScanLimit", 128, 1, 10000);
+        PROTECT_NEARBY_SUBLEVEL_IMPACTS = BUILDER.define("protectNearbySubLevelImpacts", true);
+        BOUNCE_RESPONSE_SCALE = BUILDER.defineInRange("bounceResponseScale", 0.65, 0.0, 10.0);
+        BOUNCE_RESPONSE_THRESHOLD = BUILDER.defineInRange("bounceResponseThreshold", 0.45, 0.0, 1.0);
+        REACTION_RESPONSE_SCALE = BUILDER.defineInRange("reactionResponseScale", 0.45, 0.0, 10.0);
+        REACTION_YIELD_LIMIT = BUILDER.defineInRange("reactionYieldLimit", 0.85, 0.0, 1.0);
+        BUILDER.pop();
+
+        BUILDER.push("structural");
+        MOVING_STRUCTURES_BREAK_BLOCKS = BUILDER.define("movingStructuresBreakBlocks", true);
+        LOW_FRICTION_DAMAGE_REDUCTION = BUILDER.defineInRange("lowFrictionDamageReduction", 0.6, 0.0, 1.0);
+        FRAGILE_DAMAGE_MULTIPLIER = BUILDER.defineInRange("fragileDamageMultiplier", 2.2, 1.0, 10.0);
+        MASS_EXPONENT = BUILDER.defineInRange("massExponent", 0.85, 0.0, 2.0);
+        FALLBACK_IMPACT_MASS = BUILDER.defineInRange("fallbackImpactMass", 1.0, 0.01, 100000.0);
+        MAX_EFFECTIVE_MASS = BUILDER.defineInRange("maxEffectiveMass", 100.0, 1.0, 100000.0);
+        SOFT_BLOCK_STRENGTH_MULTIPLIER = BUILDER.defineInRange("softBlockStrengthMultiplier", 1.0, 1.0, 1000.0);
         HARDNESS_STRENGTH_FACTOR = BUILDER.defineInRange("hardnessStrengthFactor", 20.0, 0.0, 1000.0);
         BLAST_STRENGTH_FACTOR = BUILDER.defineInRange("blastStrengthFactor", 18.0, 0.0, 1000.0);
-        BASE_STRENGTH = BUILDER.comment("Flat base strength. Keep this low enough that material hardness still matters.")
-                .defineInRange("baseStrength", 12.0, 0.0, 1000.0);
+        BASE_STRENGTH = BUILDER.defineInRange("baseStrength", 12.0, 0.0, 1000.0);
         CRACK_YIELD_THRESHOLD = BUILDER.defineInRange("crackYieldThreshold", 1.15, 0.0, 1000.0);
         BREAK_YIELD_THRESHOLD = BUILDER.defineInRange("breakYieldThreshold", 9.5, 0.0, 1000.0);
         HEAVY_BREAK_YIELD_THRESHOLD = BUILDER.defineInRange("heavyBreakYieldThreshold", 16.0, 0.0, 1000.0);
@@ -217,8 +204,7 @@ public final class TrueImpactConfig {
         BUILDER.pop();
 
         BUILDER.push("propagation");
-        MAX_PROPAGATION_BLOCKS = BUILDER.comment("Maximum nearby blocks that can receive crack marks from one catastrophic impact.")
-                .defineInRange("maxPropagationBlocks", 24, 0, 10000);
+        MAX_PROPAGATION_BLOCKS = BUILDER.defineInRange("maxPropagationBlocks", 24, 0, 10000);
         PROPAGATION_MIN_ENERGY = BUILDER.defineInRange("propagationMinEnergy", 42.0, 0.0, 1000000.0);
         PROPAGATION_ENERGY_SCALE = BUILDER.defineInRange("propagationEnergyScale", 0.026, 0.0, 1000.0);
         SAME_BLOCK_DECAY = BUILDER.defineInRange("sameBlockDecay", 0.45, 0.0, 1.0);
@@ -227,212 +213,134 @@ public final class TrueImpactConfig {
         BUILDER.pop();
 
         BUILDER.push("pairReaction");
-        ENABLE_PAIR_REACTION = BUILDER.comment("Experimental: apply equal-ish counter impulses when two Sable physical sublevels collide and either side is elastic.")
-                .define("enablePairReaction", true);
-        PAIR_REACTION_SCALE = BUILDER.comment("Scales pair collision counter-impulses. Lower if elastic structures launch too hard.")
-                .defineInRange("pairReactionScale", 0.025, 0.0, 10.0);
-        PAIR_REACTION_MAX_IMPULSE = BUILDER.comment("Caps raw collision force used by pair reaction.")
-                .defineInRange("pairReactionMaxImpulse", 250.0, 0.0, 1000000.0);
-        PAIR_REACTION_MAX_VELOCITY_CHANGE = BUILDER.comment("Caps approximate velocity change from one pair reaction impulse.")
-                .defineInRange("pairReactionMaxVelocityChange", 3.0, 0.0, 1000.0);
-        PAIR_REACTION_FORCE_THRESHOLD = BUILDER.comment("Minimum collision force required to trigger a pair reaction impulse. Prevents micro-jitter and 'bumping' on light touches.")
-                .defineInRange("pairReactionForceThreshold", 50.0, 0.0, 1000000.0);
+        ENABLE_PAIR_REACTION = BUILDER.define("enablePairReaction", true);
+        PAIR_REACTION_SCALE = BUILDER.defineInRange("pairReactionScale", 0.025, 0.0, 10.0);
+        PAIR_REACTION_MAX_IMPULSE = BUILDER.defineInRange("pairReactionMaxImpulse", 250.0, 0.0, 1000000.0);
+        PAIR_REACTION_MAX_VELOCITY_CHANGE = BUILDER.defineInRange("pairReactionMaxVelocityChange", 3.0, 0.0, 1000.0);
+        PAIR_REACTION_FORCE_THRESHOLD = BUILDER.defineInRange("pairReactionForceThreshold", 50.0, 0.0, 1000000.0);
         BUILDER.pop();
 
         BUILDER.push("terrainImpact");
-        ENABLE_TERRAIN_IMPACT_DAMAGE = BUILDER.comment("Experimental: when a Sable sublevel hits normal terrain, damage the terrain using the sublevel mass even if the callback fires on the sublevel block side.")
-                .define("enableTerrainImpactDamage", true);
+        ENABLE_TERRAIN_IMPACT_DAMAGE = BUILDER.define("enableTerrainImpactDamage", true);
         TERRAIN_IMPACT_DAMAGE_SCALE = BUILDER.defineInRange("terrainImpactDamageScale", 0.00016, 0.0, 1000.0);
-        TERRAIN_IMPACT_FORCE_THRESHOLD = BUILDER.comment("Terrain impacts below this force are treated as rolling/sliding contact and do not damage terrain.")
-                .defineInRange("terrainImpactForceThreshold", 2200.0, 0.0, 1000000000.0);
-        TERRAIN_IMPACT_FORCE_EXPONENT = BUILDER.comment("Exponent applied to terrain collision force above the threshold. 1.0 keeps current linear force scaling; higher values make violent impacts dig much harder.")
-                .defineInRange("terrainImpactForceExponent", 1.0, 0.0, 8.0);
-        TERRAIN_IMPACT_MASS_EXPONENT = BUILDER.comment("Separate mass exponent for terrain damage. Lower than global massExponent so normal vehicles crack terrain before breaking it.")
-                .defineInRange("terrainImpactMassExponent", 0.7, 0.0, 2.0);
-        TERRAIN_IMPACT_MAX_EFFECTIVE_MASS = BUILDER.comment("Separate effective mass cap for terrain damage.")
-                .defineInRange("terrainImpactMaxEffectiveMass", 35.0, 1.0, 100000.0);
-        TERRAIN_STEP_CONTACT_FORGIVENESS = BUILDER.comment("Horizontal impacts within this distance below a block top are treated as step-up contact, not terrain damage.")
-                .defineInRange("terrainStepContactForgiveness", 0.22, 0.0, 1.0);
-        TERRAIN_STEP_SIDE_NORMAL_THRESHOLD = BUILDER.comment("Contacts with vertical normal component below this are considered side contacts for step forgiveness.")
-                .defineInRange("terrainStepSideNormalThreshold", 0.35, 0.0, 1.0);
+        TERRAIN_IMPACT_FORCE_THRESHOLD = BUILDER.defineInRange("terrainImpactForceThreshold", 2200.0, 0.0, 1000000000.0);
+        TERRAIN_IMPACT_FORCE_EXPONENT = BUILDER.defineInRange("terrainImpactForceExponent", 1.0, 0.0, 8.0);
+        TERRAIN_IMPACT_MASS_EXPONENT = BUILDER.defineInRange("terrainImpactMassExponent", 0.7, 0.0, 2.0);
+        TERRAIN_IMPACT_MAX_EFFECTIVE_MASS = BUILDER.defineInRange("terrainImpactMaxEffectiveMass", 35.0, 1.0, 100000.0);
+        TERRAIN_STEP_CONTACT_FORGIVENESS = BUILDER.defineInRange("terrainStepContactForgiveness", 0.22, 0.0, 1.0);
+        TERRAIN_STEP_SIDE_NORMAL_THRESHOLD = BUILDER.defineInRange("terrainStepSideNormalThreshold", 0.35, 0.0, 1.0);
         TERRAIN_IMPACT_BREAK_YIELD = BUILDER.defineInRange("terrainImpactBreakYield", 8.5, 0.0, 1000.0);
-        TERRAIN_IMPACT_MAX_BLOCKS = BUILDER.comment("Maximum terrain blocks broken by one terrain impact collision.")
-                .defineInRange("terrainImpactMaxBlocks", 4, 0, 10000);
+        TERRAIN_IMPACT_MAX_BLOCKS = BUILDER.defineInRange("terrainImpactMaxBlocks", 4, 0, 10000);
         BUILDER.pop();
 
         BUILDER.push("entityImpact");
-        ENABLE_ENTITY_IMPACT_DAMAGE = BUILDER.comment("Damages living entities near a Sable sublevel impact point.")
-                .define("enableEntityImpactDamage", true);
+        ENABLE_ENTITY_IMPACT_DAMAGE = BUILDER.define("enableEntityImpactDamage", true);
         ENTITY_IMPACT_DAMAGE_SCALE = BUILDER.defineInRange("entityImpactDamageScale", 0.18, 0.0, 1000.0);
         ENTITY_IMPACT_MIN_DAMAGE = BUILDER.defineInRange("entityImpactMinDamage", 1.0, 0.0, 1000.0);
-        ENTITY_IMPACT_MAX_DAMAGE = BUILDER.comment("Maximum damage per entity impact. Set to 0 for unlimited.")
-                .defineInRange("entityImpactMaxDamage", 18.0, 0.0, 1000000.0);
-        ENTITY_IMPACT_RADIUS = BUILDER.comment("Radius around the impact point that can damage entities.")
-                .defineInRange("entityImpactRadius", 1.75, 0.0, 32.0);
-        ENTITY_MOVING_IMPACT_DAMAGE_SCALE = BUILDER.comment("Damage scale for direct moving sublevel vs living entity impacts.")
-                .defineInRange("entityMovingImpactDamageScale", 0.006, 0.0, 1000.0);
-        ENTITY_MOVING_IMPACT_MAX_DAMAGE = BUILDER.comment("Maximum damage for direct moving sublevel vs living entity impacts. Set to 0 for unlimited.")
-                .defineInRange("entityMovingImpactMaxDamage", 6.0, 0.0, 1000000.0);
-        ENTITY_MOVING_IMPACT_CONTACT_MARGIN = BUILDER.comment("Small contact margin for direct moving sublevel entity impacts. This replaces broad radius damage for direct hits.")
-                .defineInRange("entityMovingImpactContactMargin", 0.18, 0.0, 4.0);
-        ENTITY_MOVING_IMPACT_MIN_RELATIVE_SPEED = BUILDER.comment("Direct entity impact needs this much relative speed between sublevel and entity.")
-                .defineInRange("entityMovingImpactMinRelativeSpeed", 3.0, 0.0, 1000.0);
-        ENTITY_MOVING_IMPACT_MIN_CLOSING_SPEED = BUILDER.comment("Direct entity impact needs this much speed toward the entity, not merely shared acceleration.")
-                .defineInRange("entityMovingImpactMinClosingSpeed", 1.75, 0.0, 1000.0);
-        ENTITY_STANDING_SUPPORT_TOLERANCE = BUILDER.comment("Entities whose feet are within this distance above a sublevel top are treated as standing on it, not being hit by it.")
-                .defineInRange("entityStandingSupportTolerance", 0.35, 0.0, 4.0);
-        ENTITY_STANDING_MAX_UPWARD_SPEED = BUILDER.comment("Standing support is ignored if the sublevel is moving upward faster than this.")
-                .defineInRange("entityStandingMaxUpwardSpeed", 1.25, 0.0, 1000.0);
-        ENTITY_IMPACT_MIN_SPEED = BUILDER.comment("Sublevel speed below this value will not directly damage entities.")
-                .defineInRange("entityImpactMinSpeed", 4.0, 0.0, 1000.0);
-        ENTITY_IMPACT_COOLDOWN_TICKS = BUILDER.comment("Per entity/sublevel hit cooldown to avoid damage every tick while pinned.")
-                .defineInRange("entityImpactCooldownTicks", 20, 0, 200);
-        ENTITY_IMPACT_SCAN_INTERVAL_TICKS = BUILDER.comment("How often direct moving sublevel entity damage scans run. 1 = every tick, 2 = every other tick. Raise for better server performance.")
-                .defineInRange("entityImpactScanIntervalTicks", 2, 1, 200);
-        ENTITY_IMPACT_MAX_SUBLEVELS_PER_SCAN = BUILDER.comment("Maximum moving Sable sublevels checked for direct entity damage per scan. Lower this if worlds with many physical structures stutter.")
-                .defineInRange("entityImpactMaxSubLevelsPerScan", 96, 1, 1000000);
+        ENTITY_IMPACT_MAX_DAMAGE = BUILDER.defineInRange("entityImpactMaxDamage", 18.0, 0.0, 1000000.0);
+        ENTITY_IMPACT_RADIUS = BUILDER.defineInRange("entityImpactRadius", 1.75, 0.0, 32.0);
+        ENTITY_MOVING_IMPACT_DAMAGE_SCALE = BUILDER.defineInRange("entityMovingImpactDamageScale", 0.006, 0.0, 1000.0);
+        ENTITY_MOVING_IMPACT_MAX_DAMAGE = BUILDER.defineInRange("entityMovingImpactMaxDamage", 6.0, 0.0, 1000000.0);
+        ENTITY_MOVING_IMPACT_CONTACT_MARGIN = BUILDER.defineInRange("entityMovingImpactContactMargin", 0.18, 0.0, 4.0);
+        ENTITY_MOVING_IMPACT_MIN_RELATIVE_SPEED = BUILDER.defineInRange("entityMovingImpactMinRelativeSpeed", 3.0, 0.0, 1000.0);
+        ENTITY_MOVING_IMPACT_MIN_CLOSING_SPEED = BUILDER.defineInRange("entityMovingImpactMinClosingSpeed", 1.75, 0.0, 1000.0);
+        ENTITY_STANDING_SUPPORT_TOLERANCE = BUILDER.defineInRange("entityStandingSupportTolerance", 0.35, 0.0, 4.0);
+        ENTITY_STANDING_MAX_UPWARD_SPEED = BUILDER.defineInRange("entityStandingMaxUpwardSpeed", 1.25, 0.0, 1000.0);
+        ENTITY_IMPACT_MIN_SPEED = BUILDER.defineInRange("entityImpactMinSpeed", 4.0, 0.0, 1000.0);
+        ENTITY_IMPACT_COOLDOWN_TICKS = BUILDER.defineInRange("entityImpactCooldownTicks", 20, 0, 200);
+        ENTITY_IMPACT_SCAN_INTERVAL_TICKS = BUILDER.defineInRange("entityImpactScanIntervalTicks", 2, 1, 200);
+        ENTITY_IMPACT_MAX_SUBLEVELS_PER_SCAN = BUILDER.defineInRange("entityImpactMaxSubLevelsPerScan", 96, 1, 1000000);
         BUILDER.pop();
 
         BUILDER.push("subLevelFracture");
-        ENABLE_SUBLEVEL_FRACTURE = BUILDER.comment("Experimental: very strong impacts can cut weak internal connections so Sable's native splitter creates new sublevels.")
-                .define("enableSubLevelFracture", true);
-        SUBLEVEL_FRACTURE_FORCE_THRESHOLD = BUILDER.comment("Minimum collision force before internal sublevel fracture is considered. Raise this if vehicles split too easily.")
-                .defineInRange("subLevelFractureForceThreshold", 620.0, 0.0, 1000000000.0);
-        SUBLEVEL_FRACTURE_FORCE_SCALE = BUILDER.comment("Scales raw collision force into fracture damage.")
-                .defineInRange("subLevelFractureForceScale", 0.068, 0.0, 1000.0);
-        SUBLEVEL_FRACTURE_FORCE_EXPONENT = BUILDER.comment("Exponent applied to collision force above the fracture threshold. 1.0 keeps current linear behavior; higher values make high-speed/high-force crashes split structures much more aggressively.")
-                .defineInRange("subLevelFractureForceExponent", 1.0, 0.0, 8.0);
-        SUBLEVEL_FRACTURE_RADIUS = BUILDER.comment("Maximum radius around the impact point scanned for weak connections.")
-                .defineInRange("subLevelFractureRadius", 4.0, 0.0, 32.0);
-        SUBLEVEL_FRACTURE_MAX_BLOCKS = BUILDER.comment("Maximum internal blocks removed by one fracture event.")
-                .defineInRange("subLevelFractureMaxBlocks", 18, 0, 10000);
-        SUBLEVEL_FRACTURE_MAX_CANDIDATE_CHECKS = BUILDER.comment("Maximum block positions inspected by one fracture scan. Lower this to cap worst-case CPU cost.")
-                .defineInRange("subLevelFractureMaxCandidateChecks", 384, 1, 1000000);
-        SUBLEVEL_FRACTURE_MAX_CANDIDATES = BUILDER.comment("Maximum fracture candidates kept for sorting and chance checks. Lower this if impacts stutter when many blocks are nearby.")
-                .defineInRange("subLevelFractureMaxCandidates", 96, 1, 1000000);
-        SUBLEVEL_FRACTURE_COOLDOWN_TICKS = BUILDER.comment("Minimum ticks between expensive fracture scans for the same Sable physical structure. Raise this for large-structure performance.")
-                .defineInRange("subLevelFractureCooldownTicks", 4, 0, 200);
-        SUBLEVEL_FRACTURE_MAX_ATTEMPTS_PER_TICK = BUILDER.comment("Global cap for fracture scans started per server tick per dimension. Extra collision points skip fracture to protect TPS.")
-                .defineInRange("subLevelFractureMaxAttemptsPerTick", 8, 1, 1000000);
-        SUBLEVEL_FRACTURE_SNAPSHOT_PADDING = BUILDER.comment("Extra block padding captured around fracture candidates for structural analysis. 1 is faster, 2 is more detailed.")
-                .defineInRange("subLevelFractureSnapshotPadding", 1, 0, 4);
-        ENABLE_ASYNC_FRACTURE_ANALYSIS = BUILDER.comment("Experimental: compute fracture candidates on a background thread after the world snapshot is captured on the server thread. Final block changes still run on the server thread.")
-                .define("enableAsyncFractureAnalysis", false);
-        ASYNC_FRACTURE_MAX_QUEUED_JOBS = BUILDER.comment("Maximum pending async fracture jobs. New async jobs are skipped when the queue is full to protect server TPS.")
-                .defineInRange("asyncFractureMaxQueuedJobs", 64, 1, 1000000);
-        ASYNC_FRACTURE_MAX_APPLIED_JOBS_PER_TICK = BUILDER.comment("Maximum completed async fracture jobs applied to the world per tick.")
-                .defineInRange("asyncFractureMaxAppliedJobsPerTick", 4, 1, 10000);
-        SUBLEVEL_FRACTURE_FRICTION_RESISTANCE = BUILDER.comment("High-friction blocks resist fracture by this multiplier per friction point.")
-                .defineInRange("subLevelFractureFrictionResistance", 1.6, 0.0, 1000.0);
-        SUBLEVEL_FRACTURE_SAME_BLOCK_RESISTANCE = BUILDER.comment("Same-material connections resist fracture more than mixed-material seams.")
-                .defineInRange("subLevelFractureSameBlockResistance", 1.6, 0.0, 1000.0);
-        SUBLEVEL_FRACTURE_STICKY_RESISTANCE = BUILDER.comment("Resistance multiplier for sticky/glue-like blocks. Large values make them almost never fracture.")
-                .defineInRange("subLevelFractureStickyResistance", 10000.0, 1.0, 1000000000.0);
-        SUBLEVEL_FRACTURE_MASS_REFERENCE = BUILDER.comment("Mass at which a structure starts receiving noticeable extra fracture power.")
-                .defineInRange("subLevelFractureMassReference", 14.0, 1.0, 1000000.0);
-        SUBLEVEL_FRACTURE_MASS_BONUS_SCALE = BUILDER.comment("How much large structures amplify fracture power.")
-                .defineInRange("subLevelFractureMassBonusScale", 0.8, 0.0, 1000.0);
-        SUBLEVEL_FRACTURE_IMBALANCE_BONUS_SCALE = BUILDER.comment("How much off-center impacts amplify fracture power.")
-                .defineInRange("subLevelFractureImbalanceBonusScale", 0.85, 0.0, 1000.0);
-        SUBLEVEL_FRACTURE_IMBALANCE_MAX_MULTIPLIER = BUILDER.comment("Maximum multiplier from off-center mass imbalance.")
-                .defineInRange("subLevelFractureImbalanceMaxMultiplier", 4.0, 1.0, 1000.0);
-        SUBLEVEL_FRACTURE_CHANCE_SCALE = BUILDER.comment("Converts fracture score into actual break chance. Raise for more random/local breakage.")
-                .defineInRange("subLevelFractureChanceScale", 1.25, 0.0, 1000.0);
-        SUBLEVEL_FRACTURE_IMPACT_FOCUS_EXPONENT = BUILDER.comment("Higher values concentrate fracture probability near the impact point.")
-                .defineInRange("subLevelFractureImpactFocusExponent", 1.8, 0.1, 10.0);
-        SUBLEVEL_FRACTURE_CRACK_BONUS_SCALE = BUILDER.comment("How much existing cumulative crack damage increases fracture chance.")
-                .defineInRange("subLevelFractureCrackBonusScale", 3.0, 0.0, 1000.0);
-        SUBLEVEL_FRACTURE_FATIGUE_SCALE = BUILDER.comment("How much near-miss fracture force is stored as cumulative block damage/cracks.")
-                .defineInRange("subLevelFractureFatigueScale", 0.22, 0.0, 1000.0);
-        SUBLEVEL_FRACTURE_INTERLOCK_STRENGTH = BUILDER.comment("Strength multiplier from checkerboard/interlocked mixed-material neighbors.")
-                .defineInRange("subLevelFractureInterlockStrength", 1.8, 0.0, 1000.0);
-        SUBLEVEL_FRACTURE_BEAM_STRENGTH = BUILDER.comment("Strength multiplier from beam/girder/frame/support blocks near a candidate fracture.")
-                .defineInRange("subLevelFractureBeamStrength", 2.4, 0.0, 1000.0);
-        SUBLEVEL_FRACTURE_CONTINUOUS_SEAM_WEAKNESS = BUILDER.comment("Extra weakness for straight continuous seams. Interlocked seams resist this.")
-                .defineInRange("subLevelFractureContinuousSeamWeakness", 1.7, 0.0, 1000.0);
-        SUBLEVEL_FRACTURE_WEAK_PLANE_SPREAD = BUILDER.comment("How much likely fracture planes increase fracture chance in nearby aligned blocks.")
-                .defineInRange("subLevelFractureWeakPlaneSpread", 0.55, 0.0, 1000.0);
+        ENABLE_SUBLEVEL_FRACTURE = BUILDER.define("enableSubLevelFracture", true);
+        SUBLEVEL_FRACTURE_FORCE_THRESHOLD = BUILDER.defineInRange("subLevelFractureForceThreshold", 850.0, 0.0, 1000000000.0);
+        SUBLEVEL_FRACTURE_FORCE_SCALE = BUILDER.defineInRange("subLevelFractureForceScale", 0.068, 0.0, 1000.0);
+        SUBLEVEL_FRACTURE_FORCE_EXPONENT = BUILDER.defineInRange("subLevelFractureForceExponent", 1.0, 0.0, 8.0);
+        SUBLEVEL_FRACTURE_RADIUS = BUILDER.defineInRange("subLevelFractureRadius", 4.0, 0.0, 32.0);
+        SUBLEVEL_FRACTURE_MAX_BLOCKS = BUILDER.defineInRange("subLevelFractureMaxBlocks", 18, 0, 10000);
+        SUBLEVEL_FRACTURE_MAX_CANDIDATE_CHECKS = BUILDER.defineInRange("subLevelFractureMaxCandidateChecks", 384, 1, 1000000);
+        SUBLEVEL_FRACTURE_MAX_CANDIDATES = BUILDER.defineInRange("subLevelFractureMaxCandidates", 96, 1, 1000000);
+        SUBLEVEL_FRACTURE_COOLDOWN_TICKS = BUILDER.defineInRange("subLevelFractureCooldownTicks", 4, 0, 200);
+        SUBLEVEL_FRACTURE_MAX_ATTEMPTS_PER_TICK = BUILDER.defineInRange("subLevelFractureMaxAttemptsPerTick", 8, 1, 1000000);
+        SUBLEVEL_FRACTURE_SNAPSHOT_PADDING = BUILDER.defineInRange("subLevelFractureSnapshotPadding", 1, 0, 4);
+        ENABLE_ASYNC_FRACTURE_ANALYSIS = BUILDER.define("enableAsyncFractureAnalysis", false);
+        ASYNC_FRACTURE_MAX_QUEUED_JOBS = BUILDER.defineInRange("asyncFractureMaxQueuedJobs", 64, 1, 1000000);
+        ASYNC_FRACTURE_MAX_APPLIED_JOBS_PER_TICK = BUILDER.defineInRange("asyncFractureMaxAppliedJobsPerTick", 4, 1, 10000);
+        SUBLEVEL_FRACTURE_FRICTION_RESISTANCE = BUILDER.defineInRange("subLevelFractureFrictionResistance", 1.6, 0.0, 1000.0);
+        SUBLEVEL_FRACTURE_SAME_BLOCK_RESISTANCE = BUILDER.defineInRange("subLevelFractureSameBlockResistance", 1.6, 0.0, 1000.0);
+        SUBLEVEL_FRACTURE_STICKY_RESISTANCE = BUILDER.defineInRange("subLevelFractureStickyResistance", 10000.0, 1.0, 1000000000.0);
+        SUBLEVEL_FRACTURE_MASS_REFERENCE = BUILDER.defineInRange("subLevelFractureMassReference", 14.0, 1.0, 1000000.0);
+        SUBLEVEL_FRACTURE_MASS_BONUS_SCALE = BUILDER.defineInRange("subLevelFractureMassBonusScale", 0.8, 0.0, 1000.0);
+        SUBLEVEL_FRACTURE_IMBALANCE_BONUS_SCALE = BUILDER.defineInRange("subLevelFractureImbalanceBonusScale", 0.85, 0.0, 1000.0);
+        SUBLEVEL_FRACTURE_IMBALANCE_MAX_MULTIPLIER = BUILDER.defineInRange("subLevelFractureImbalanceMaxMultiplier", 4.0, 1.0, 1000.0);
+        SUBLEVEL_FRACTURE_CHANCE_SCALE = BUILDER.defineInRange("subLevelFractureChanceScale", 1.25, 0.0, 1000.0);
+        SUBLEVEL_FRACTURE_IMPACT_FOCUS_EXPONENT = BUILDER.defineInRange("subLevelFractureImpactFocusExponent", 1.8, 0.1, 10.0);
+        SUBLEVEL_FRACTURE_CRACK_BONUS_SCALE = BUILDER.defineInRange("subLevelFractureCrackBonusScale", 3.0, 0.0, 1000.0);
+        SUBLEVEL_FRACTURE_FATIGUE_SCALE = BUILDER.defineInRange("subLevelFractureFatigueScale", 0.22, 0.0, 1000.0);
+        SUBLEVEL_FRACTURE_INTERLOCK_STRENGTH = BUILDER.defineInRange("subLevelFractureInterlockStrength", 1.8, 0.0, 1000.0);
+        SUBLEVEL_FRACTURE_BEAM_STRENGTH = BUILDER.defineInRange("subLevelFractureBeamStrength", 2.4, 0.0, 1000.0);
+        SUBLEVEL_FRACTURE_CONTINUOUS_SEAM_WEAKNESS = BUILDER.defineInRange("subLevelFractureContinuousSeamWeakness", 1.7, 0.0, 1000.0);
+        SUBLEVEL_FRACTURE_WEAK_PLANE_SPREAD = BUILDER.defineInRange("subLevelFractureWeakPlaneSpread", 0.55, 0.0, 1000.0);
         BUILDER.pop();
 
         BUILDER.push("explosionImpact");
-        ENABLE_EXPLOSION_IMPACT_FRACTURE = BUILDER.comment("If true, explosions send pressure waves into nearby Sable physical structures, causing cracks and internal fracture.")
-                .define("enableExplosionImpactFracture", true);
-        EXPLOSION_IMPACT_FORCE_SCALE = BUILDER.comment("Scales explosion radius and distance into fracture force. Raise for more dramatic blast separation.")
-                .defineInRange("explosionImpactForceScale", 225.0, 0.0, 1000000.0);
-        EXPLOSION_IMPACT_RADIUS_MULTIPLIER = BUILDER.comment("How far explosions search for Sable physical structures, as a multiplier of explosion radius.")
-                .defineInRange("explosionImpactRadiusMultiplier", 1.65, 0.0, 32.0);
-        EXPLOSION_IMPACT_CONFINEMENT_SCALE = BUILDER.comment("Extra blast pressure in enclosed spaces (blockedRatio^2). Higher values make indoor explosions much more lethal than outdoor ones.")
-                .defineInRange("explosionImpactConfinementScale", 4.5, 0.0, 100.0);
-        EXPLOSION_IMPACT_MAX_SUBLEVELS = BUILDER.comment("Maximum nearby Sable physical structures processed by one explosion.")
-                .defineInRange("explosionImpactMaxSubLevels", 32, 1, 1000000);
-        EXPLOSION_IMPACT_RAY_SAMPLES = BUILDER.comment("Invisible shockwave ray count used to detect enclosed blasts and impacted Sable structures. Higher is more accurate but costs more CPU.")
-                .defineInRange("explosionImpactRaySamples", 48, 6, 512);
-        EXPLOSION_IMPACT_RAY_STEP = BUILDER.comment("Distance advanced per shockwave ray sample step. Lower is more precise but costs more CPU.")
-                .defineInRange("explosionImpactRayStep", 0.75, 0.1, 4.0);
-        ENABLE_EXPLOSION_IMPULSE = BUILDER.comment("If true, shockwave hits push Sable physical structures away from the explosion center.")
-                .define("enableExplosionImpulse", true);
-        EXPLOSION_IMPULSE_SCALE = BUILDER.comment("Converts shockwave pressure into outward impulse. Raise for more dramatic flying debris.")
-                .defineInRange("explosionImpulseScale", 0.018, 0.0, 1000.0);
-        EXPLOSION_MAX_IMPULSE = BUILDER.comment("Caps outward impulse from one explosion hit per Sable physical structure.")
-                .defineInRange("explosionMaxImpulse", 80.0, 0.0, 1000000.0);
+        ENABLE_EXPLOSION_IMPACT_FRACTURE = BUILDER.define("enableExplosionImpactFracture", true);
+        EXPLOSION_IMPACT_FORCE_SCALE = BUILDER.defineInRange("explosionImpactForceScale", 950.0, 0.0, 1000000.0);
+        EXPLOSION_IMPACT_RADIUS_MULTIPLIER = BUILDER.defineInRange("explosionImpactRadiusMultiplier", 1.85, 0.0, 32.0);
+        EXPLOSION_IMPACT_CONFINEMENT_SCALE = BUILDER.defineInRange("explosionImpactConfinementScale", 6.5, 0.0, 100.0);
+        EXPLOSION_IMPACT_MAX_SUBLEVELS = BUILDER.defineInRange("explosionImpactMaxSubLevels", 32, 1, 1000000);
+        EXPLOSION_IMPACT_RAY_SAMPLES = BUILDER.defineInRange("explosionImpactRaySamples", 48, 6, 512);
+        EXPLOSION_IMPACT_RAY_STEP = BUILDER.defineInRange("explosionImpactRayStep", 0.75, 0.1, 4.0);
+        ENABLE_EXPLOSION_IMPULSE = BUILDER.define("enableExplosionImpulse", true);
+        EXPLOSION_IMPULSE_SCALE = BUILDER.defineInRange("explosionImpulseScale", 0.018, 0.0, 1000.0);
+        EXPLOSION_MAX_IMPULSE = BUILDER.defineInRange("explosionMaxImpulse", 80.0, 0.0, 1000000.0);
         BUILDER.pop();
 
         BUILDER.push("impactExplosion");
-        ENABLE_IMPACT_EXPLOSIONS = BUILDER.comment("If true, massive high-energy crashes can trigger standard Minecraft explosions at the impact point.")
-                .define("enableImpactExplosions", false);
-        IMPACT_EXPLOSION_FORCE_THRESHOLD = BUILDER.comment("Minimum collision force (before mass scaling) to trigger an impact explosion.")
-                .defineInRange("impactExplosionForceThreshold", 5000.0, 0.0, 1000000000.0);
-        IMPACT_EXPLOSION_MASS_THRESHOLD = BUILDER.comment("Minimum Sable structure mass required to trigger an impact explosion.")
-                .defineInRange("impactExplosionMassThreshold", 15.0, 0.0, 1000000.0);
-        IMPACT_EXPLOSION_SCALE = BUILDER.comment("Scales total impact energy (force * mass) into explosion radius.")
-                .defineInRange("impactExplosionScale", 0.000018, 0.0, 100.0);
-        IMPACT_EXPLOSION_MAX_RADIUS = BUILDER.comment("Caps the radius of impact-triggered explosions.")
-                .defineInRange("impactExplosionMaxRadius", 12.0, 0.0, 64.0);
-        IMPACT_EXPLOSION_FIRE_CHANCE = BUILDER.comment("Chance (0.0 to 1.0) that an impact explosion creates fire. 0.0 disables fire entirely.")
-                .defineInRange("impactExplosionFireChance", 0.0, 0.0, 1.0);
-        IMPACT_EXPLOSION_MAX_PER_BATCH = BUILDER.comment("Maximum number of explosions that can fire from a single collision batch. Prevents a crash from spawning dozens of simultaneous explosion sound sources and freezing physics-audio mods.")
-                .defineInRange("impactExplosionMaxPerBatch", 1, 1, 64);
-        IMPACT_EXPLOSION_COALESCE_RADIUS = BUILDER.comment("Explosions within this distance (blocks) of a stronger explosion in the same batch are suppressed. Keeps one big boom instead of many small ones.")
-                .defineInRange("impactExplosionCoalesceRadius", 16.0, 0.0, 256.0);
+        ENABLE_IMPACT_EXPLOSIONS = BUILDER.define("enableImpactExplosions", false);
+        IMPACT_EXPLOSION_FORCE_THRESHOLD = BUILDER.defineInRange("impactExplosionForceThreshold", 5000.0, 0.0, 1000000000.0);
+        IMPACT_EXPLOSION_MASS_THRESHOLD = BUILDER.defineInRange("impactExplosionMassThreshold", 15.0, 0.0, 1000000.0);
+        IMPACT_EXPLOSION_SCALE = BUILDER.defineInRange("impactExplosionScale", 0.000018, 0.0, 100.0);
+        IMPACT_EXPLOSION_MAX_RADIUS = BUILDER.defineInRange("impactExplosionMaxRadius", 12.0, 0.0, 64.0);
+        IMPACT_EXPLOSION_FIRE_CHANCE = BUILDER.defineInRange("impactExplosionFireChance", 0.0, 0.0, 1.0);
+        IMPACT_EXPLOSION_MAX_PER_BATCH = BUILDER.defineInRange("impactExplosionMaxPerBatch", 1, 1, 64);
+        IMPACT_EXPLOSION_COALESCE_RADIUS = BUILDER.defineInRange("impactExplosionCoalesceRadius", 16.0, 0.0, 256.0);
         BUILDER.pop();
 
         BUILDER.push("materialToughness");
-        ENABLE_MATERIAL_TOUGHNESS = BUILDER.comment("If true, selected materials receive separate strength, toughness, and brittleness multipliers.")
-                .define("enableMaterialToughness", true);
-        DEFAULT_MATERIAL_STRENGTH_MULTIPLIER = BUILDER.comment("Default material strength multiplier for blocks without an override.")
-                .defineInRange("defaultMaterialStrengthMultiplier", 1.0, 0.0, 1000000.0);
-        DEFAULT_MATERIAL_TOUGHNESS_MULTIPLIER = BUILDER.comment("Default material toughness multiplier for blocks without an override.")
-                .defineInRange("defaultMaterialToughnessMultiplier", 1.0, 0.0, 1000000.0);
-        DEFAULT_MATERIAL_BRITTLENESS = BUILDER.comment("Default brittleness multiplier. Lower means impact over-stress accumulates damage more slowly.")
-                .defineInRange("defaultMaterialBrittleness", 1.0, 0.0, 1000000.0);
-        NETHERITE_STRENGTH_MULTIPLIER = BUILDER.comment("Netherite block strength multiplier. High strength means larger force is needed before meaningful damage.")
-                .defineInRange("netheriteStrengthMultiplier", 14.0, 0.0, 1000000.0);
-        NETHERITE_TOUGHNESS_MULTIPLIER = BUILDER.comment("Netherite block toughness multiplier. High toughness means repeated over-stress is needed before breaking.")
-                .defineInRange("netheriteToughnessMultiplier", 48.0, 0.0, 1000000.0);
-        NETHERITE_BRITTLENESS = BUILDER.comment("Netherite brittleness multiplier. Lower means it absorbs impact without quickly turning that impact into cracks.")
-                .defineInRange("netheriteBrittleness", 0.018, 0.0, 1000000.0);
+        ENABLE_MATERIAL_TOUGHNESS = BUILDER.define("enableMaterialToughness", true);
+        DEFAULT_MATERIAL_STRENGTH_MULTIPLIER = BUILDER.defineInRange("defaultMaterialStrengthMultiplier", 1.0, 0.0, 1000000.0);
+        DEFAULT_MATERIAL_TOUGHNESS_MULTIPLIER = BUILDER.defineInRange("defaultMaterialToughnessMultiplier", 1.0, 0.0, 1000000.0);
+        DEFAULT_MATERIAL_BRITTLENESS = BUILDER.defineInRange("defaultMaterialBrittleness", 1.0, 0.0, 1000000.0);
+        NETHERITE_STRENGTH_MULTIPLIER = BUILDER.defineInRange("netheriteStrengthMultiplier", 14.0, 0.0, 1000000.0);
+        NETHERITE_TOUGHNESS_MULTIPLIER = BUILDER.defineInRange("netheriteToughnessMultiplier", 48.0, 0.0, 1000000.0);
+        NETHERITE_BRITTLENESS = BUILDER.defineInRange("netheriteBrittleness", 0.018, 0.0, 1000000.0);
         BUILDER.pop();
 
         BUILDER.push("client");
-        ENABLE_GOGGLES_BLOCK_TOOLTIP = BUILDER.comment("Client-side helper: when wearing Create: Aeronautics aviator goggles, block item tooltips show Sable and True Impact material data.")
-                .define("enableGogglesBlockTooltip", true);
+        ENABLE_GOGGLES_BLOCK_TOOLTIP = BUILDER.define("enableGogglesBlockTooltip", true);
         BUILDER.pop();
 
         BUILDER.push("cumulativeDamage");
-        ENABLE_CUMULATIVE_BLOCK_DAMAGE = BUILDER.comment("Accumulates repeated crack-level hits until the block breaks.")
-                .define("enableCumulativeBlockDamage", true);
+        ENABLE_CUMULATIVE_BLOCK_DAMAGE = BUILDER.define("enableCumulativeBlockDamage", true);
         CUMULATIVE_BLOCK_DAMAGE_SCALE = BUILDER.defineInRange("cumulativeBlockDamageScale", 0.65, 0.0, 1000.0);
-        CUMULATIVE_BLOCK_DAMAGE_DECAY_TICKS = BUILDER.comment("Ticks before stored block damage expires if the block is not hit again.")
-                .defineInRange("cumulativeBlockDamageDecayTicks", 600, 20, 72000);
-        CUMULATIVE_BLOCK_DAMAGE_MAX_ENTRIES = BUILDER.comment("Safety cap for remembered damaged blocks.")
-                .defineInRange("cumulativeBlockDamageMaxEntries", 4096, 128, 1000000);
+        CUMULATIVE_BLOCK_DAMAGE_DECAY_TICKS = BUILDER.defineInRange("cumulativeBlockDamageDecayTicks", 600, 20, 72000);
+        CUMULATIVE_BLOCK_DAMAGE_MAX_ENTRIES = BUILDER.defineInRange("cumulativeBlockDamageMaxEntries", 4096, 128, 1000000);
         BUILDER.pop();
 
         BUILDER.push("performance");
-        ENABLE_PERFORMANCE_LOGGING = BUILDER.comment("If true, logs periodic Sable True Impact performance counters. Keep false for normal gameplay.")
-                .define("enablePerformanceLogging", false);
-        PERFORMANCE_LOG_INTERVAL_TICKS = BUILDER.comment("How often performance counters are logged when enablePerformanceLogging is true.")
-                .defineInRange("performanceLogIntervalTicks", 200, 20, 72000);
+        ENABLE_PERFORMANCE_LOGGING = BUILDER.define("enablePerformanceLogging", false);
+        PERFORMANCE_LOG_INTERVAL_TICKS = BUILDER.defineInRange("performanceLogIntervalTicks", 200, 20, 72000);
+        BUILDER.pop();
+        
+        BUILDER.push("distantHorizons");
+        ENABLE_DH_SUBLEVEL_PROXY_LOD = BUILDER.comment("Experimental: render Sable sublevels as Distant Horizons LODs for massive fleets.")
+                .define("enableDHSubLevelProxyLod", false);
+        DH_SUBLEVEL_PROXY_MIN_DISTANCE = BUILDER.comment("Minimum distance to start rendering DH proxies (should be near your chunk render distance).")
+                .defineInRange("dhSubLevelProxyMinDistance", 256.0, 0.0, 10000.0);
+        DH_SUBLEVEL_PROXY_MAX_DISTANCE = BUILDER.comment("Maximum distance to render DH proxies.")
+                .defineInRange("dhSubLevelProxyMaxDistance", 2048.0, 0.0, 10000.0);
         BUILDER.pop();
 
         SPEC = BUILDER.build();

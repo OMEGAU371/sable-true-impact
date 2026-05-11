@@ -132,6 +132,8 @@ dependencies {
 
     // Example mod dependency using a file as dependency
     implementation files("libs/sable-neoforge-1.21.1-1.2.2.jar")
+    implementation files("libs/sable-companion-common-1.21.1-1.6.0.jar")
+    compileOnly files("libs/DistantHorizons-3.0.3-b-1.21.1-fabric-neoforge.jar")
 
     // Example project dependency using a sister or child project:
     // implementation project(":myproject")

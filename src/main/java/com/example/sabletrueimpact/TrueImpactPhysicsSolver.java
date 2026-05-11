@@ -18,14 +18,8 @@ import java.util.Set;
 
 public class TrueImpactPhysicsSolver {
     public static final BlockSubLevelCollisionCallback HARDNESS_CALLBACK = new HardnessFragileCallback();
-    private static TagKey<net.minecraft.world.level.block.Block> fragileTag;
-
-    private static TagKey<net.minecraft.world.level.block.Block> getFragileTag() {
-        if (fragileTag == null) {
-            fragileTag = TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath("sable", "fragile"));
-        }
-        return fragileTag;
-    }
+    private static final TagKey<net.minecraft.world.level.block.Block> SABLE_FRAGILE = TagKey.create(
+            Registries.BLOCK, ResourceLocation.fromNamespaceAndPath("sable", "fragile"));
 
     /** Blocks that can be compacted into dirt by a light impact instead of being broken. */
     private static final Set<Block> COMPACTABLE_SOIL = Set.of(
@@ -135,7 +129,7 @@ public class TrueImpactPhysicsSolver {
 
             double restitution = clamp01(PhysicsBlockPropertyHelper.getRestitution(state));
             double friction = Math.max(0.0, PhysicsBlockPropertyHelper.getFriction(state));
-            boolean fragile = state.is(getFragileTag());
+            boolean fragile = state.is(SABLE_FRAGILE);
 
             // Distributed kinetic energy. Sable's restitution/friction are treated as material response:
             // bouncy or low-friction blocks shed more energy into rebound/sliding instead of fracture.
@@ -150,9 +144,10 @@ public class TrueImpactPhysicsSolver {
                     * TrueImpactConfig.DAMAGE_SCALE.get()
                     * TrueImpactConfig.GLOBAL_STRENGTH_SCALE.get();
             
-            double breakThreshold = Math.max(MaterialImpactProperties.breakThreshold(state, structuralIntegrity), 1.0);
-            double overStress = Math.max(0.0, kineticEnergy - breakThreshold);
-            double yieldRatio = kineticEnergy / breakThreshold;
+            double materialStrength = Math.max(MaterialImpactProperties.displayStrength(state, structuralIntegrity), 1.0);
+            double materialToughness = Math.max(MaterialImpactProperties.displayToughness(state, structuralIntegrity), materialStrength);
+            double overStress = Math.max(0.0, kineticEnergy - materialStrength);
+            double yieldRatio = kineticEnergy / materialStrength;
             double elasticBreakVelocity = TrueImpactConfig.MIN_BREAK_VELOCITY.get()
                     * (1.0 + restitution * TrueImpactConfig.RESTITUTION_BREAK_VELOCITY_MULTIPLIER.get());
             double elasticPropagationVelocity = TrueImpactConfig.MIN_PROPAGATION_VELOCITY.get()
@@ -220,7 +215,7 @@ public class TrueImpactPhysicsSolver {
                         level,
                         pos,
                         MaterialImpactProperties.fatigueDamage(state, overStress),
-                        breakThreshold * TrueImpactConfig.BREAK_YIELD_THRESHOLD.get(),
+                        materialToughness * TrueImpactConfig.BREAK_YIELD_THRESHOLD.get(),
                         system.hashCode() + pos.hashCode()
                 );
                 if (!broke) {

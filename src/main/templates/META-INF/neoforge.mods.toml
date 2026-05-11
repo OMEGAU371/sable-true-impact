@@ -36,3 +36,10 @@ config="${mod_id}.mixins.json"
     versionRange="[1.2.2,)"
     ordering="AFTER"
     side="BOTH"
+
+[[dependencies.${mod_id}]]
+    modId="distanthorizons"
+    type="optional"
+    versionRange="[3.0.3-b,)"
+    ordering="AFTER"
+    side="CLIENT"

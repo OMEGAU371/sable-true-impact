@@ -1,0 +1,500 @@
+﻿java.lang.IllegalStateException: Failed to parse either. First: Not a valid resource location: Tracks:track_mount Non [a-z0-9_.-] character in namespace of location: Tracks:track_mount; Second: Not a JSON object: "Tracks:track_mount"
+	at MC-BOOTSTRAP/datafixerupper@8.0.16/com.mojang.serialization.DataResult$Error.getOrThrow(DataResult.java:287) ~[datafixerupper-8.0.16.jar%23114!/:?] {}
+	at MC-BOOTSTRAP/datafixerupper@8.0.16/com.mojang.serialization.DataResult.getOrThrow(DataResult.java:81) ~[datafixerupper-8.0.16.jar%23114!/:?] {re:mixin}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.tags.TagLoader.load(TagLoader.java:53) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:classloading}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.tags.TagLoader.loadAndBuild(TagLoader.java:118) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:classloading}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.tags.TagManager.lambda$createLoader$3(TagManager.java:46) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:classloading}
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1768) [?:?] {}
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.exec(CompletableFuture.java:1760) [?:?] {}
+	at java.base/java.util.concurrent.ForkJoinTask.doExec(ForkJoinTask.java:387) [?:?] {}
+	at java.base/java.util.concurrent.ForkJoinPool$WorkQueue.topLevelExec(ForkJoinPool.java:1312) [?:?] {}
+	at java.base/java.util.concurrent.ForkJoinPool.scan(ForkJoinPool.java:1843) [?:?] {re:mixin,re:computing_frames}
+	at java.base/java.util.concurrent.ForkJoinPool.runWorker(ForkJoinPool.java:1808) [?:?] {re:mixin,re:computing_frames}
+	at java.base/java.util.concurrent.ForkJoinWorkerThread.run(ForkJoinWorkerThread.java:188) [?:?] {re:mixin}
+[18:33:07] [Worker-ResourceReload-16/ERROR] [minecraft/TagLoader]: Couldn't read tag list minecraft:mineable/pickaxe from minecraft:tags/block/mineable/pickaxe.json in data pack mod/tracks
+java.lang.IllegalStateException: Failed to parse either. First: Not a valid resource location: Tracks:track_drive_wheel Non [a-z0-9_.-] character in namespace of location: Tracks:track_drive_wheel; Second: Not a JSON object: "Tracks:track_drive_wheel"; Failed to parse either. First: Not a valid resource location: Tracks:suspension_track Non [a-z0-9_.-] character in namespace of location: Tracks:suspension_track; Second: Not a JSON object: "Tracks:suspension_track"; Failed to parse either. First: Not a valid resource location: Tracks:track_mount Non [a-z0-9_.-] character in namespace of location: Tracks:track_mount; Second: Not a JSON object: "Tracks:track_mount"
+	at MC-BOOTSTRAP/datafixerupper@8.0.16/com.mojang.serialization.DataResult$Error.getOrThrow(DataResult.java:287) ~[datafixerupper-8.0.16.jar%23114!/:?] {}
+	at MC-BOOTSTRAP/datafixerupper@8.0.16/com.mojang.serialization.DataResult.getOrThrow(DataResult.java:81) ~[datafixerupper-8.0.16.jar%23114!/:?] {re:mixin}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.tags.TagLoader.load(TagLoader.java:53) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:classloading}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.tags.TagLoader.loadAndBuild(TagLoader.java:118) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:classloading}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.tags.TagManager.lambda$createLoader$3(TagManager.java:46) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:classloading}
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1768) [?:?] {}
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.exec(CompletableFuture.java:1760) [?:?] {}
+	at java.base/java.util.concurrent.ForkJoinTask.doExec(ForkJoinTask.java:387) [?:?] {}
+	at java.base/java.util.concurrent.ForkJoinPool$WorkQueue.topLevelExec(ForkJoinPool.java:1312) [?:?] {}
+	at java.base/java.util.concurrent.ForkJoinPool.scan(ForkJoinPool.java:1843) [?:?] {re:mixin,re:computing_frames}
+	at java.base/java.util.concurrent.ForkJoinPool.runWorker(ForkJoinPool.java:1808) [?:?] {re:mixin,re:computing_frames}
+	at java.base/java.util.concurrent.ForkJoinWorkerThread.run(ForkJoinWorkerThread.java:188) [?:?] {re:mixin}
+[18:33:07] [Worker-ResourceReload-16/ERROR] [minecraft/TagLoader]: Couldn't read tag list create:safe_nbt from create:tags/block/safe_nbt.json in data pack mod/tracks
+java.lang.IllegalStateException: Failed to parse either. First: Not a valid resource location: Tracks:track_drive_wheel Non [a-z0-9_.-] character in namespace of location: Tracks:track_drive_wheel; Second: Not a JSON object: "Tracks:track_drive_wheel"; Failed to parse either. First: Not a valid resource location: Tracks:suspension_track Non [a-z0-9_.-] character in namespace of location: Tracks:suspension_track; Second: Not a JSON object: "Tracks:suspension_track"; Failed to parse either. First: Not a valid resource location: Tracks:track_mount Non [a-z0-9_.-] character in namespace of location: Tracks:track_mount; Second: Not a JSON object: "Tracks:track_mount"
+	at MC-BOOTSTRAP/datafixerupper@8.0.16/com.mojang.serialization.DataResult$Error.getOrThrow(DataResult.java:287) ~[datafixerupper-8.0.16.jar%23114!/:?] {}
+	at MC-BOOTSTRAP/datafixerupper@8.0.16/com.mojang.serialization.DataResult.getOrThrow(DataResult.java:81) ~[datafixerupper-8.0.16.jar%23114!/:?] {re:mixin}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.tags.TagLoader.load(TagLoader.java:53) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:classloading}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.tags.TagLoader.loadAndBuild(TagLoader.java:118) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:classloading}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.tags.TagManager.lambda$createLoader$3(TagManager.java:46) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:classloading}
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1768) [?:?] {}
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.exec(CompletableFuture.java:1760) [?:?] {}
+	at java.base/java.util.concurrent.ForkJoinTask.doExec(ForkJoinTask.java:387) [?:?] {}
+	at java.base/java.util.concurrent.ForkJoinPool$WorkQueue.topLevelExec(ForkJoinPool.java:1312) [?:?] {}
+	at java.base/java.util.concurrent.ForkJoinPool.scan(ForkJoinPool.java:1843) [?:?] {re:mixin,re:computing_frames}
+	at java.base/java.util.concurrent.ForkJoinPool.runWorker(ForkJoinPool.java:1808) [?:?] {re:mixin,re:computing_frames}
+	at java.base/java.util.concurrent.ForkJoinWorkerThread.run(ForkJoinWorkerThread.java:188) [?:?] {re:mixin}
+[18:33:08] [Render thread/INFO] [minecraft/RecipeManager]: Loaded 5346 recipes
+[18:33:09] [Render thread/INFO] [minecraft/AdvancementTree]: Loaded 4430 advancements
+[18:33:09] [Render thread/INFO] [Moonlight/]: Applied 17 data villager trades
+[18:33:09] [Render thread/INFO] [Moonlight/]: Failed to load custom color set definition {"id":"quark:rune","colors":{"default":"quark:blank_rune"},"replace":false}. Ignoring
+[18:33:09] [Render thread/INFO] [Moonlight/]: Failed to load custom color set definition {"id":"quark:shard","colors":{"default":"quark:clear_shard"},"replace":false}. Ignoring
+[18:33:09] [Render thread/INFO] [Supplementaries/]: Loaded 29 flute songs
+[18:33:09] [Render thread/INFO] [co.dr.tf.TFMG/]: Added 8 Engine Fuel Types
+[18:33:10] [Render thread/INFO] [Supplementaries/]: Registering custom dispenser behaviors
+[18:33:10] [Render thread/WARN] [ModernFix/]: Initial datapack load took 4.843 s
+[18:33:10] [Render thread/INFO] [Vista/]: Restored 0 cached videos from disk
+[18:33:10] [Render thread/INFO] [Vista/]: Media Cache initialized at D:\.minecraft\versions\鑸┖锛乗vista_web_content_cache, max size = 512 MB
+[18:33:10] [Server thread/INFO] [minecraft/IntegratedServer]: Starting integrated minecraft server version 1.21.1
+[18:33:10] [Server thread/INFO] [minecraft/MinecraftServer]: Generating keypair
+[18:33:10] [Server thread/INFO] [Di.se.di.co.wo.AbstractDhWorld/]: Started DhWorld of type CLIENT_SERVER
+[18:33:11] [Server thread/INFO] [de.ry.sa.Sable/]: Assigned physics scene ID 0 to minecraft:overworld
+[2026-05-11T10:33:11.024182200Z] [[32mINFO[0m] (sable_rapier) Rapier initialized scene 0
+[18:33:11] [Server thread/INFO] [Di.se.di.ne.NeoforgeClientProxy/]: level load
+[18:33:11] [DH-Full Data Migration Thread[0]/INFO] [Di.se.di.co.fi.fu.V2.DataMigratorV1/]: No migration necessary.
+[18:33:11] [Server thread/INFO] [Di.se.di.co.le.AbstractDhServerLevel/]: Started DhClientServerLevel for [Wrapped{ServerLevel[鏂扮殑涓栫晫]@minecraft:overworld}] at [[LocalSaveStructure@(D:\.minecraft\versions\鑸┖锛乗saves\鏂扮殑涓栫晫 (2)\data)]].
+[18:33:11] [Server thread/INFO] [de.ry.sa.Sable/]: Assigned physics scene ID 1 to minecraft:the_end
+[2026-05-11T10:33:11.340255000Z] [[32mINFO[0m] (sable_rapier) Rapier initialized scene 1
+[18:33:11] [Server thread/INFO] [Di.se.di.ne.NeoforgeClientProxy/]: level load
+[18:33:11] [DH-Full Data Migration Thread[0]/INFO] [Di.se.di.co.fi.fu.V2.DataMigratorV1/]: No migration necessary.
+[18:33:11] [Server thread/INFO] [Di.se.di.co.le.AbstractDhServerLevel/]: Started DhClientServerLevel for [Wrapped{ServerLevel[鏂扮殑涓栫晫]@minecraft:the_end}] at [[LocalSaveStructure@(D:\.minecraft\versions\鑸┖锛乗saves\鏂扮殑涓栫晫 (2)\data;D:\.minecraft\versions\鑸┖锛乗saves\鏂扮殑涓栫晫 (2)\DIM1\data)]].
+[18:33:11] [Server thread/INFO] [de.ry.sa.Sable/]: Assigned physics scene ID 2 to minecraft:the_nether
+[2026-05-11T10:33:11.420781300Z] [[32mINFO[0m] (sable_rapier) Rapier initialized scene 2
+[18:33:11] [Server thread/INFO] [Di.se.di.ne.NeoforgeClientProxy/]: level load
+[18:33:11] [DH-Full Data Migration Thread[0]/INFO] [Di.se.di.co.fi.fu.V2.DataMigratorV1/]: No migration necessary.
+[18:33:11] [Server thread/INFO] [Di.se.di.co.le.AbstractDhServerLevel/]: Started DhClientServerLevel for [Wrapped{ServerLevel[鏂扮殑涓栫晫]@minecraft:the_nether}] at [[LocalSaveStructure@(D:\.minecraft\versions\鑸┖锛乗saves\鏂扮殑涓栫晫 (2)\data;D:\.minecraft\versions\鑸┖锛乗saves\鏂扮殑涓栫晫 (2)\DIM1\data;D:\.minecraft\versions\鑸┖锛乗saves\鏂扮殑涓栫晫 (2)\DIM-1\data)]].
+[18:33:11] [Server thread/INFO] [minecraft/MinecraftServer]: Preparing start region for dimension minecraft:overworld
+[18:33:12] [Render thread/INFO] [minecraft/LoggerChunkProgressListener]: Preparing spawn area: 0%
+[18:33:12] [Render thread/INFO] [minecraft/LoggerChunkProgressListener]: Preparing spawn area: 0%
+[18:33:12] [Render thread/INFO] [minecraft/LoggerChunkProgressListener]: Time elapsed: 1126 ms
+[18:33:12] [Server thread/INFO] [ne.ne.ne.se.pe.PermissionAPI/]: Successfully initialized permission handler neoforge:default_handler
+[18:33:12] [Server thread/INFO] [de.lo.gn.Gears/]: GnKinetics SERVER SETUP
+[18:33:16] [Server thread/INFO] [de.ry.sa.Sable/]: Assigned physics scene ID 3 to minecraft:server_faucet_test_level
+[2026-05-11T10:33:16.005774000Z] [[32mINFO[0m] (sable_rapier) Rapier initialized scene 3
+[18:33:16] [Server thread/INFO] [Di.se.di.ne.NeoforgeClientProxy/]: level unload
+[18:33:16] [Server thread/INFO] [de.ry.sa.Sable/]: Assigned physics scene ID 4 to minecraft:server_projectile_test_level
+[2026-05-11T10:33:16.121394900Z] [[32mINFO[0m] (sable_rapier) Rapier initialized scene 4
+[18:33:16] [Server thread/INFO] [minecraft/IntegratedServer]: Changing view distance to 15, from 10
+[18:33:16] [Server thread/INFO] [minecraft/IntegratedServer]: Changing simulation distance to 15, from 0
+[18:33:16] [Render thread/INFO] [de.ry.sa.Sable/]: Adding local UDP server channel future
+[18:33:16] [Render thread/WARN] [io.ne.bo.Bootstrap/]: Unknown channel option 'SO_BROADCAST' for channel '[id: 0x0c5fb6fe]'
+[18:33:16] [Netty Server IO #1/INFO] [de.ry.sa.Sable/]: Server UDP channel active
+[18:33:16] [Render thread/INFO] [de.ry.sa.Sable/]: Starting local client UDP channel future
+[18:33:16] [Netty Local Client IO #1/INFO] [de.ry.sa.Sable/]: Client UDP channel active
+[18:33:16] [Render thread/INFO] [co.si.cr.Create/]: Created 157 recipes which will be injected into the game
+[18:33:16] [Render thread/INFO] [co.si.cr.Create/]: Created 0 tags which will be injected into the game
+[18:33:17] [Server thread/INFO] [minecraft/PlayerList]: OMEGAU371[local:E:70206047] logged in with entity id 10 at (208.45925028257258, 5.645362791464688, 176.41111121156254)
+[18:33:17] [Server thread/INFO] [de.ry.sa.Sable/]: Beginning attempted authentication with player OMEGAU371
+[18:33:17] [Render thread/INFO] [xa.ma.WorldMap/]: Fullscreen map required item set to nothing.
+[18:33:17] [Server thread/INFO] [minecraft/MinecraftServer]: OMEGAU371 joined the game
+[18:33:17] [Render thread/INFO] [xa.ma.WorldMap/]: New world map session initialized!
+[18:33:17] [Render thread/INFO] [xa.hu.mi.MinimapLogs/]: Minimap required item set to nothing.
+[18:33:17] [Render thread/INFO] [xa.hu.mi.MinimapLogs/]: New Xaero hud session initialized!
+[18:33:18] [Server thread/INFO] [Di.se.di.co.ap.in.ServerApi/]: Player [OMEGAU371] joined.
+[18:33:18] [Render thread/INFO] [Di.se.di.ne.NeoforgeClientProxy/]: level load
+[18:33:18] [Render thread/INFO] [Di.se.di.co.ap.in.ClientApi/]: Loading client level [Wrapped{ClientLevel@9c3tnjqi54e38@minecraft:overworld}]-[9c3tnjqi54e38@minecraft:overworld].
+[18:33:18] [Render thread/INFO] [Di.se.di.co.ap.in.ClientApi/]: Loaded [0] waiting chunk wrappers.
+[18:33:18] [Render thread/INFO] [Iris/]: Reloading pipeline on dimension change: minecraft:overworld => minecraft:overworld
+[18:33:18] [Render thread/INFO] [Iris/]: Destroying pipeline minecraft:overworld
+[18:33:18] [Render thread/INFO] [Iris/]: Creating pipeline for dimension minecraft:overworld
+[18:33:18] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO] [Di.se.di.co.ge.BatchGenerator/]: Batch Chunk Generator initialized
+[18:33:18] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO] [Di.se.di.co.ge.qu.WorldGenerationQueue/]: Creating world gen queue
+[18:33:18] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO] [Di.se.di.co.ge.qu.WorldGenerationQueue/]: Created world gen queue
+[18:33:18] [DH-Request Module Ticker [minecraft:overworld] Thread[0]/INFO] [Di.se.di.co.fi.fu.GeneratedFullDataSourceProvider/]: Set world gen queue for level [minecraft:overworld].
+[18:33:18] [Render thread/INFO] [ChunkBuilder/]: Started 10 worker threads
+[18:33:19] [Render thread/INFO] [flywheel/]: Started 10 worker threads
+[18:33:19] [Render thread/INFO] [Di.se.di.co.ap.in.ClientApi/]: Loading client level [Wrapped{ClientLevel@9c3tnjqi54e38@minecraft:overworld}]-[9c3tnjqi54e38@minecraft:overworld].
+[18:33:19] [Render thread/INFO] [Di.se.di.co.ap.in.ClientApi/]: Loaded [0] waiting chunk wrappers.
+[18:33:20] [Render thread/INFO] [Moonlight/]: Synced Custom World Data [supplementaries_globe_data]
+[18:33:20] [Render thread/INFO] [Moonlight/]: Synced Custom World Data [vista_viewfinder_connection]
+[18:33:20] [Render thread/INFO] [Supplementaries/]: Synced Captured Mobs settings
+[18:33:20] [Render thread/INFO] [Supplementaries/]: Synced Hourglass data
+[18:33:20] [Render thread/INFO] [Sounds/]: Building tag cache.
+[18:33:20] [Render thread/INFO] [me.je.co.ut.LoggedTimer/]: Starting JEI...
+[18:33:20] [Render thread/INFO] [me.je.li.lo.PluginCaller/]: Registering item subtypes...
+[18:33:20] [Render thread/INFO] [me.je.li.lo.PluginCallerTimerRunnable/]: Registering item subtypes: jei:minecraft took 76.83 milliseconds
+[18:33:20] [Render thread/INFO] [me.je.li.lo.PluginCaller/]: Registering item subtypes took 105.3 milliseconds
+[18:33:20] [Render thread/INFO] [me.je.li.lo.PluginCaller/]: Registering fluid subtypes...
+[18:33:20] [Render thread/INFO] [me.je.li.lo.PluginCallerTimerRunnable/]: Registering fluid subtypes: jei:debug took 18.97 milliseconds
+[18:33:20] [Render thread/ERROR] [me.je.li.lo.re.SubtypeRegistration/]: An interpreter is already registered for this: create:potion
+java.lang.IllegalArgumentException: null
+	at TRANSFORMER/jei@19.27.0.340/mezz.jei.library.load.registration.SubtypeRegistration.registerSubtypeInterpreter(SubtypeRegistration.java:26) ~[%5BJEI鐗╁搧绠＄悊鍣?5D%20jei-1.21.1-neoforge-19.27.0.340.jar%23241!/:19.27.0.340] {re:classloading}
+	at TRANSFORMER/create@6.0.10/com.simibubi.create.compat.jei.CreateJEI.registerFluidSubtypes(CreateJEI.java:364) ~[%5B鏈烘鍔ㄥ姏%5D%20create-1.21.1-6.0.10.jar%23247!/:6.0.10] {re:classloading}
+	at TRANSFORMER/jei@19.27.0.340/mezz.jei.library.load.PluginLoader.lambda$registerSubtypes$1(PluginLoader.java:74) ~[%5BJEI鐗╁搧绠＄悊鍣?5D%20jei-1.21.1-neoforge-19.27.0.340.jar%23241!/:19.27.0.340] {re:classloading}
+	at TRANSFORMER/jei@19.27.0.340/mezz.jei.library.load.PluginCaller.callOnPlugins(PluginCaller.java:26) ~[%5BJEI鐗╁搧绠＄悊鍣?5D%20jei-1.21.1-neoforge-19.27.0.340.jar%23241!/:19.27.0.340] {re:classloading}
+	at TRANSFORMER/jei@19.27.0.340/mezz.jei.library.load.PluginLoader.registerSubtypes(PluginLoader.java:73) ~[%5BJEI鐗╁搧绠＄悊鍣?5D%20jei-1.21.1-neoforge-19.27.0.340.jar%23241!/:19.27.0.340] {re:classloading}
+	at TRANSFORMER/jei@19.27.0.340/mezz.jei.library.startup.JeiStarter.start(JeiStarter.java:112) ~[%5BJEI鐗╁搧绠＄悊鍣?5D%20jei-1.21.1-neoforge-19.27.0.340.jar%23241!/:19.27.0.340] {re:classloading}
+	at TRANSFORMER/jei@19.27.0.340/mezz.jei.neoforge.startup.StartEventObserver.transitionState(StartEventObserver.java:175) ~[%5BJEI鐗╁搧绠＄悊鍣?5D%20jei-1.21.1-neoforge-19.27.0.340.jar%23241!/:19.27.0.340] {re:classloading}
+	at TRANSFORMER/jei@19.27.0.340/mezz.jei.neoforge.startup.StartEventObserver.onEvent(StartEventObserver.java:120) ~[%5BJEI鐗╁搧绠＄悊鍣?5D%20jei-1.21.1-neoforge-19.27.0.340.jar%23241!/:19.27.0.340] {re:classloading}
+	at MC-BOOTSTRAP/net.neoforged.bus/net.neoforged.bus.ConsumerEventHandler.invoke(ConsumerEventHandler.java:27) ~[bus-8.0.5.jar%23164!/:?] {}
+	at MC-BOOTSTRAP/net.neoforged.bus/net.neoforged.bus.EventBus.post(EventBus.java:360) ~[bus-8.0.5.jar%23164!/:?] {}
+	at MC-BOOTSTRAP/net.neoforged.bus/net.neoforged.bus.EventBus.post(EventBus.java:328) ~[bus-8.0.5.jar%23164!/:?] {}
+	at TRANSFORMER/neoforge@21.1.226/net.neoforged.neoforge.client.ClientHooks.onRecipesUpdated(ClientHooks.java:664) ~[neoforge-21.1.226-universal.jar%23240!/:?] {re:mixin,re:classloading,pl:mixin:APP:sodium-neoforge.mixins.json:platform.neoforge.ClientHooksMixin from mod sodium,pl:mixin:APP:moonlight.mixins.json:ClientHooksMixin from mod moonlight,pl:mixin:A}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.client.multiplayer.ClientPacketListener.handleUpdateRecipes(ClientPacketListener.java:1506) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,pl:runtimedistcleaner:A,re:classloading,pl:accesstransformer:B,pl:mixin:APP:xaerolib.mixins.json:MixinClientPacketListener from mod xaerolib,pl:mixin:APP:xaeroworldmap.mixins.json:MixinClientPlayNetworkHandler from mod xaeroworldmap,pl:mixin:APP:xaeroworldmap.neoforge.mixins.json:MixinForgeClientPacketListener from mod xaeroworldmap,pl:mixin:APP:mixins.iris.json:MixinClientPacketListener from mod iris,pl:mixin:APP:clientsort.mixins.json:client.ClientPacketListenerMixin from mod clientsort,pl:mixin:APP:DistantHorizons.neoforge.mixins.json:client.MixinClientPacketListener from mod distanthorizons,pl:mixin:APP:sodium-common.mixins.json:core.world.map.ClientPacketListenerMixin from mod sodium,pl:mixin:APP:supplementaries-common.mixins.json:ClientPacketListenerMixin from mod supplementaries,pl:mixin:APP:moonlight-common.mixins.json:ClientPacketListenerMixin from mod moonlight,pl:mixin:APP:xaerohud.mixins.json:MixinClientPlayNetworkHandler from mod xaerominimap,pl:mixin:APP:ponder-common.mixins.json:client.accessor.ClientPacketListenerAccessor from mod ponder,pl:mixin:APP:sable.mixins.json:entity.entities_stick_sublevels.ClientPacketListenerMixin from mod sable,pl:mixin:APP:sable.mixins.json:entity.entity_rotations_and_riding.ClientPacketListenerMixin from mod sable,pl:mixin:APP:sable.mixins.json:plot.lighting.ClientPacketListenerMixin from mod sable,pl:mixin:A,pl:runtimedistcleaner:A}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.network.protocol.game.ClientboundUpdateRecipesPacket.handle(ClientboundUpdateRecipesPacket.java:32) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:classloading}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.network.protocol.game.ClientboundUpdateRecipesPacket.handle(ClientboundUpdateRecipesPacket.java:13) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:classloading}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.network.protocol.PacketUtils.lambda$ensureRunningOnSameThread$0(PacketUtils.java:27) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:classloading}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.util.thread.BlockableEventLoop.doRunTask(BlockableEventLoop.java:148) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,re:computing_frames,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.util.thread.ReentrantBlockableEventLoop.doRunTask(ReentrantBlockableEventLoop.java:23) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,re:computing_frames,re:classloading}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.util.thread.BlockableEventLoop.pollTask(BlockableEventLoop.java:122) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,re:computing_frames,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.util.thread.BlockableEventLoop.runAllTasks(BlockableEventLoop.java:111) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,re:computing_frames,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.client.Minecraft.runTick(Minecraft.java:1155) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,pl:runtimedistcleaner:A,re:classloading,pl:accesstransformer:B,pl:mixin:APP:mixins.modernui-neoforge.json:MixinMinecraft from mod modernui,pl:mixin:APP:aeronautics.mixins.json:custom_situational_music.MinecraftMixin from mod aeronautics,pl:mixin:APP:xaeroworldmap.mixins.json:MixinMinecraftClient from mod xaeroworldmap,pl:mixin:APP:xaeroworldmap.neoforge.mixins.json:MixinForgeMinecraftClient from mod xaeroworldmap,pl:mixin:APP:modernfix-modernfix.mixins.json:bugfix.world_leaks.MinecraftMixin from mod modernfix,pl:mixin:APP:modernfix-modernfix.mixins.json:perf.suspend_integrated_server_during_load.MinecraftMixin from mod modernfix,pl:mixin:APP:modernfix-modernfix.mixins.json:perf.dedicated_reload_executor.MinecraftMixin from mod modernfix,pl:mixin:APP:modernfix-modernfix.mixins.json:perf.encoder_cache_leak.MinecraftMixin from mod modernfix,pl:mixin:APP:modernfix-modernfix.mixins.json:feature.measure_time.MinecraftMixin_Forge from mod modernfix,pl:mixin:APP:modernfix-modernfix.mixins.json:feature.measure_time.MinecraftMixin from mod modernfix,pl:mixin:APP:mixins.iris.json:MixinMinecraft_Images from mod iris,pl:mixin:APP:mixins.iris.json:MixinMinecraft_Keybinds from mod iris,pl:mixin:APP:mixins.iris.json:MixinMinecraft_PipelineManagement from mod iris,pl:mixin:APP:veil.debug.mixins.json:client.DebugMinecraftMixin from mod veil,pl:mixin:APP:veil.pipeline.mixins.json:client.PipelineMinecraftMixin from mod veil,pl:mixin:APP:veil.neoforge.mixins.json:client.MinecraftMixin from mod veil,pl:mixin:APP:simulated.mixins.json:handle.MinecraftMixin from mod simulated,pl:mixin:APP:clientsort.mixins.json:client.MinecraftMixin from mod clientsort,pl:mixin:APP:DistantHorizons.neoforge.mixins.json:client.MixinMinecraft from mod distanthorizons,pl:mixin:APP:sodium-common.mixins.json:core.MinecraftMixin from mod sodium,pl:mixin:APP:sodium-neoforge.mixins.json:platform.neoforge.EntrypointMixin from mod sodium,pl:mixin:APP:supplementaries-common.mixins.json:MinecraftMixin from mod supplementaries,pl:mixin:APP:moonlight-common.mixins.json:MinecraftMixin from mod moonlight,pl:mixin:APP:sounds.mixins.json:ui.HotbarKeybindSoundEffects from mod sounds,pl:mixin:APP:sounds.mixins.json:ui.ScreenSoundEffect from mod sounds,pl:mixin:APP:xaerohud.mixins.json:MixinMinecraftClient from mod xaerominimap,pl:mixin:APP:entityculling.mixins.json:DebugScreenEntriesAccessor from mod entityculling,pl:mixin:APP:entityculling.mixins.json:LivingEntityRendererAccessor from mod entityculling,pl:mixin:APP:immediatelyfast-common.mixins.json:core.MixinMinecraftClient from mod immediatelyfast,pl:mixin:APP:architectury.mixins.json:MixinMinecraft from mod architectury,pl:mixin:APP:yacl.mixins.json:MinecraftMixin from mod yet_another_config_lib_v3,pl:mixin:APP:transition.mixins.json:EntityRenderStateMixin from mod transition,pl:mixin:APP:transition.mixins.json:EntityRendererMixin from mod transition,pl:mixin:APP:transition.mixins.json:BlockEntityRenderStateMixin from mod transition,pl:mixin:APP:transition.mixins.json:MinecraftMixin from mod transition,pl:mixin:APP:flywheel.impl.mixins.json:MinecraftMixin from mod flywheel,pl:mixin:APP:ponder-common.mixins.json:client.WindowResizeMixin from mod ponder,pl:mixin:APP:create.mixins.json:accessor.MinecraftAccessor from mod create,pl:mixin:APP:sable.mixins.json:camera.new_camera_types.MinecraftMixin from mod sable,pl:mixin:APP:sable.mixins.json:plot.MinecraftMixin from mod sable,pl:mixin:APP:sable.mixins.json:punching.MinecraftMixin from mod sable,pl:mixin:APP:imblocker-neoforge.mixins.json:MinecraftClientMixin from mod imblocker,pl:mixin:APP:mixins.customskinloader.json:MixinMinecraft from mod customskinloader,pl:mixin:APP:modernfix-modernfix.mixins.json:feature.remove_telemetry.MinecraftMixin_Telemetry from mod modernfix,pl:mixin:A,pl:runtimedistcleaner:A}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.client.Minecraft.run(Minecraft.java:807) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,pl:runtimedistcleaner:A,re:classloading,pl:accesstransformer:B,pl:mixin:APP:mixins.modernui-neoforge.json:MixinMinecraft from mod modernui,pl:mixin:APP:aeronautics.mixins.json:custom_situational_music.MinecraftMixin from mod aeronautics,pl:mixin:APP:xaeroworldmap.mixins.json:MixinMinecraftClient from mod xaeroworldmap,pl:mixin:APP:xaeroworldmap.neoforge.mixins.json:MixinForgeMinecraftClient from mod xaeroworldmap,pl:mixin:APP:modernfix-modernfix.mixins.json:bugfix.world_leaks.MinecraftMixin from mod modernfix,pl:mixin:APP:modernfix-modernfix.mixins.json:perf.suspend_integrated_server_during_load.MinecraftMixin from mod modernfix,pl:mixin:APP:modernfix-modernfix.mixins.json:perf.dedicated_reload_executor.MinecraftMixin from mod modernfix,pl:mixin:APP:modernfix-modernfix.mixins.json:perf.encoder_cache_leak.MinecraftMixin from mod modernfix,pl:mixin:APP:modernfix-modernfix.mixins.json:feature.measure_time.MinecraftMixin_Forge from mod modernfix,pl:mixin:APP:modernfix-modernfix.mixins.json:feature.measure_time.MinecraftMixin from mod modernfix,pl:mixin:APP:mixins.iris.json:MixinMinecraft_Images from mod iris,pl:mixin:APP:mixins.iris.json:MixinMinecraft_Keybinds from mod iris,pl:mixin:APP:mixins.iris.json:MixinMinecraft_PipelineManagement from mod iris,pl:mixin:APP:veil.debug.mixins.json:client.DebugMinecraftMixin from mod veil,pl:mixin:APP:veil.pipeline.mixins.json:client.PipelineMinecraftMixin from mod veil,pl:mixin:APP:veil.neoforge.mixins.json:client.MinecraftMixin from mod veil,pl:mixin:APP:simulated.mixins.json:handle.MinecraftMixin from mod simulated,pl:mixin:APP:clientsort.mixins.json:client.MinecraftMixin from mod clientsort,pl:mixin:APP:DistantHorizons.neoforge.mixins.json:client.MixinMinecraft from mod distanthorizons,pl:mixin:APP:sodium-common.mixins.json:core.MinecraftMixin from mod sodium,pl:mixin:APP:sodium-neoforge.mixins.json:platform.neoforge.EntrypointMixin from mod sodium,pl:mixin:APP:supplementaries-common.mixins.json:MinecraftMixin from mod supplementaries,pl:mixin:APP:moonlight-common.mixins.json:MinecraftMixin from mod moonlight,pl:mixin:APP:sounds.mixins.json:ui.HotbarKeybindSoundEffects from mod sounds,pl:mixin:APP:sounds.mixins.json:ui.ScreenSoundEffect from mod sounds,pl:mixin:APP:xaerohud.mixins.json:MixinMinecraftClient from mod xaerominimap,pl:mixin:APP:entityculling.mixins.json:DebugScreenEntriesAccessor from mod entityculling,pl:mixin:APP:entityculling.mixins.json:LivingEntityRendererAccessor from mod entityculling,pl:mixin:APP:immediatelyfast-common.mixins.json:core.MixinMinecraftClient from mod immediatelyfast,pl:mixin:APP:architectury.mixins.json:MixinMinecraft from mod architectury,pl:mixin:APP:yacl.mixins.json:MinecraftMixin from mod yet_another_config_lib_v3,pl:mixin:APP:transition.mixins.json:EntityRenderStateMixin from mod transition,pl:mixin:APP:transition.mixins.json:EntityRendererMixin from mod transition,pl:mixin:APP:transition.mixins.json:BlockEntityRenderStateMixin from mod transition,pl:mixin:APP:transition.mixins.json:MinecraftMixin from mod transition,pl:mixin:APP:flywheel.impl.mixins.json:MinecraftMixin from mod flywheel,pl:mixin:APP:ponder-common.mixins.json:client.WindowResizeMixin from mod ponder,pl:mixin:APP:create.mixins.json:accessor.MinecraftAccessor from mod create,pl:mixin:APP:sable.mixins.json:camera.new_camera_types.MinecraftMixin from mod sable,pl:mixin:APP:sable.mixins.json:plot.MinecraftMixin from mod sable,pl:mixin:APP:sable.mixins.json:punching.MinecraftMixin from mod sable,pl:mixin:APP:imblocker-neoforge.mixins.json:MinecraftClientMixin from mod imblocker,pl:mixin:APP:mixins.customskinloader.json:MixinMinecraft from mod customskinloader,pl:mixin:APP:modernfix-modernfix.mixins.json:feature.remove_telemetry.MinecraftMixin_Telemetry from mod modernfix,pl:mixin:A,pl:runtimedistcleaner:A}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.client.main.Main.main(Main.java:230) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:runtimedistcleaner:A,re:classloading,pl:mixin:APP:veil.debug.mixins.json:client.DebugMainMixin from mod veil,pl:mixin:A,pl:runtimedistcleaner:A}
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103) ~[?:?] {}
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580) ~[?:?] {}
+	at MC-BOOTSTRAP/fml_loader@4.0.42/net.neoforged.fml.loading.targets.CommonLaunchHandler.runTarget(CommonLaunchHandler.java:136) ~[loader-4.0.42.jar%23161!/:4.0] {}
+	at MC-BOOTSTRAP/fml_loader@4.0.42/net.neoforged.fml.loading.targets.CommonLaunchHandler.clientService(CommonLaunchHandler.java:124) ~[loader-4.0.42.jar%23161!/:4.0] {}
+	at MC-BOOTSTRAP/fml_loader@4.0.42/net.neoforged.fml.loading.targets.CommonClientLaunchHandler.runService(CommonClientLaunchHandler.java:32) ~[loader-4.0.42.jar%23161!/:4.0] {}
+	at MC-BOOTSTRAP/fml_loader@4.0.42/net.neoforged.fml.loading.targets.CommonLaunchHandler.lambda$launchService$4(CommonLaunchHandler.java:118) ~[loader-4.0.42.jar%23161!/:4.0] {}
+	at MC-BOOTSTRAP/cpw.mods.modlauncher@11.0.5/cpw.mods.modlauncher.LaunchServiceHandlerDecorator.launch(LaunchServiceHandlerDecorator.java:30) [modlauncher-11.0.5.jar%23166!/:?] {}
+	at MC-BOOTSTRAP/cpw.mods.modlauncher@11.0.5/cpw.mods.modlauncher.LaunchServiceHandler.launch(LaunchServiceHandler.java:53) [modlauncher-11.0.5.jar%23166!/:?] {}
+	at MC-BOOTSTRAP/cpw.mods.modlauncher@11.0.5/cpw.mods.modlauncher.LaunchServiceHandler.launch(LaunchServiceHandler.java:71) [modlauncher-11.0.5.jar%23166!/:?] {}
+	at MC-BOOTSTRAP/cpw.mods.modlauncher@11.0.5/cpw.mods.modlauncher.Launcher.run(Launcher.java:103) [modlauncher-11.0.5.jar%23166!/:?] {}
+	at MC-BOOTSTRAP/cpw.mods.modlauncher@11.0.5/cpw.mods.modlauncher.Launcher.main(Launcher.java:74) [modlauncher-11.0.5.jar%23166!/:?] {}
+	at MC-BOOTSTRAP/cpw.mods.modlauncher@11.0.5/cpw.mods.modlauncher.BootstrapLaunchConsumer.accept(BootstrapLaunchConsumer.java:26) [modlauncher-11.0.5.jar%23166!/:?] {}
+	at MC-BOOTSTRAP/cpw.mods.modlauncher@11.0.5/cpw.mods.modlauncher.BootstrapLaunchConsumer.accept(BootstrapLaunchConsumer.java:23) [modlauncher-11.0.5.jar%23166!/:?] {}
+	at cpw.mods.bootstraplauncher@2.0.2/cpw.mods.bootstraplauncher.BootstrapLauncher.run(BootstrapLauncher.java:210) [bootstraplauncher-2.0.2.jar:?] {}
+	at cpw.mods.bootstraplauncher@2.0.2/cpw.mods.bootstraplauncher.BootstrapLauncher.main(BootstrapLauncher.java:69) [bootstraplauncher-2.0.2.jar:?] {}
+[18:33:20] [Render thread/ERROR] [me.je.li.lo.re.SubtypeRegistration/]: An interpreter is already registered for this: create:flowing_potion
+java.lang.IllegalArgumentException: null
+	at TRANSFORMER/jei@19.27.0.340/mezz.jei.library.load.registration.SubtypeRegistration.registerSubtypeInterpreter(SubtypeRegistration.java:26) ~[%5BJEI鐗╁搧绠＄悊鍣?5D%20jei-1.21.1-neoforge-19.27.0.340.jar%23241!/:19.27.0.340] {re:classloading}
+	at TRANSFORMER/create@6.0.10/com.simibubi.create.compat.jei.CreateJEI.registerFluidSubtypes(CreateJEI.java:365) ~[%5B鏈烘鍔ㄥ姏%5D%20create-1.21.1-6.0.10.jar%23247!/:6.0.10] {re:classloading}
+	at TRANSFORMER/jei@19.27.0.340/mezz.jei.library.load.PluginLoader.lambda$registerSubtypes$1(PluginLoader.java:74) ~[%5BJEI鐗╁搧绠＄悊鍣?5D%20jei-1.21.1-neoforge-19.27.0.340.jar%23241!/:19.27.0.340] {re:classloading}
+	at TRANSFORMER/jei@19.27.0.340/mezz.jei.library.load.PluginCaller.callOnPlugins(PluginCaller.java:26) ~[%5BJEI鐗╁搧绠＄悊鍣?5D%20jei-1.21.1-neoforge-19.27.0.340.jar%23241!/:19.27.0.340] {re:classloading}
+	at TRANSFORMER/jei@19.27.0.340/mezz.jei.library.load.PluginLoader.registerSubtypes(PluginLoader.java:73) ~[%5BJEI鐗╁搧绠＄悊鍣?5D%20jei-1.21.1-neoforge-19.27.0.340.jar%23241!/:19.27.0.340] {re:classloading}
+	at TRANSFORMER/jei@19.27.0.340/mezz.jei.library.startup.JeiStarter.start(JeiStarter.java:112) ~[%5BJEI鐗╁搧绠＄悊鍣?5D%20jei-1.21.1-neoforge-19.27.0.340.jar%23241!/:19.27.0.340] {re:classloading}
+	at TRANSFORMER/jei@19.27.0.340/mezz.jei.neoforge.startup.StartEventObserver.transitionState(StartEventObserver.java:175) ~[%5BJEI鐗╁搧绠＄悊鍣?5D%20jei-1.21.1-neoforge-19.27.0.340.jar%23241!/:19.27.0.340] {re:classloading}
+	at TRANSFORMER/jei@19.27.0.340/mezz.jei.neoforge.startup.StartEventObserver.onEvent(StartEventObserver.java:120) ~[%5BJEI鐗╁搧绠＄悊鍣?5D%20jei-1.21.1-neoforge-19.27.0.340.jar%23241!/:19.27.0.340] {re:classloading}
+	at MC-BOOTSTRAP/net.neoforged.bus/net.neoforged.bus.ConsumerEventHandler.invoke(ConsumerEventHandler.java:27) ~[bus-8.0.5.jar%23164!/:?] {}
+	at MC-BOOTSTRAP/net.neoforged.bus/net.neoforged.bus.EventBus.post(EventBus.java:360) ~[bus-8.0.5.jar%23164!/:?] {}
+	at MC-BOOTSTRAP/net.neoforged.bus/net.neoforged.bus.EventBus.post(EventBus.java:328) ~[bus-8.0.5.jar%23164!/:?] {}
+	at TRANSFORMER/neoforge@21.1.226/net.neoforged.neoforge.client.ClientHooks.onRecipesUpdated(ClientHooks.java:664) ~[neoforge-21.1.226-universal.jar%23240!/:?] {re:mixin,re:classloading,pl:mixin:APP:sodium-neoforge.mixins.json:platform.neoforge.ClientHooksMixin from mod sodium,pl:mixin:APP:moonlight.mixins.json:ClientHooksMixin from mod moonlight,pl:mixin:A}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.client.multiplayer.ClientPacketListener.handleUpdateRecipes(ClientPacketListener.java:1506) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,pl:runtimedistcleaner:A,re:classloading,pl:accesstransformer:B,pl:mixin:APP:xaerolib.mixins.json:MixinClientPacketListener from mod xaerolib,pl:mixin:APP:xaeroworldmap.mixins.json:MixinClientPlayNetworkHandler from mod xaeroworldmap,pl:mixin:APP:xaeroworldmap.neoforge.mixins.json:MixinForgeClientPacketListener from mod xaeroworldmap,pl:mixin:APP:mixins.iris.json:MixinClientPacketListener from mod iris,pl:mixin:APP:clientsort.mixins.json:client.ClientPacketListenerMixin from mod clientsort,pl:mixin:APP:DistantHorizons.neoforge.mixins.json:client.MixinClientPacketListener from mod distanthorizons,pl:mixin:APP:sodium-common.mixins.json:core.world.map.ClientPacketListenerMixin from mod sodium,pl:mixin:APP:supplementaries-common.mixins.json:ClientPacketListenerMixin from mod supplementaries,pl:mixin:APP:moonlight-common.mixins.json:ClientPacketListenerMixin from mod moonlight,pl:mixin:APP:xaerohud.mixins.json:MixinClientPlayNetworkHandler from mod xaerominimap,pl:mixin:APP:ponder-common.mixins.json:client.accessor.ClientPacketListenerAccessor from mod ponder,pl:mixin:APP:sable.mixins.json:entity.entities_stick_sublevels.ClientPacketListenerMixin from mod sable,pl:mixin:APP:sable.mixins.json:entity.entity_rotations_and_riding.ClientPacketListenerMixin from mod sable,pl:mixin:APP:sable.mixins.json:plot.lighting.ClientPacketListenerMixin from mod sable,pl:mixin:A,pl:runtimedistcleaner:A}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.network.protocol.game.ClientboundUpdateRecipesPacket.handle(ClientboundUpdateRecipesPacket.java:32) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:classloading}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.network.protocol.game.ClientboundUpdateRecipesPacket.handle(ClientboundUpdateRecipesPacket.java:13) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:classloading}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.network.protocol.PacketUtils.lambda$ensureRunningOnSameThread$0(PacketUtils.java:27) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:classloading}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.util.thread.BlockableEventLoop.doRunTask(BlockableEventLoop.java:148) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,re:computing_frames,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.util.thread.ReentrantBlockableEventLoop.doRunTask(ReentrantBlockableEventLoop.java:23) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,re:computing_frames,re:classloading}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.util.thread.BlockableEventLoop.pollTask(BlockableEventLoop.java:122) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,re:computing_frames,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.util.thread.BlockableEventLoop.runAllTasks(BlockableEventLoop.java:111) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,re:computing_frames,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.client.Minecraft.runTick(Minecraft.java:1155) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,pl:runtimedistcleaner:A,re:classloading,pl:accesstransformer:B,pl:mixin:APP:mixins.modernui-neoforge.json:MixinMinecraft from mod modernui,pl:mixin:APP:aeronautics.mixins.json:custom_situational_music.MinecraftMixin from mod aeronautics,pl:mixin:APP:xaeroworldmap.mixins.json:MixinMinecraftClient from mod xaeroworldmap,pl:mixin:APP:xaeroworldmap.neoforge.mixins.json:MixinForgeMinecraftClient from mod xaeroworldmap,pl:mixin:APP:modernfix-modernfix.mixins.json:bugfix.world_leaks.MinecraftMixin from mod modernfix,pl:mixin:APP:modernfix-modernfix.mixins.json:perf.suspend_integrated_server_during_load.MinecraftMixin from mod modernfix,pl:mixin:APP:modernfix-modernfix.mixins.json:perf.dedicated_reload_executor.MinecraftMixin from mod modernfix,pl:mixin:APP:modernfix-modernfix.mixins.json:perf.encoder_cache_leak.MinecraftMixin from mod modernfix,pl:mixin:APP:modernfix-modernfix.mixins.json:feature.measure_time.MinecraftMixin_Forge from mod modernfix,pl:mixin:APP:modernfix-modernfix.mixins.json:feature.measure_time.MinecraftMixin from mod modernfix,pl:mixin:APP:mixins.iris.json:MixinMinecraft_Images from mod iris,pl:mixin:APP:mixins.iris.json:MixinMinecraft_Keybinds from mod iris,pl:mixin:APP:mixins.iris.json:MixinMinecraft_PipelineManagement from mod iris,pl:mixin:APP:veil.debug.mixins.json:client.DebugMinecraftMixin from mod veil,pl:mixin:APP:veil.pipeline.mixins.json:client.PipelineMinecraftMixin from mod veil,pl:mixin:APP:veil.neoforge.mixins.json:client.MinecraftMixin from mod veil,pl:mixin:APP:simulated.mixins.json:handle.MinecraftMixin from mod simulated,pl:mixin:APP:clientsort.mixins.json:client.MinecraftMixin from mod clientsort,pl:mixin:APP:DistantHorizons.neoforge.mixins.json:client.MixinMinecraft from mod distanthorizons,pl:mixin:APP:sodium-common.mixins.json:core.MinecraftMixin from mod sodium,pl:mixin:APP:sodium-neoforge.mixins.json:platform.neoforge.EntrypointMixin from mod sodium,pl:mixin:APP:supplementaries-common.mixins.json:MinecraftMixin from mod supplementaries,pl:mixin:APP:moonlight-common.mixins.json:MinecraftMixin from mod moonlight,pl:mixin:APP:sounds.mixins.json:ui.HotbarKeybindSoundEffects from mod sounds,pl:mixin:APP:sounds.mixins.json:ui.ScreenSoundEffect from mod sounds,pl:mixin:APP:xaerohud.mixins.json:MixinMinecraftClient from mod xaerominimap,pl:mixin:APP:entityculling.mixins.json:DebugScreenEntriesAccessor from mod entityculling,pl:mixin:APP:entityculling.mixins.json:LivingEntityRendererAccessor from mod entityculling,pl:mixin:APP:immediatelyfast-common.mixins.json:core.MixinMinecraftClient from mod immediatelyfast,pl:mixin:APP:architectury.mixins.json:MixinMinecraft from mod architectury,pl:mixin:APP:yacl.mixins.json:MinecraftMixin from mod yet_another_config_lib_v3,pl:mixin:APP:transition.mixins.json:EntityRenderStateMixin from mod transition,pl:mixin:APP:transition.mixins.json:EntityRendererMixin from mod transition,pl:mixin:APP:transition.mixins.json:BlockEntityRenderStateMixin from mod transition,pl:mixin:APP:transition.mixins.json:MinecraftMixin from mod transition,pl:mixin:APP:flywheel.impl.mixins.json:MinecraftMixin from mod flywheel,pl:mixin:APP:ponder-common.mixins.json:client.WindowResizeMixin from mod ponder,pl:mixin:APP:create.mixins.json:accessor.MinecraftAccessor from mod create,pl:mixin:APP:sable.mixins.json:camera.new_camera_types.MinecraftMixin from mod sable,pl:mixin:APP:sable.mixins.json:plot.MinecraftMixin from mod sable,pl:mixin:APP:sable.mixins.json:punching.MinecraftMixin from mod sable,pl:mixin:APP:imblocker-neoforge.mixins.json:MinecraftClientMixin from mod imblocker,pl:mixin:APP:mixins.customskinloader.json:MixinMinecraft from mod customskinloader,pl:mixin:APP:modernfix-modernfix.mixins.json:feature.remove_telemetry.MinecraftMixin_Telemetry from mod modernfix,pl:mixin:A,pl:runtimedistcleaner:A}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.client.Minecraft.run(Minecraft.java:807) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,pl:runtimedistcleaner:A,re:classloading,pl:accesstransformer:B,pl:mixin:APP:mixins.modernui-neoforge.json:MixinMinecraft from mod modernui,pl:mixin:APP:aeronautics.mixins.json:custom_situational_music.MinecraftMixin from mod aeronautics,pl:mixin:APP:xaeroworldmap.mixins.json:MixinMinecraftClient from mod xaeroworldmap,pl:mixin:APP:xaeroworldmap.neoforge.mixins.json:MixinForgeMinecraftClient from mod xaeroworldmap,pl:mixin:APP:modernfix-modernfix.mixins.json:bugfix.world_leaks.MinecraftMixin from mod modernfix,pl:mixin:APP:modernfix-modernfix.mixins.json:perf.suspend_integrated_server_during_load.MinecraftMixin from mod modernfix,pl:mixin:APP:modernfix-modernfix.mixins.json:perf.dedicated_reload_executor.MinecraftMixin from mod modernfix,pl:mixin:APP:modernfix-modernfix.mixins.json:perf.encoder_cache_leak.MinecraftMixin from mod modernfix,pl:mixin:APP:modernfix-modernfix.mixins.json:feature.measure_time.MinecraftMixin_Forge from mod modernfix,pl:mixin:APP:modernfix-modernfix.mixins.json:feature.measure_time.MinecraftMixin from mod modernfix,pl:mixin:APP:mixins.iris.json:MixinMinecraft_Images from mod iris,pl:mixin:APP:mixins.iris.json:MixinMinecraft_Keybinds from mod iris,pl:mixin:APP:mixins.iris.json:MixinMinecraft_PipelineManagement from mod iris,pl:mixin:APP:veil.debug.mixins.json:client.DebugMinecraftMixin from mod veil,pl:mixin:APP:veil.pipeline.mixins.json:client.PipelineMinecraftMixin from mod veil,pl:mixin:APP:veil.neoforge.mixins.json:client.MinecraftMixin from mod veil,pl:mixin:APP:simulated.mixins.json:handle.MinecraftMixin from mod simulated,pl:mixin:APP:clientsort.mixins.json:client.MinecraftMixin from mod clientsort,pl:mixin:APP:DistantHorizons.neoforge.mixins.json:client.MixinMinecraft from mod distanthorizons,pl:mixin:APP:sodium-common.mixins.json:core.MinecraftMixin from mod sodium,pl:mixin:APP:sodium-neoforge.mixins.json:platform.neoforge.EntrypointMixin from mod sodium,pl:mixin:APP:supplementaries-common.mixins.json:MinecraftMixin from mod supplementaries,pl:mixin:APP:moonlight-common.mixins.json:MinecraftMixin from mod moonlight,pl:mixin:APP:sounds.mixins.json:ui.HotbarKeybindSoundEffects from mod sounds,pl:mixin:APP:sounds.mixins.json:ui.ScreenSoundEffect from mod sounds,pl:mixin:APP:xaerohud.mixins.json:MixinMinecraftClient from mod xaerominimap,pl:mixin:APP:entityculling.mixins.json:DebugScreenEntriesAccessor from mod entityculling,pl:mixin:APP:entityculling.mixins.json:LivingEntityRendererAccessor from mod entityculling,pl:mixin:APP:immediatelyfast-common.mixins.json:core.MixinMinecraftClient from mod immediatelyfast,pl:mixin:APP:architectury.mixins.json:MixinMinecraft from mod architectury,pl:mixin:APP:yacl.mixins.json:MinecraftMixin from mod yet_another_config_lib_v3,pl:mixin:APP:transition.mixins.json:EntityRenderStateMixin from mod transition,pl:mixin:APP:transition.mixins.json:EntityRendererMixin from mod transition,pl:mixin:APP:transition.mixins.json:BlockEntityRenderStateMixin from mod transition,pl:mixin:APP:transition.mixins.json:MinecraftMixin from mod transition,pl:mixin:APP:flywheel.impl.mixins.json:MinecraftMixin from mod flywheel,pl:mixin:APP:ponder-common.mixins.json:client.WindowResizeMixin from mod ponder,pl:mixin:APP:create.mixins.json:accessor.MinecraftAccessor from mod create,pl:mixin:APP:sable.mixins.json:camera.new_camera_types.MinecraftMixin from mod sable,pl:mixin:APP:sable.mixins.json:plot.MinecraftMixin from mod sable,pl:mixin:APP:sable.mixins.json:punching.MinecraftMixin from mod sable,pl:mixin:APP:imblocker-neoforge.mixins.json:MinecraftClientMixin from mod imblocker,pl:mixin:APP:mixins.customskinloader.json:MixinMinecraft from mod customskinloader,pl:mixin:APP:modernfix-modernfix.mixins.json:feature.remove_telemetry.MinecraftMixin_Telemetry from mod modernfix,pl:mixin:A,pl:runtimedistcleaner:A}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.client.main.Main.main(Main.java:230) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:runtimedistcleaner:A,re:classloading,pl:mixin:APP:veil.debug.mixins.json:client.DebugMainMixin from mod veil,pl:mixin:A,pl:runtimedistcleaner:A}
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103) ~[?:?] {}
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580) ~[?:?] {}
+	at MC-BOOTSTRAP/fml_loader@4.0.42/net.neoforged.fml.loading.targets.CommonLaunchHandler.runTarget(CommonLaunchHandler.java:136) ~[loader-4.0.42.jar%23161!/:4.0] {}
+	at MC-BOOTSTRAP/fml_loader@4.0.42/net.neoforged.fml.loading.targets.CommonLaunchHandler.clientService(CommonLaunchHandler.java:124) ~[loader-4.0.42.jar%23161!/:4.0] {}
+	at MC-BOOTSTRAP/fml_loader@4.0.42/net.neoforged.fml.loading.targets.CommonClientLaunchHandler.runService(CommonClientLaunchHandler.java:32) ~[loader-4.0.42.jar%23161!/:4.0] {}
+	at MC-BOOTSTRAP/fml_loader@4.0.42/net.neoforged.fml.loading.targets.CommonLaunchHandler.lambda$launchService$4(CommonLaunchHandler.java:118) ~[loader-4.0.42.jar%23161!/:4.0] {}
+	at MC-BOOTSTRAP/cpw.mods.modlauncher@11.0.5/cpw.mods.modlauncher.LaunchServiceHandlerDecorator.launch(LaunchServiceHandlerDecorator.java:30) [modlauncher-11.0.5.jar%23166!/:?] {}
+	at MC-BOOTSTRAP/cpw.mods.modlauncher@11.0.5/cpw.mods.modlauncher.LaunchServiceHandler.launch(LaunchServiceHandler.java:53) [modlauncher-11.0.5.jar%23166!/:?] {}
+	at MC-BOOTSTRAP/cpw.mods.modlauncher@11.0.5/cpw.mods.modlauncher.LaunchServiceHandler.launch(LaunchServiceHandler.java:71) [modlauncher-11.0.5.jar%23166!/:?] {}
+	at MC-BOOTSTRAP/cpw.mods.modlauncher@11.0.5/cpw.mods.modlauncher.Launcher.run(Launcher.java:103) [modlauncher-11.0.5.jar%23166!/:?] {}
+	at MC-BOOTSTRAP/cpw.mods.modlauncher@11.0.5/cpw.mods.modlauncher.Launcher.main(Launcher.java:74) [modlauncher-11.0.5.jar%23166!/:?] {}
+	at MC-BOOTSTRAP/cpw.mods.modlauncher@11.0.5/cpw.mods.modlauncher.BootstrapLaunchConsumer.accept(BootstrapLaunchConsumer.java:26) [modlauncher-11.0.5.jar%23166!/:?] {}
+	at MC-BOOTSTRAP/cpw.mods.modlauncher@11.0.5/cpw.mods.modlauncher.BootstrapLaunchConsumer.accept(BootstrapLaunchConsumer.java:23) [modlauncher-11.0.5.jar%23166!/:?] {}
+	at cpw.mods.bootstraplauncher@2.0.2/cpw.mods.bootstraplauncher.BootstrapLauncher.run(BootstrapLauncher.java:210) [bootstraplauncher-2.0.2.jar:?] {}
+	at cpw.mods.bootstraplauncher@2.0.2/cpw.mods.bootstraplauncher.BootstrapLauncher.main(BootstrapLauncher.java:69) [bootstraplauncher-2.0.2.jar:?] {}
+[18:33:20] [Render thread/INFO] [me.je.li.lo.PluginCallerTimerRunnable/]: Registering fluid subtypes: create:jei_plugin took 13.88 milliseconds
+[18:33:20] [Render thread/INFO] [me.je.li.lo.PluginCaller/]: Registering fluid subtypes took 44.26 milliseconds
+[18:33:20] [Render thread/INFO] [me.je.li.lo.PluginCaller/]: Registering ingredients...
+[18:33:21] [Render thread/WARN] [me.je.li.pl.va.in.ItemStackListFactory/]: Item Group has no display items and no search tab display items. Items from this group will be missing from the JEI ingredient list. FTB Suite
+[18:33:21] [Render thread/INFO] [me.je.li.lo.PluginCallerTimerRunnable/]: Registering ingredients: jei:minecraft took 1.103 seconds
+[18:33:21] [Render thread/INFO] [me.je.li.lo.PluginCallerTimerRunnable/]: Registering ingredients: createmetallurgy:jei_plugin took 45.76 milliseconds
+[18:33:21] [Render thread/INFO] [me.je.li.lo.PluginCaller/]: Registering ingredients took 1.151 seconds
+[18:33:21] [Render thread/INFO] [me.je.li.lo.PluginCaller/]: Registering extra ingredients...
+[18:33:21] [Render thread/INFO] [me.je.li.lo.PluginCallerTimerRunnable/]: Registering extra ingredients: tfmg:jei_plugin took 20.75 milliseconds
+[18:33:21] [Render thread/INFO] [me.je.li.lo.PluginCaller/]: Registering extra ingredients took 25.48 milliseconds
+[18:33:21] [Render thread/INFO] [me.je.li.lo.PluginCaller/]: Registering search ingredient aliases...
+[18:33:21] [Render thread/INFO] [me.je.li.lo.PluginCaller/]: Registering search ingredient aliases took 7.001 milliseconds
+[18:33:21] [Render thread/INFO] [me.je.li.lo.PluginCaller/]: Registering Mod Info...
+[18:33:21] [Render thread/INFO] [me.je.li.lo.PluginCaller/]: Registering Mod Info took 3.590 milliseconds
+[18:33:21] [Render thread/INFO] [me.je.li.lo.PluginCaller/]: Registering categories...
+[18:33:22] [Render thread/INFO] [me.je.li.lo.PluginCallerTimerRunnable/]: Registering categories: jei:minecraft took 194.7 milliseconds
+[18:33:22] [Render thread/INFO] [me.je.li.lo.PluginCallerTimerRunnable/]: Registering categories: createbigcannons:jei_plugin took 241.5 milliseconds
+[18:33:22] [Render thread/INFO] [me.je.li.lo.PluginCallerTimerRunnable/]: Registering categories: createdieselgenerators:jei_plugin took 163.0 milliseconds
+[18:33:22] [Render thread/INFO] [me.je.li.lo.PluginCallerTimerRunnable/]: Registering categories: tfmg:jei_plugin took 172.0 milliseconds
+[18:33:22] [Render thread/INFO] [me.je.li.lo.PluginCallerTimerRunnable/]: Registering categories: createmetallurgy:jei_plugin took 184.3 milliseconds
+[18:33:23] [Render thread/INFO] [me.je.li.lo.PluginCallerTimerRunnable/]: Registering categories: powergrid:jei took 121.5 milliseconds
+[18:33:23] [Render thread/INFO] [me.je.li.lo.PluginCallerTimerRunnable/]: Registering categories: create:jei_plugin took 421.7 milliseconds
+[18:33:23] [Render thread/INFO] [me.je.li.lo.PluginCaller/]: Registering categories took 1.511 seconds
+[18:33:23] [Render thread/INFO] [me.je.li.lo.PluginCaller/]: Registering vanilla category extensions...
+[18:33:23] [Render thread/INFO] [me.je.li.lo.PluginCallerTimerRunnable/]: Registering vanilla category extensions: jei:minecraft took 37.20 milliseconds
+[18:33:23] [Render thread/INFO] [me.je.li.lo.PluginCaller/]: Registering vanilla category extensions took 38.91 milliseconds
+[18:33:23] [Render thread/INFO] [me.je.li.lo.PluginCaller/]: Registering recipe catalysts...
+[18:33:23] [Render thread/INFO] [me.je.li.lo.PluginCallerTimerRunnable/]: Registering recipe catalysts: createbigcannons:jei_plugin took 11.73 milliseconds
+[18:33:23] [Render thread/INFO] [me.je.li.lo.PluginCaller/]: Registering recipe catalysts took 23.56 milliseconds
+[18:33:23] [Render thread/INFO] [me.je.co.ut.LoggedTimer/]: Building recipe registry...
+[18:33:23] [Render thread/INFO] [me.je.co.ut.LoggedTimer/]: Building recipe registry took 141.7 milliseconds
+[18:33:23] [Render thread/INFO] [me.je.li.lo.PluginCaller/]: Registering advanced plugins...
+[18:33:23] [Render thread/INFO] [me.je.li.lo.PluginCaller/]: Registering advanced plugins took 1.377 milliseconds
+[18:33:23] [Render thread/INFO] [me.je.li.lo.PluginCaller/]: Registering recipes...
+[18:33:24] [Render thread/INFO] [me.je.li.lo.PluginCallerTimerRunnable/]: Registering recipes: jei:minecraft took 895.0 milliseconds
+[18:33:24] [Render thread/INFO] [me.je.li.lo.PluginCallerTimerRunnable/]: Registering recipes: createbigcannons:jei_plugin took 89.85 milliseconds
+[18:33:24] [Render thread/INFO] [me.je.li.lo.PluginCallerTimerRunnable/]: Registering recipes: simulated:jei_plugin took 15.51 milliseconds
+[18:33:24] [Render thread/INFO] [me.je.li.lo.PluginCallerTimerRunnable/]: Registering recipes: createdieselgenerators:jei_plugin took 25.57 milliseconds
+[18:33:24] [Render thread/INFO] [me.je.li.lo.PluginCallerTimerRunnable/]: Registering recipes: supplementaries:jei_plugin took 121.7 milliseconds
+[18:33:24] [Render thread/INFO] [me.je.li.lo.PluginCallerTimerRunnable/]: Registering recipes: tfmg:jei_plugin took 27.65 milliseconds
+[18:33:24] [Render thread/INFO] [me.je.li.lo.PluginCallerTimerRunnable/]: Registering recipes: createmetallurgy:jei_plugin took 14.82 milliseconds
+[18:33:25] [Render thread/INFO] [me.je.li.lo.PluginCallerTimerRunnable/]: Registering recipes: create:jei_plugin took 549.4 milliseconds
+[18:33:25] [Render thread/INFO] [me.je.li.lo.PluginCaller/]: Registering recipes took 1.745 seconds
+[18:33:25] [Render thread/INFO] [me.je.li.lo.PluginCaller/]: Registering recipes transfer handlers...
+[18:33:25] [Render thread/INFO] [me.je.li.lo.PluginCallerTimerRunnable/]: Registering recipes transfer handlers: jei:minecraft took 25.10 milliseconds
+[18:33:25] [Render thread/INFO] [me.je.li.lo.PluginCallerTimerRunnable/]: Registering recipes transfer handlers: tfmg:jei_plugin took 19.81 milliseconds
+[18:33:25] [Render thread/INFO] [me.je.li.lo.PluginCaller/]: Registering recipes transfer handlers took 46.56 milliseconds
+[18:33:25] [Render thread/INFO] [me.je.co.ut.LoggedTimer/]: Building runtime...
+[18:33:25] [Render thread/INFO] [me.je.li.lo.PluginCaller/]: Registering gui handlers...
+[18:33:25] [Render thread/INFO] [me.je.li.lo.PluginCallerTimerRunnable/]: Registering gui handlers: jei:minecraft took 32.25 milliseconds
+[18:33:25] [Render thread/INFO] [me.je.li.lo.PluginCallerTimerRunnable/]: Registering gui handlers: jei:gui took 50.81 milliseconds
+[18:33:25] [Render thread/INFO] [me.je.li.lo.PluginCaller/]: Registering gui handlers took 111.2 milliseconds
+[18:33:25] [Render thread/INFO] [me.je.li.lo.PluginCaller/]: Registering Runtime...
+[18:33:25] [Render thread/INFO] [me.je.gu.st.JeiGuiStarter/]: Starting JEI GUI
+[18:33:25] [Render thread/INFO] [me.je.co.ut.LoggedTimer/]: Building ingredient list...
+[18:33:25] [Render thread/INFO] [me.je.co.ut.LoggedTimer/]: Building ingredient list took 110.0 milliseconds
+[18:33:25] [Render thread/INFO] [me.je.co.ut.LoggedTimer/]: Building ingredient filter...
+[18:33:26] [Render thread/INFO] [me.je.gu.in.IngredientFilter/]: Adding 4421 ingredients
+[18:33:28] [Render thread/INFO] [me.je.gu.in.IngredientFilter/]: Added 4421 ingredients
+[18:33:28] [Render thread/INFO] [me.je.co.ut.LoggedTimer/]: Building ingredient filter took 2.485 seconds
+[18:33:29] [Render thread/INFO] [me.je.li.lo.PluginCallerTimerRunnable/]: Registering Runtime: jei:neoforge_gui took 3.598 seconds
+[18:33:29] [Render thread/INFO] [me.je.li.lo.PluginCaller/]: Registering Runtime took 3.600 seconds
+[18:33:29] [Render thread/INFO] [me.je.co.ut.LoggedTimer/]: Building runtime took 3.798 seconds
+[18:33:29] [Render thread/INFO] [me.je.li.lo.PluginCaller/]: Sending Runtime...
+[18:33:29] [Render thread/INFO] [rb.cr.CreateBigCannons/]: Attempting to load CBC deployer recipes
+[18:33:29] [Render thread/INFO] [me.je.li.lo.PluginCallerTimerRunnable/]: Sending Runtime: createbigcannons:jei_plugin took 23.58 milliseconds
+[18:33:29] [Render thread/INFO] [me.je.li.lo.PluginCaller/]: Sending Runtime took 25.21 milliseconds
+[18:33:29] [Render thread/INFO] [me.je.co.ut.LoggedTimer/]: Starting JEI took 9.197 seconds
+[18:33:29] [Render thread/INFO] [xa.hu.mi.MinimapLogs/]: Minimap updated server level id: -50959927 for world ResourceKey[minecraft:dimension / minecraft:overworld]
+[18:33:29] [Render thread/INFO] [FTB Library/]: received server config settings for config: ftbultimine-server
+[18:33:29] [Render thread/INFO] [sn.ja.Jade/]: Received config from the server: 
+[18:33:29] [Render thread/INFO] [Moonlight/]: Overriding configs moonlight-common.toml with synced configs (editable)
+[18:33:29] [Render thread/INFO] [Moonlight/]: Synced moonlight-common.toml configs
+[18:33:29] [Render thread/INFO] [Moonlight/]: Overriding configs supplementaries-common.toml with synced configs (editable)
+[18:33:29] [Render thread/INFO] [Moonlight/]: Synced supplementaries-common.toml configs
+[18:33:29] [Render thread/INFO] [Moonlight/]: Overriding configs vista-common.toml with synced configs (editable)
+[18:33:29] [Render thread/INFO] [Moonlight/]: Synced vista-common.toml configs
+[18:33:29] [Render thread/INFO] [Di.se.di.co.re.op.gl.GLProxy/]: Iris detected, Distant Horizons OpenGL error logging won't be sent in the chat due to Iris throwing known (harmless) OpenGL errors. This is a bug with Iris, not Distant Horizons.
+[18:33:29] [Render thread/INFO] [Di.se.di.co.re.op.gl.GLProxy/]: Creating GLProxy... If this is the last message you see there must have been an OpenGL error.
+[18:33:29] [Render thread/INFO] [Di.se.di.co.re.op.gl.GLProxy/]: Lod Render OpenGL version [4.6.0 NVIDIA 572.42].
+[18:33:29] [Render thread/INFO] [Di.se.di.co.re.op.gl.GLProxy/]: minecraftGlCapabilities:
+Your OpenGL support:
+openGL version 3.2+: [true] <- REQUIRED
+Vertex Attribute Buffer Binding: [true] <- optional improvement
+Buffer Storage: [true] <- optional improvement
+
+[18:33:29] [Render thread/INFO] [Di.se.di.co.re.op.gl.GLProxy/]: GPU Vendor [NVIDIA CORPORATION] with OS [Windows], Preferred upload method is [BUFFER_STORAGE].
+[18:33:29] [Render thread/INFO] [Di.se.di.co.re.op.gl.GLProxy/]: GLProxy creation successful. OpenGL smiles upon you this day.
+[18:33:33] [Render thread/INFO] [me.je.li.in.IngredientManager/]: Ingredients are being removed at runtime: 27 net.minecraft.world.item.ItemStack
+[18:33:33] [Render thread/INFO] [me.je.li.in.IngredientManager/]: Ingredients are being removed at runtime: 18 net.minecraft.world.item.ItemStack
+[18:33:33] [Render thread/INFO] [me.je.li.in.IngredientManager/]: Ingredients are being added at runtime: 27 net.minecraft.world.item.ItemStack
+[18:33:33] [Render thread/INFO] [me.je.li.in.IngredientManager/]: Ingredients are being added at runtime: 18 net.minecraft.world.item.ItemStack
+[18:33:33] [Render thread/INFO] [me.je.li.in.IngredientManager/]: Ingredients are being removed at runtime: 27 net.minecraft.world.item.ItemStack
+[18:33:33] [Render thread/INFO] [me.je.li.in.IngredientManager/]: Ingredients are being removed at runtime: 18 net.minecraft.world.item.ItemStack
+[18:33:33] [Render thread/INFO] [me.je.li.in.IngredientManager/]: Ingredients are being added at runtime: 27 net.minecraft.world.item.ItemStack
+[18:33:33] [Render thread/INFO] [me.je.li.in.IngredientManager/]: Ingredients are being added at runtime: 18 net.minecraft.world.item.ItemStack
+[18:33:33] [Render thread/INFO] [minecraft/AdvancementTree]: Loaded 45 advancements
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.GlDhMetaRenderer_neoforge/]: Setting up renderer
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.GlDhMetaRenderer_neoforge/]: Renderer setup complete
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Loading shader with type: [35633]
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Shader loaded sucessfully.
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Loading shader with type: [35632]
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Shader loaded sucessfully.
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.ve.GlVertexAttributePostGL43/]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 16
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.re.LodRenderer/]: Overriding vanilla MC settings to better fit Distant Horizons... This behavior can be disabled in the Distant Horizons config.
+[18:33:37] [Render thread/INFO] [Di.se.di.co.wr.mi.MinecraftClientWrapper_neoforge/]: Disabling vanilla clouds... This is done to prevent vanilla clouds from rendering on top of Distant Horizons LODs.
+[18:33:37] [Render thread/INFO] [Di.se.di.co.wr.mi.MinecraftClientWrapper_neoforge/]: Disabling vanilla chunk fade in... This is done to prevent vanilla chunks from flashing on the Distant Horizons boarder when moving (which is distracting).
+[18:33:37] [Render thread/INFO] [Di.se.di.co.wr.mi.MinecraftClientWrapper_neoforge/]: Disabling fabulous graphics... This is done to fix vanilla chunks (specifically water blocks) not fading into Distant Horizons LODs when DH's 'Vanilla Fade' option is enabled.
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Loading shader with type: [35633]
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Shader loaded sucessfully.
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Loading shader with type: [35632]
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Shader loaded sucessfully.
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.ve.GlVertexAttributePostGL43/]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 12
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Loading shader with type: [35633]
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Shader loaded sucessfully.
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Loading shader with type: [35632]
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Shader loaded sucessfully.
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.ve.GlVertexAttributePostGL43/]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 12
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Loading shader with type: [35633]
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Shader loaded sucessfully.
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Loading shader with type: [35632]
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Shader loaded sucessfully.
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Loading shader with type: [35633]
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Shader loaded sucessfully.
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Loading shader with type: [35632]
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Shader loaded sucessfully.
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.ve.GlVertexAttributePostGL43/]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 8
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Loading shader with type: [35633]
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Shader loaded sucessfully.
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Loading shader with type: [35632]
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Shader loaded sucessfully.
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Loading shader with type: [35633]
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Shader loaded sucessfully.
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Loading shader with type: [35632]
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Shader loaded sucessfully.
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Loading shader with type: [35633]
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Shader loaded sucessfully.
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Loading shader with type: [35632]
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Shader loaded sucessfully.
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Loading shader with type: [35633]
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Shader loaded sucessfully.
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Loading shader with type: [35632]
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Shader loaded sucessfully.
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Loading shader with type: [35633]
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Shader loaded sucessfully.
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Loading shader with type: [35632]
+[18:33:37] [Render thread/INFO] [Di.se.di.co.re.op.gl.sh.GlShader/]: Shader loaded sucessfully.
+[18:33:38] [Render thread/INFO] [Veil/]: Multi-Bind supported, using core
+[18:33:39] [Render thread/INFO] [xa.hu.mi.MinimapLogs/]: Reloading radar icon resources...
+[18:33:39] [Render thread/INFO] [xa.hu.mi.MinimapLogs/]: Reloaded radar icon resources!
+[18:33:41] [Render thread/WARN] [Sodium-VertexConsumerTracker/]: Class xaero.hud.minimap.radar.icon.creator.render.form.model.part.RadarIconModelPartPrerenderer$VertexConsumerWrapper does not support optimized vertex writing code paths, which may cause reduced rendering performance
+[18:33:41] [Render thread/INFO] [minecraft/ChatComponent]: [System] [CHAT] Distant Horizons: High vanilla render distance detected.\nUsing a high vanilla render distance uses a lot of CPU power \nand doesn't improve graphics much after about 12.\nLowering your vanilla render distance will give you better FPS\nand reduce stuttering at a similar visual quality.\nA vanilla render distance of 8 is recommended.\nThis message can be disabled in DH's config under Advanced -> Logging.\n
+[18:33:42] [Render thread/WARN] [ModernFix/]: Time from main menu to in-game was 31.787355 seconds
+[18:33:42] [Render thread/WARN] [ModernFix/]: Total time to load game and open world was 119.69836 seconds
+[18:33:45] [Render thread/INFO] [minecraft/ChatComponent]: [System] [CHAT] Distant Horizons: G1 Garbage collector detected.\nThis can cause FPS stuttering. \nIt's recommended to use a concurrent garbage collector \nlike ZGC (Java 21+) or Shenandoah (Java 8 through 17) \nfor a smoother experience.
+[18:35:27] [Server thread/INFO] [minecraft/IntegratedServer]: Saving and pausing game...
+[18:35:27] [Server thread/INFO] [minecraft/MinecraftServer]: Saving chunks for level 'ServerLevel[鏂扮殑涓栫晫]'/minecraft:overworld
+[18:35:27] [Server thread/INFO] [de.ry.sa.Sable/]: Saving sub-levels for level 'ServerLevel[鏂扮殑涓栫晫]'/minecraft:overworld
+[18:35:28] [Server thread/INFO] [minecraft/MinecraftServer]: Saving chunks for level 'ServerLevel[鏂扮殑涓栫晫]'/minecraft:the_end
+[18:35:28] [Server thread/INFO] [de.ry.sa.Sable/]: Saving sub-levels for level 'ServerLevel[鏂扮殑涓栫晫]'/minecraft:the_end
+[18:35:28] [Server thread/INFO] [minecraft/MinecraftServer]: Saving chunks for level 'ServerLevel[鏂扮殑涓栫晫]'/minecraft:the_nether
+[18:35:28] [Server thread/INFO] [de.ry.sa.Sable/]: Saving sub-levels for level 'ServerLevel[鏂扮殑涓栫晫]'/minecraft:the_nether
+[18:40:45] [Server thread/WARN] [minecraft/MinecraftServer]: Can't keep up! Is the server overloaded? Running 5193ms or 103 ticks behind
+[18:40:50] [Render thread/ERROR] [de.ry.sa.Sable/]: Received a sub-level movement packet for a non-existent sub-level
+[18:40:54] [Server thread/INFO] [minecraft/IntegratedServer]: Saving and pausing game...
+[18:40:54] [Server thread/INFO] [minecraft/MinecraftServer]: Saving chunks for level 'ServerLevel[鏂扮殑涓栫晫]'/minecraft:overworld
+[18:40:54] [Server thread/INFO] [de.ry.sa.Sable/]: Saving sub-levels for level 'ServerLevel[鏂扮殑涓栫晫]'/minecraft:overworld
+[18:40:54] [Server thread/INFO] [minecraft/MinecraftServer]: Saving chunks for level 'ServerLevel[鏂扮殑涓栫晫]'/minecraft:the_end
+[18:40:54] [Server thread/INFO] [de.ry.sa.Sable/]: Saving sub-levels for level 'ServerLevel[鏂扮殑涓栫晫]'/minecraft:the_end
+[18:40:54] [Server thread/INFO] [minecraft/MinecraftServer]: Saving chunks for level 'ServerLevel[鏂扮殑涓栫晫]'/minecraft:the_nether
+[18:40:54] [Server thread/INFO] [de.ry.sa.Sable/]: Saving sub-levels for level 'ServerLevel[鏂扮殑涓栫晫]'/minecraft:the_nether
+[18:43:30] [Server thread/INFO] [minecraft/MinecraftServer]: [OMEGAU371: Set own game mode to Spectator Mode]
+[18:43:30] [Render thread/INFO] [minecraft/ChatComponent]: [System] [CHAT] Set own game mode to Spectator Mode
+[18:43:49] [Server thread/INFO] [minecraft/MinecraftServer]: [OMEGAU371: Set own game mode to Creative Mode]
+[18:43:49] [Render thread/INFO] [minecraft/ChatComponent]: [System] [CHAT] Set own game mode to Creative Mode
+[18:43:58] [Render thread/INFO] [minecraft/AdvancementTree]: Loaded 48 advancements
+[18:44:23] [Server thread/INFO] [co.si.cr.Create/]: New Schematic Uploaded: OMEGAU371/瑙傚厜椋炶墖-鐗╃悊鍖?nbt
+[18:45:16] [Render thread/ERROR] [minecraft/ItemStack]: Tried to load invalid item: 'Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: railways:brass_wrapped_locometal'
+[18:45:16] [Render thread/ERROR] [minecraft/ItemStack]: Tried to load invalid item: 'Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: railways:brass_wrapped_locometal'
+[18:45:16] [Render thread/ERROR] [minecraft/ItemStack]: Tried to load invalid item: 'Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: railways:brass_wrapped_locometal'
+[18:45:16] [Render thread/ERROR] [minecraft/ItemStack]: Tried to load invalid item: 'Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: railways:brass_wrapped_locometal'
+[18:45:17] [Render thread/ERROR] [minecraft/ItemStack]: Tried to load invalid item: 'Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: railways:brass_wrapped_locometal'
+[18:45:17] [Render thread/ERROR] [minecraft/ItemStack]: Tried to load invalid item: 'Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: railways:brass_wrapped_locometal'
+[18:45:17] [Render thread/ERROR] [minecraft/ItemStack]: Tried to load invalid item: 'Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: railways:brass_wrapped_locometal'
+[18:45:17] [Render thread/ERROR] [minecraft/ItemStack]: Tried to load invalid item: 'Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: railways:brass_wrapped_locometal'
+[18:45:17] [Render thread/ERROR] [minecraft/ItemStack]: Tried to load invalid item: 'Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: railways:brass_wrapped_locometal'
+[18:45:17] [Render thread/ERROR] [minecraft/ItemStack]: Tried to load invalid item: 'Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: railways:brass_wrapped_locometal'
+[18:45:17] [Render thread/ERROR] [minecraft/ItemStack]: Tried to load invalid item: 'Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: railways:brass_wrapped_locometal'
+[18:45:17] [Render thread/ERROR] [minecraft/ItemStack]: Tried to load invalid item: 'Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: railways:brass_wrapped_locometal'
+[18:45:31] [Server thread/ERROR] [minecraft/ItemStack]: Tried to load invalid item: 'Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: railways:brass_wrapped_locometal'
+[18:45:31] [Server thread/ERROR] [minecraft/ItemStack]: Tried to load invalid item: 'Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: railways:brass_wrapped_locometal'
+[18:45:31] [Server thread/ERROR] [minecraft/ItemStack]: Tried to load invalid item: 'Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: railways:brass_wrapped_locometal'
+[18:45:31] [Server thread/ERROR] [minecraft/ItemStack]: Tried to load invalid item: 'Unknown registry key in ResourceKey[minecraft:root / minecraft:item]: railways:brass_wrapped_locometal'
+[18:45:31] [Server thread/ERROR] [minecraft/BlockAttachedEntity]: Block-attached entity at invalid position: BlockPos{x=20481068, y=106, z=20481032}
+[18:45:40] [Server thread/INFO] [minecraft/Villager]: Villager Villager['Farmer'/803, l='ServerLevel[鏂扮殑涓栫晫]', x=241.26, y=0.00, z=332.21] died, message: 'Farmer was squished too much'
+[18:45:40] [Render thread/INFO] [minecraft/Villager]: Villager Villager['Farmer'/803, l='ClientLevel', x=241.15, y=0.00, z=332.53] died, message: 'Farmer died'
+[18:45:47] [Server thread/INFO] [minecraft/Villager]: Villager Villager['Unemployed'/805, l='ServerLevel[鏂扮殑涓栫晫]', x=255.49, y=0.00, z=325.71] died, message: 'Unemployed was squished too much'
+[18:45:47] [Render thread/INFO] [minecraft/Villager]: Villager Villager['Unemployed'/805, l='ClientLevel', x=255.49, y=0.00, z=325.17] died, message: 'Unemployed died'
+[18:45:49] [Server thread/INFO] [minecraft/Villager]: Villager Villager['Farmer'/806, l='ServerLevel[鏂扮殑涓栫晫]', x=256.74, y=1.25, z=313.75] died, message: 'Farmer was squished too much'
+[18:45:49] [Render thread/INFO] [minecraft/Villager]: Villager Villager['Farmer'/806, l='ClientLevel', x=256.70, y=0.61, z=313.56] died, message: 'Farmer died'
+[18:45:49] [Server thread/INFO] [minecraft/Villager]: Villager Villager['Farmer'/800, l='ServerLevel[鏂扮殑涓栫晫]', x=262.03, y=0.00, z=342.52] died, message: 'Farmer was squished too much'
+[18:45:49] [Render thread/INFO] [minecraft/Villager]: Villager Villager['Farmer'/800, l='ClientLevel', x=262.38, y=0.00, z=342.52] died, message: 'Farmer died'
+[18:46:01] [Server thread/INFO] [minecraft/IntegratedServer]: Saving and pausing game...
+[18:46:01] [Server thread/INFO] [minecraft/MinecraftServer]: Saving chunks for level 'ServerLevel[鏂扮殑涓栫晫]'/minecraft:overworld
+[18:46:01] [Server thread/INFO] [de.ry.sa.Sable/]: Saving sub-levels for level 'ServerLevel[鏂扮殑涓栫晫]'/minecraft:overworld
+[18:46:01] [Server thread/INFO] [minecraft/MinecraftServer]: Saving chunks for level 'ServerLevel[鏂扮殑涓栫晫]'/minecraft:the_end
+[18:46:01] [Server thread/INFO] [de.ry.sa.Sable/]: Saving sub-levels for level 'ServerLevel[鏂扮殑涓栫晫]'/minecraft:the_end
+[18:46:01] [Server thread/INFO] [minecraft/MinecraftServer]: Saving chunks for level 'ServerLevel[鏂扮殑涓栫晫]'/minecraft:the_nether
+[18:46:01] [Server thread/INFO] [de.ry.sa.Sable/]: Saving sub-levels for level 'ServerLevel[鏂扮殑涓栫晫]'/minecraft:the_nether
+[18:46:04] [Server thread/INFO] [de.ry.sa.Sable/]: Saving sub-levels for level 'ServerLevel[鏂扮殑涓栫晫]'/minecraft:overworld
+[18:46:04] [Server thread/INFO] [de.ry.sa.Sable/]: Saving sub-levels for level 'ServerLevel[鏂扮殑涓栫晫]'/minecraft:the_end
+[18:46:04] [Server thread/INFO] [de.ry.sa.Sable/]: Saving sub-levels for level 'ServerLevel[鏂扮殑涓栫晫]'/minecraft:the_nether
+[18:46:15] [Render thread/ERROR] [de.ry.sa.Sable/]: Received a sub-level movement packet for a non-existent sub-level
+[18:46:17] [Server thread/INFO] [minecraft/MinecraftServer]: [OMEGAU371: Set own game mode to Spectator Mode]
+[18:46:17] [Render thread/INFO] [minecraft/ChatComponent]: [System] [CHAT] Set own game mode to Spectator Mode
+[18:46:18] [Server thread/INFO] [minecraft/MinecraftServer]: [OMEGAU371: Set own game mode to Creative Mode]
+[18:46:18] [Render thread/INFO] [minecraft/ChatComponent]: [System] [CHAT] Set own game mode to Creative Mode
+[18:46:18] [Server thread/WARN] [minecraft/MinecraftServer]: Can't keep up! Is the server overloaded? Running 2003ms or 40 ticks behind
+[18:46:21] [Render thread/ERROR] [de.ry.sa.Sable/]: Received a sub-level movement packet for a non-existent sub-level
+[18:46:21] [Server thread/WARN] [minecraft/LevelChunk]: Block entity simulated:throttle_lever @ BlockPos{x=257, y=10, z=256} state Block{minecraft:air} invalid for ticking:
+[18:46:21] [Server thread/WARN] [minecraft/LevelChunk]: Block entity simulated:throttle_lever @ BlockPos{x=253, y=10, z=256} state Block{minecraft:air} invalid for ticking:
+[18:46:21] [Server thread/WARN] [minecraft/LevelChunk]: Block entity create:analog_lever @ BlockPos{x=253, y=16, z=272} state Block{minecraft:air} invalid for ticking:
+[18:46:41] [Render thread/INFO] [minecraft/AdvancementTree]: Loaded 67 advancements
+[18:46:52] [Server thread/INFO] [minecraft/MinecraftServer]: [OMEGAU371: Summoned new Primed TNT]
+[18:46:52] [Render thread/INFO] [minecraft/ChatComponent]: [System] [CHAT] Summoned new Primed TNT
+[18:46:53] [Render thread/INFO] [minecraft/AdvancementTree]: Loaded 138 advancements
+[18:46:55] [Server thread/INFO] [minecraft/MinecraftServer]: [OMEGAU371: Summoned new Primed TNT]
+[18:46:55] [Render thread/INFO] [minecraft/ChatComponent]: [System] [CHAT] Summoned new Primed TNT
+[18:46:55] [Render thread/INFO] [minecraft/AdvancementTree]: Loaded 140 advancements
+[18:46:58] [Server thread/INFO] [minecraft/MinecraftServer]: [OMEGAU371: Set own game mode to Spectator Mode]
+[18:46:58] [Render thread/INFO] [minecraft/ChatComponent]: [System] [CHAT] Set own game mode to Spectator Mode
+[18:47:00] [Server thread/INFO] [minecraft/MinecraftServer]: [OMEGAU371: Set own game mode to Creative Mode]
+[18:47:00] [Render thread/INFO] [minecraft/ChatComponent]: [System] [CHAT] Set own game mode to Creative Mode
+[18:47:01] [Server thread/INFO] [minecraft/MinecraftServer]: [OMEGAU371: Summoned new Primed TNT]
+[18:47:01] [Render thread/INFO] [minecraft/ChatComponent]: [System] [CHAT] Summoned new Primed TNT
+[18:47:03] [Server thread/INFO] [minecraft/MinecraftServer]: [OMEGAU371: Summoned new Primed TNT]
+[18:47:03] [Render thread/INFO] [minecraft/ChatComponent]: [System] [CHAT] Summoned new Primed TNT
+[18:47:05] [Server thread/INFO] [minecraft/MinecraftServer]: [OMEGAU371: Summoned new Primed TNT]
+[18:47:05] [Render thread/INFO] [minecraft/ChatComponent]: [System] [CHAT] Summoned new Primed TNT
+[18:47:06] [Render thread/INFO] [minecraft/AdvancementTree]: Loaded 142 advancements
+[18:47:06] [Render thread/INFO] [minecraft/AdvancementTree]: Loaded 144 advancements
+[18:47:07] [Server thread/INFO] [minecraft/MinecraftServer]: [OMEGAU371: Summoned new Primed TNT]
+[18:47:07] [Render thread/INFO] [minecraft/ChatComponent]: [System] [CHAT] Summoned new Primed TNT
+[18:47:07] [Server thread/INFO] [minecraft/MinecraftServer]: [OMEGAU371: Summoned new Primed TNT]
+[18:47:07] [Render thread/INFO] [minecraft/ChatComponent]: [System] [CHAT] Summoned new Primed TNT
+[18:47:08] [Server thread/INFO] [minecraft/MinecraftServer]: [OMEGAU371: Summoned new Primed TNT]
+[18:47:08] [Render thread/INFO] [minecraft/ChatComponent]: [System] [CHAT] Summoned new Primed TNT
+[18:47:08] [Server thread/INFO] [minecraft/MinecraftServer]: [OMEGAU371: Summoned new Primed TNT]
+[18:47:08] [Render thread/INFO] [minecraft/ChatComponent]: [System] [CHAT] Summoned new Primed TNT
+[18:47:10] [Server thread/INFO] [minecraft/MinecraftServer]: [OMEGAU371: Summoned new Primed TNT]
+[18:47:10] [Render thread/INFO] [minecraft/ChatComponent]: [System] [CHAT] Summoned new Primed TNT
+[18:47:11] [Server thread/INFO] [minecraft/MinecraftServer]: [OMEGAU371: Summoned new Primed TNT]
+[18:47:11] [Render thread/INFO] [minecraft/ChatComponent]: [System] [CHAT] Summoned new Primed TNT
+[18:47:16] [Render thread/INFO] [minecraft/AdvancementTree]: Loaded 146 advancements
+[18:47:38] [Render thread/ERROR] [de.ry.sa.Sable/]: Received a sub-level movement packet for a non-existent sub-level
+[18:47:52] [Render thread/ERROR] [de.ry.sa.Sable/]: Received a sub-level movement packet for a non-existent sub-level
+[18:47:52] [Render thread/ERROR] [de.ry.sa.Sable/]: Received a sub-level movement packet for a non-existent sub-level
+[18:47:52] [Render thread/ERROR] [de.ry.sa.Sable/]: Received a sub-level movement packet for a non-existent sub-level
+[18:47:52] [Render thread/ERROR] [de.ry.sa.Sable/]: Received a sub-level movement packet for a non-existent sub-level
+[18:47:53] [Render thread/ERROR] [de.ry.sa.Sable/]: Received a sub-level movement packet for a non-existent sub-level
+[18:47:54] [Render thread/ERROR] [de.ry.sa.Sable/]: Received a sub-level movement packet for a non-existent sub-level
+[18:47:54] [Render thread/ERROR] [de.ry.sa.Sable/]: Received a sub-level movement packet for a non-existent sub-level
+[18:47:54] [Render thread/ERROR] [de.ry.sa.Sable/]: Received a sub-level movement packet for a non-existent sub-level
+[18:47:55] [Render thread/ERROR] [de.ry.sa.Sable/]: Received a sub-level movement packet for a non-existent sub-level
+[18:47:55] [Render thread/ERROR] [de.ry.sa.Sable/]: Received a sub-level movement packet for a non-existent sub-level
+[18:47:55] [Render thread/ERROR] [de.ry.sa.Sable/]: Received a sub-level movement packet for a non-existent sub-level
+[18:47:56] [Render thread/ERROR] [de.ry.sa.Sable/]: Received a sub-level movement packet for a non-existent sub-level
+[18:47:56] [Render thread/ERROR] [de.ry.sa.Sable/]: Received a sub-level movement packet for a non-existent sub-level
+[18:48:01] [Server thread/INFO] [minecraft/MinecraftServer]: [OMEGAU371: Killed 925 entities]
+[18:48:01] [Render thread/INFO] [minecraft/ChatComponent]: [System] [CHAT] Killed 925 entities
+
+thread '<unnamed>' (11780) panicked at /usr/local/cargo/git/checkouts/rapier-b7330b82f1d0b14c/38e92f1/crates/rapier3d/../../src/geometry/narrow_phase.rs:1222:34:
+Internal error: island should be awake.
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread '<unnamed>' (11780) panicked at /rustc/de6d33c033441c5880b863f94d7a3ec8cad141bd/library\core\src\panicking.rs:225:5:
+panic in a function that cannot unwind
+stack backtrace:
+   0:     0x7ffc847edd70 - <unknown>
+   1:     0x7ffc847f6481 - <unknown>
+   2:     0x7ffc847f1264 - <unknown>
+   3:     0x7ffc847e73b2 - <unknown>
+   4:     0x7ffc847ea6ff - <unknown>
+   5:     0x7ffc847ea9c3 - <unknown>
+   6:     0x7ffc847e74ba - <unknown>
+   7:     0x7ffc847e6acf - <unknown>
+   8:     0x7ffc847e793e - <unknown>
+   9:     0x7ffc84811307 - <unknown>
+  10:     0x7ffc84811281 - <unknown>
+  11:     0x7ffc84811436 - <unknown>
+  12:     0x7ffc846e48d7 - <unknown>
+  13:     0x7ffd5a731030 - <unknown>
+  14:     0x7ffd5a734608 - <unknown>
+  15:     0x7ffd67dbf416 - <unknown>
+  16:     0x7ffc846e4868 - <unknown>
+  17:      0x1c48ce174be - <unknown>
+thread caused non-unwinding panic. aborting.
