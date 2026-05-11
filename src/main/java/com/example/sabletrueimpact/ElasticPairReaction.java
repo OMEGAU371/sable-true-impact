@@ -111,13 +111,13 @@ public final class ElasticPairReaction {
             boolean isFlat = points.size() > 3 && area > 1.5;
 
             if (isTerrain) {
-                processTerrainImpact(isFlat, explosions);
+                processTerrainImpact(isFlat, !isFlat, explosions);
             } else {
                 processPairReaction(explosions);
             }
         }
 
-        private void processTerrainImpact(boolean isFlat, List<ExplosionCandidate> explosions) {
+        private void processTerrainImpact(boolean isFlat, boolean isPointy, List<ExplosionCandidate> explosions) {
             ServerLevel level = level(subLevel);
             Vector3d rotation = rotationPoint(subLevel);
             if (level == null || rotation == null) return;
@@ -133,11 +133,11 @@ public final class ElasticPairReaction {
                 double distributedForce = totalForce / limit;
                 for (int i = 0; i < limit; i++) {
                     PointData p = points.get(i);
-                    applyTerrainImpact(subLevel, p.local, p.normal, distributedForce * 1.5, explosions);
+                    applyTerrainImpact(subLevel, p.local, p.normal, distributedForce * 1.5, explosions, false);
                 }
             } else {
                 PointData lead = points.get(0);
-                applyTerrainImpact(subLevel, lead.local, lead.normal, totalForce, explosions);
+                applyTerrainImpact(subLevel, lead.local, lead.normal, totalForce, explosions, isPointy);
             }
         }
 
@@ -176,7 +176,7 @@ public final class ElasticPairReaction {
         private record PointData(Vector3d local, Vector3d normal, double force, Object slA, Object slB) {}
     }
 
-    private static void applyTerrainImpact(Object subLevel, Vector3d localPoint, Vector3d normal, double forceAmount, List<ExplosionCandidate> explosions) {
+    private static void applyTerrainImpact(Object subLevel, Vector3d localPoint, Vector3d normal, double forceAmount, List<ExplosionCandidate> explosions, boolean isPointy) {
         if (!TrueImpactConfig.ENABLE_TERRAIN_IMPACT_DAMAGE.get() || (TrueImpactConfig.ELASTIC_BLOCKS_BREAK_BLOCKS.get() == false && isElasticSubLevel(subLevel))) {
             return;
         }
@@ -198,9 +198,14 @@ public final class ElasticPairReaction {
             double energy = force * mass * TrueImpactConfig.TERRAIN_IMPACT_DAMAGE_SCALE.get() * TrueImpactConfig.DAMAGE_SCALE.get();
             
             BlockPos center = BlockPos.containing(globalPoint.x, globalPoint.y, globalPoint.z);
-            damageTerrain(level, center, normal, energy);
+            damageTerrain(level, center, normal, energy, isPointy);
             damageEntities(level, new Vec3(globalPoint.x, globalPoint.y, globalPoint.z), energy);
             collectExplosion(explosions, level, globalPoint, forceAmount, mass(subLevel));
+
+            // Soften reaction for pointy objects to allow sinking
+            if (isPointy && forceAmount > TrueImpactConfig.TERRAIN_IMPACT_FORCE_THRESHOLD.get()) {
+                applyImpulse(0, subLevel, localPoint, normal, -forceAmount * 0.15); // Counteract the bounce-back slightly
+            }
         }
     }
 
@@ -233,7 +238,7 @@ public final class ElasticPairReaction {
         }
     }
 
-    private static void damageTerrain(ServerLevel level, BlockPos center, Vector3d normal, double energy) {
+    private static void damageTerrain(ServerLevel level, BlockPos center, Vector3d normal, double energy, boolean isPointy) {
         level.getServer().execute(() -> {
             PriorityQueue<TerrainNode> queue = new PriorityQueue<>(Comparator.comparingDouble(TerrainNode::cost));
             Set<BlockPos> visited = new HashSet<>();
@@ -243,8 +248,9 @@ public final class ElasticPairReaction {
             queue.add(new TerrainNode(center.immutable(), energy, 0.0));
             visited.add(center.immutable());
             int broken = 0;
+            int maxBroken = isPointy ? TrueImpactConfig.TERRAIN_IMPACT_MAX_BLOCKS.get() * 6 : TrueImpactConfig.TERRAIN_IMPACT_MAX_BLOCKS.get();
 
-            while (!queue.isEmpty() && broken < TrueImpactConfig.TERRAIN_IMPACT_MAX_BLOCKS.get()) {
+            while (!queue.isEmpty() && broken < maxBroken) {
                 TerrainNode node = queue.poll();
                 BlockPos pos = node.pos();
                 BlockState state = level.getBlockState(pos);
@@ -261,12 +267,18 @@ public final class ElasticPairReaction {
                 if (yield >= TrueImpactConfig.TERRAIN_IMPACT_BREAK_YIELD.get()) {
                     level.destroyBlock(pos, true);
                     broken++;
-                    double remaining = (node.energy() - materialThreshold) * 0.55;
-                    if (remaining > materialThreshold * 0.2) {
+                    
+                    // Piercing energy loss is much lower when moving in the impact direction
+                    double decay = isPointy ? 0.85 : 0.55; 
+                    double remaining = (node.energy() - materialThreshold) * decay;
+                    
+                    if (remaining > materialThreshold * 0.1) {
                         for (Direction dir : Direction.values()) {
                             BlockPos next = pos.relative(dir).immutable();
                             if (visited.add(next)) {
-                                double bias = 1.0 + Math.max(0.0, new Vector3d(dir.getStepX(), dir.getStepY(), dir.getStepZ()).dot(direction)) * 0.8;
+                                // Extreme directional bias for pointy impacts (piercing)
+                                double dot = new Vector3d(dir.getStepX(), dir.getStepY(), dir.getStepZ()).dot(direction);
+                                double bias = 1.0 + Math.max(0.0, dot) * (isPointy ? 5.0 : 0.8);
                                 queue.add(new TerrainNode(next, remaining * bias, node.cost() + 1.0 / bias));
                             }
                         }
