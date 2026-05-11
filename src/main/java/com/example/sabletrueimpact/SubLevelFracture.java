@@ -29,7 +29,9 @@ public final class SubLevelFracture {
     private static final Method GET_MASS_TRACKER = findMethod("dev.ryanhcode.sable.sublevel.ServerSubLevel", "getMassTracker");
     private static final Method GET_MASS = findMethod("dev.ryanhcode.sable.api.physics.mass.MassData", "getMass");
     private static final Method GET_CENTER_OF_MASS = findMethod("dev.ryanhcode.sable.api.physics.mass.MassData", "getCenterOfMass");
-    private static final Method ON_SOLID_REMOVED = findMethod("dev.ryanhcode.sable.sublevel.plot.heat.SubLevelHeatMapManager", "onSolidRemoved", BlockPos.class);
+    private static final Method GET_ON_SOLID_REMOVED = findMethod("dev.ryanhcode.sable.sublevel.plot.heat.SubLevelHeatMapManager", "onSolidRemoved", BlockPos.class);
+    private static final Method LOGICAL_POSE = findMethod("dev.ryanhcode.sable.sublevel.SubLevel", "logicalPose");
+    private static final Method ROTATION_POINT = findMethod("dev.ryanhcode.sable.companion.math.Pose3d", "rotationPoint");
     private static final Map<Integer, List<Offset>> OFFSET_CACHE = new ConcurrentHashMap<>();
     private static final ExecutorService FRACTURE_EXECUTOR = Executors.newSingleThreadExecutor(new FractureThreadFactory());
     private static final ConcurrentLinkedQueue<PendingFracture> COMPLETED_FRACTURES = new ConcurrentLinkedQueue<>();
@@ -54,12 +56,23 @@ public final class SubLevelFracture {
         if (level == null) {
             return;
         }
+
+        // Convert local-space contact point → world-space before touching block world.
+        // Without this, ships near the origin would destroy blocks at (0,0,0).
+        Vector3d worldPoint = toWorldPoint(subLevel, localPoint);
+        if (worldPoint == null
+                || !Double.isFinite(worldPoint.x)
+                || !Double.isFinite(worldPoint.y)
+                || !Double.isFinite(worldPoint.z)) {
+            return;
+        }
+
         if (!claimFractureBudget(level, subLevel)) {
             TrueImpactPerformance.recordFractureSkippedBudget();
             return;
         }
 
-        BlockPos center = BlockPos.containing(localPoint.x, localPoint.y, localPoint.z);
+        BlockPos center = BlockPos.containing(worldPoint.x, worldPoint.y, worldPoint.z);
         double scaledForce = scaledForceAboveThreshold(
                 forceAmount,
                 TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_THRESHOLD.get(),
@@ -380,7 +393,7 @@ public final class SubLevelFracture {
             return;
         }
         try {
-            ON_SOLID_REMOVED.invoke(heatMapManager, pos);
+            GET_ON_SOLID_REMOVED.invoke(heatMapManager, pos);
         } catch (ReflectiveOperationException | RuntimeException ignored) {
         }
     }
@@ -392,6 +405,20 @@ public final class SubLevelFracture {
             return method;
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException("Missing Sable method " + className + "#" + methodName, e);
+        }
+    }
+
+    /** Resolves a Rapier local-space point to Minecraft world-space by adding the sub-level's rotation point. */
+    static Vector3d toWorldPoint(Object subLevel, Vector3d localPoint) {
+        try {
+            Object pose = LOGICAL_POSE.invoke(subLevel);
+            Object rp = ROTATION_POINT.invoke(pose);
+            double rx = ((Number) rp.getClass().getMethod("x").invoke(rp)).doubleValue();
+            double ry = ((Number) rp.getClass().getMethod("y").invoke(rp)).doubleValue();
+            double rz = ((Number) rp.getClass().getMethod("z").invoke(rp)).doubleValue();
+            return new Vector3d(localPoint.x + rx, localPoint.y + ry, localPoint.z + rz);
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            return null;
         }
     }
 
