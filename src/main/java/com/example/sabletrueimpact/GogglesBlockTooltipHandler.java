@@ -43,16 +43,18 @@ public final class GogglesBlockTooltipHandler {
         double mass = safeMass(player, state);
         double friction = safeFriction(state);
         double restitution = safeRestitution(state);
-        double strength = MaterialImpactProperties.displayStrength(state, baseStrength);
-        double toughness = MaterialImpactProperties.displayToughness(state, baseStrength);
+        double strength = baseStrength * MaterialImpactProperties.strengthMultiplier(state);
+        double toughness = MaterialImpactProperties.toughnessMultiplier(state);
+        double totalResilience = MaterialImpactProperties.breakThreshold(state, baseStrength);
         double brittleness = MaterialImpactProperties.brittleness(state);
 
         event.getToolTip().add(Component.literal("Sable True Impact").withStyle(ChatFormatting.DARK_AQUA));
         event.getToolTip().add(line("Mass", "%.2f kpg", mass));
         event.getToolTip().add(line("Friction", "%.2f", friction));
         event.getToolTip().add(line("Restitution", "%.2f", restitution));
-        event.getToolTip().add(line("Strength", "%.1f pN", strength));
-        event.getToolTip().add(line("Toughness", "%.1f pN*s", toughness));
+        event.getToolTip().add(line("Base Strength", "%.1f pN", strength));
+        event.getToolTip().add(line("Toughness Factor", "x%.1f", toughness));
+        event.getToolTip().add(line("Total Resilience", "%.0f pN*s", totalResilience));
         event.getToolTip().add(line("Brittleness", "%.2f", brittleness));
     }
 

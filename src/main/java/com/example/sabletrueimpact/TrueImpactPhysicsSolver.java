@@ -144,10 +144,9 @@ public class TrueImpactPhysicsSolver {
                     * TrueImpactConfig.DAMAGE_SCALE.get()
                     * TrueImpactConfig.GLOBAL_STRENGTH_SCALE.get();
             
-            double materialStrength = Math.max(MaterialImpactProperties.displayStrength(state, structuralIntegrity), 1.0);
-            double materialToughness = Math.max(MaterialImpactProperties.displayToughness(state, structuralIntegrity), materialStrength);
-            double overStress = Math.max(0.0, kineticEnergy - materialStrength);
-            double yieldRatio = kineticEnergy / materialStrength;
+            double breakThreshold = Math.max(MaterialImpactProperties.breakThreshold(state, structuralIntegrity), 1.0);
+            double overStress = Math.max(0.0, kineticEnergy - breakThreshold);
+            double yieldRatio = kineticEnergy / breakThreshold;
             double elasticBreakVelocity = TrueImpactConfig.MIN_BREAK_VELOCITY.get()
                     * (1.0 + restitution * TrueImpactConfig.RESTITUTION_BREAK_VELOCITY_MULTIPLIER.get());
             double elasticPropagationVelocity = TrueImpactConfig.MIN_PROPAGATION_VELOCITY.get()
@@ -215,7 +214,7 @@ public class TrueImpactPhysicsSolver {
                         level,
                         pos,
                         MaterialImpactProperties.fatigueDamage(state, overStress),
-                        materialToughness * TrueImpactConfig.BREAK_YIELD_THRESHOLD.get(),
+                        breakThreshold * TrueImpactConfig.BREAK_YIELD_THRESHOLD.get(),
                         system.hashCode() + pos.hashCode()
                 );
                 if (!broke) {

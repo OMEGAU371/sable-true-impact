@@ -28,16 +28,13 @@ public final class MaterialImpactProperties {
         return properties(state).brittleness();
     }
 
+    /**
+     * The ultimate threshold for breaking this block. 
+     * Combines base resistance, strength multiplier, and toughness multiplier.
+     */
     public static double breakThreshold(BlockState state, double baseStrength) {
-        return baseStrength * strengthMultiplier(state) * toughnessMultiplier(state);
-    }
-
-    public static double displayStrength(BlockState state, double baseStrength) {
-        return baseStrength * strengthMultiplier(state);
-    }
-
-    public static double displayToughness(BlockState state, double baseStrength) {
-        return baseStrength * toughnessMultiplier(state);
+        Properties p = properties(state);
+        return baseStrength * p.strengthMultiplier() * p.toughnessMultiplier();
     }
 
     public static double fatigueDamage(BlockState state, double damage) {
