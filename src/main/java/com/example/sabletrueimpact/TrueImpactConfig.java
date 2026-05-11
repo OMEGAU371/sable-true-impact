@@ -299,7 +299,7 @@ public final class TrueImpactConfig {
         SUBLEVEL_FRACTURE_FORCE_THRESHOLD = BUILDER.comment("Minimum collision force before internal sublevel fracture is considered. Raise this if vehicles split too easily.")
                 .defineInRange("subLevelFractureForceThreshold", 620.0, 0.0, 1000000000.0);
         SUBLEVEL_FRACTURE_FORCE_SCALE = BUILDER.comment("Scales raw collision force into fracture damage.")
-                .defineInRange("subLevelFractureForceScale", 0.052, 0.0, 1000.0);
+                .defineInRange("subLevelFractureForceScale", 0.068, 0.0, 1000.0);
         SUBLEVEL_FRACTURE_FORCE_EXPONENT = BUILDER.comment("Exponent applied to collision force above the fracture threshold. 1.0 keeps current linear behavior; higher values make high-speed/high-force crashes split structures much more aggressively.")
                 .defineInRange("subLevelFractureForceExponent", 1.0, 0.0, 8.0);
         SUBLEVEL_FRACTURE_RADIUS = BUILDER.comment("Maximum radius around the impact point scanned for weak connections.")
@@ -358,11 +358,11 @@ public final class TrueImpactConfig {
         ENABLE_EXPLOSION_IMPACT_FRACTURE = BUILDER.comment("If true, explosions send pressure waves into nearby Sable physical structures, causing cracks and internal fracture.")
                 .define("enableExplosionImpactFracture", true);
         EXPLOSION_IMPACT_FORCE_SCALE = BUILDER.comment("Scales explosion radius and distance into fracture force. Raise for more dramatic blast separation.")
-                .defineInRange("explosionImpactForceScale", 165.0, 0.0, 1000000.0);
+                .defineInRange("explosionImpactForceScale", 225.0, 0.0, 1000000.0);
         EXPLOSION_IMPACT_RADIUS_MULTIPLIER = BUILDER.comment("How far explosions search for Sable physical structures, as a multiplier of explosion radius.")
                 .defineInRange("explosionImpactRadiusMultiplier", 1.65, 0.0, 32.0);
-        EXPLOSION_IMPACT_CONFINEMENT_SCALE = BUILDER.comment("Extra blast pressure in enclosed spaces. 0 disables confinement bonus.")
-                .defineInRange("explosionImpactConfinementScale", 1.4, 0.0, 100.0);
+        EXPLOSION_IMPACT_CONFINEMENT_SCALE = BUILDER.comment("Extra blast pressure in enclosed spaces (blockedRatio^2). Higher values make indoor explosions much more lethal than outdoor ones.")
+                .defineInRange("explosionImpactConfinementScale", 4.5, 0.0, 100.0);
         EXPLOSION_IMPACT_MAX_SUBLEVELS = BUILDER.comment("Maximum nearby Sable physical structures processed by one explosion.")
                 .defineInRange("explosionImpactMaxSubLevels", 32, 1, 1000000);
         EXPLOSION_IMPACT_RAY_SAMPLES = BUILDER.comment("Invisible shockwave ray count used to detect enclosed blasts and impacted Sable structures. Higher is more accurate but costs more CPU.")

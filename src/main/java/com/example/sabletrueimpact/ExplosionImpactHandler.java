@@ -60,7 +60,9 @@ public final class ExplosionImpactHandler {
             WaveScan scan = scanShockwave(level, center, radius, searchRadius, nearby);
             rays = scan.rays();
             hits = scan.hits().size();
-            double confinement = 1.0 + scan.blockedRatio() * TrueImpactConfig.EXPLOSION_IMPACT_CONFINEMENT_SCALE.get();
+            // Use square scaling for blocked ratio to make fully enclosed spaces feel exponentially more violent
+            double ratio = scan.blockedRatio();
+            double confinement = 1.0 + (ratio * ratio) * TrueImpactConfig.EXPLOSION_IMPACT_CONFINEMENT_SCALE.get();
             int processed = 0;
             int maxSubLevels = TrueImpactConfig.EXPLOSION_IMPACT_MAX_SUBLEVELS.get();
             for (SubLevelEntry entry : nearby) {
