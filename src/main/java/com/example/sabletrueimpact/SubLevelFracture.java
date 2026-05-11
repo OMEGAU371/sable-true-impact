@@ -258,12 +258,17 @@ public final class SubLevelFracture {
             if (overStress <= 0.0) {
                 continue;
             }
+            
+            // Re-check against toughness for actual breakage
+            double toughnessBonus = materialToughness / materialStrength;
             double fatigueDamage = MaterialImpactProperties.fatigueDamage(state, overStress);
             double breakThreshold = Math.max(materialToughness, 1.0);
             double crackRatio = snapshot.damageRatio(pos);
             double crackBonus = 1.0 + crackRatio * TrueImpactConfig.SUBLEVEL_FRACTURE_CRACK_BONUS_SCALE.get();
             double spreadBonus = 1.0 + structure.weakPlaneSpread() * TrueImpactConfig.SUBLEVEL_FRACTURE_WEAK_PLANE_SPREAD.get();
-            double score = fatigueDamage * crackBonus * spreadBonus / breakThreshold;
+            
+            // Score now scales inverse to the square of toughness bonus to make Netherite truly god-like
+            double score = (fatigueDamage * crackBonus * spreadBonus) / (breakThreshold * toughnessBonus);
             result.add(new Candidate(pos.immutable(), score, fatigueDamage, breakThreshold));
         }
         return new CandidateScan(result, checked);

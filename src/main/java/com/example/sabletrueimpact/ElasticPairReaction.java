@@ -255,14 +255,14 @@ public final class ElasticPairReaction {
                         + TrueImpactConfig.BASE_STRENGTH.get();
                 if (state.getDestroySpeed(level, pos) < 1.0f) strength *= TrueImpactConfig.SOFT_BLOCK_STRENGTH_MULTIPLIER.get();
                 
-                double materialStrength = Math.max(MaterialImpactProperties.displayStrength(state, strength), 1.0);
-                double yield = node.energy() / materialStrength;
+                double materialThreshold = Math.max(MaterialImpactProperties.breakThreshold(state, strength), 1.0);
+                double yield = node.energy() / materialThreshold;
 
                 if (yield >= TrueImpactConfig.TERRAIN_IMPACT_BREAK_YIELD.get()) {
                     level.destroyBlock(pos, true);
                     broken++;
-                    double remaining = (node.energy() - materialStrength) * 0.55;
-                    if (remaining > materialStrength * 0.2) {
+                    double remaining = (node.energy() - materialThreshold) * 0.55;
+                    if (remaining > materialThreshold * 0.2) {
                         for (Direction dir : Direction.values()) {
                             BlockPos next = pos.relative(dir).immutable();
                             if (visited.add(next)) {
@@ -272,8 +272,8 @@ public final class ElasticPairReaction {
                         }
                     }
                 } else if (TrueImpactConfig.ENABLE_CRACKS.get() && yield > TrueImpactConfig.CRACK_YIELD_THRESHOLD.get()) {
-                    BlockDamageAccumulator.apply(level, pos, MaterialImpactProperties.fatigueDamage(state, node.energy() - materialStrength), 
-                        materialStrength * TrueImpactConfig.TERRAIN_IMPACT_BREAK_YIELD.get(), pos.hashCode());
+                    BlockDamageAccumulator.apply(level, pos, MaterialImpactProperties.fatigueDamage(state, node.energy() - materialThreshold), 
+                        materialThreshold * TrueImpactConfig.TERRAIN_IMPACT_BREAK_YIELD.get(), pos.hashCode());
                 }
             }
         });

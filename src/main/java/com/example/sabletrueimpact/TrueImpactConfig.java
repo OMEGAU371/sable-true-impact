@@ -203,8 +203,8 @@ public final class TrueImpactConfig {
                 .defineInRange("maxEffectiveMass", 100.0, 1.0, 100000.0);
         SOFT_BLOCK_STRENGTH_MULTIPLIER = BUILDER.comment("Extra strength multiplier for soft blocks like dirt/grass. 1.0 keeps soil softer than wood and stone.")
                 .defineInRange("softBlockStrengthMultiplier", 1.0, 1.0, 1000.0);
-        HARDNESS_STRENGTH_FACTOR = BUILDER.defineInRange("hardnessStrengthFactor", 28.0, 0.0, 1000.0);
-        BLAST_STRENGTH_FACTOR = BUILDER.defineInRange("blastStrengthFactor", 7.0, 0.0, 1000.0);
+        HARDNESS_STRENGTH_FACTOR = BUILDER.defineInRange("hardnessStrengthFactor", 20.0, 0.0, 1000.0);
+        BLAST_STRENGTH_FACTOR = BUILDER.defineInRange("blastStrengthFactor", 18.0, 0.0, 1000.0);
         BASE_STRENGTH = BUILDER.comment("Flat base strength. Keep this low enough that material hardness still matters.")
                 .defineInRange("baseStrength", 12.0, 0.0, 1000.0);
         CRACK_YIELD_THRESHOLD = BUILDER.defineInRange("crackYieldThreshold", 1.15, 0.0, 1000.0);
