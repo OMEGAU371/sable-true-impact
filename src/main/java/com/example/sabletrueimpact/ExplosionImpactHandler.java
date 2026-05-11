@@ -161,18 +161,21 @@ public final class ExplosionImpactHandler {
         }
 
         // 2. Scan World Entities (Crucial for Blueprints and newly placed structures)
-        // Some blueprint systems (Aeronautics/Sable Blueprints) might hold SubLevels as entities before registration
-        Class<?> subLevelClass = Class.forName("dev.ryanhcode.sable.sublevel.SubLevel");
-        List<net.minecraft.world.entity.Entity> entities = level.getEntities((net.minecraft.world.entity.Entity)null, searchArea, e -> {
-            return subLevelClass.isInstance(e);
-        });
-        
-        for (net.minecraft.world.entity.Entity e : entities) {
-            // Avoid duplicates if the entity is already in the container
-            if (nearby.stream().noneMatch(entry -> entry.subLevel() == e)) {
-                AABB bounds = (AABB) BOUNDING_BOX.invoke(e);
-                nearby.add(new SubLevelEntry(e, bounds));
+        try {
+            Class<?> subLevelClass = Class.forName("dev.ryanhcode.sable.sublevel.SubLevel");
+            List<net.minecraft.world.entity.Entity> entities = level.getEntities((net.minecraft.world.entity.Entity)null, searchArea, e -> {
+                return subLevelClass.isInstance(e);
+            });
+            
+            for (net.minecraft.world.entity.Entity e : entities) {
+                // Avoid duplicates if the entity is already in the container
+                if (nearby.stream().noneMatch(entry -> entry.subLevel() == e)) {
+                    AABB bounds = (AABB) BOUNDING_BOX.invoke(e);
+                    nearby.add(new SubLevelEntry(e, bounds));
+                }
             }
+        } catch (ClassNotFoundException ignored) {
+            // If the SubLevel interface isn't found, we just skip entity scanning
         }
 
         return nearby;

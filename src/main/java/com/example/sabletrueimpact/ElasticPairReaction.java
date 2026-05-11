@@ -31,7 +31,16 @@ public final class ElasticPairReaction {
     private static final Method GET_CENTER_OF_MASS_METHOD = findMethod("dev.ryanhcode.sable.api.physics.mass.MassData", "getCenterOfMass");
     private static final Method LOGICAL_POSE_METHOD = findMethod("dev.ryanhcode.sable.sublevel.SubLevel", "logicalPose");
     private static final Method ROTATION_POINT_METHOD = findMethod("dev.ryanhcode.sable.companion.math.Pose3d", "rotationPoint");
-    private static final Method WAKE_UP_METHOD = findMethod("dev.ryanhcode.sable.sublevel.ServerSubLevel", "wakeUp");
+    private static final Method WAKE_UP_METHOD;
+
+    static {
+        Method m = null;
+        try {
+            m = Class.forName("dev.ryanhcode.sable.sublevel.ServerSubLevel").getMethod("wakeUp");
+            m.setAccessible(true);
+        } catch (Exception ignored) {}
+        WAKE_UP_METHOD = m;
+    }
 
     private ElasticPairReaction() {}
 
@@ -163,8 +172,7 @@ public final class ElasticPairReaction {
                 impulse = Math.min(impulse, reducedMass * TrueImpactConfig.PAIR_REACTION_MAX_VELOCITY_CHANGE.get());
 
                 if (impulse > 1.0E-6) {
-                    applyImpulse(sceneId, p.slA, p.local, p.normal, impulse / massA);
-                    applyImpulse(sceneId, p.slB, p.local, p.normal, -impulse / massB);
+                    applyImpulse(sceneId, p.slA, p.slB, p.local, p.normal, impulse / massA, -impulse / massB);
                     
                     Vector3d rot = rotationPoint(p.slA);
                     if (rot != null) {
@@ -173,8 +181,6 @@ public final class ElasticPairReaction {
                 }
             }
         }
-
-        private record PointData(Vector3d local, Vector3d normal, double force, Object slA, Object slB) {}
     }
 
     private static void applyTerrainImpact(Object subLevel, Vector3d localPoint, Vector3d normal, double forceAmount, List<ExplosionCandidate> explosions) {
@@ -326,10 +332,21 @@ public final class ElasticPairReaction {
         return false;
     }
 
-    private static void applyImpulse(int sceneId, Object subLevel, Vector3d localPoint, Vector3d normal, double impulse) {
-        if (subLevel == null) return;
+    private static void applyImpulse(int sceneId, Object slA, Object slB, Vector3d localPoint, Vector3d normal, double impulseA, double impulseB) {
+        if (slA == null || slB == null) return;
         
-        // Safety: Prevent NaN or infinite forces entering Rapier
+        if (WAKE_UP_METHOD != null) {
+            try {
+                WAKE_UP_METHOD.invoke(slA);
+                WAKE_UP_METHOD.invoke(slB);
+            } catch (Exception ignored) {}
+        }
+
+        applySingleImpulse(sceneId, slA, localPoint, normal, impulseA);
+        applySingleImpulse(sceneId, slB, localPoint, normal, impulseB);
+    }
+
+    private static void applySingleImpulse(int sceneId, Object subLevel, Vector3d localPoint, Vector3d normal, double impulse) {
         if (!Double.isFinite(impulse) || Math.abs(impulse) <= 1e-6) return;
         if (!Double.isFinite(localPoint.x) || !Double.isFinite(localPoint.y) || !Double.isFinite(localPoint.z)) return;
         if (!Double.isFinite(normal.x) || !Double.isFinite(normal.y) || !Double.isFinite(normal.z)) return;
@@ -338,15 +355,10 @@ public final class ElasticPairReaction {
         Integer rid = runtimeId(subLevel);
         if (normal.lengthSquared() < 1e-8 || com == null || rid == null) return;
 
-        try {
-            // Force wake up the island before pushing it to avoid "island should be awake" panic
-            WAKE_UP_METHOD.invoke(subLevel);
-            
-            Vector3d localNormal = new Vector3d(normal).normalize().mul(impulse);
-            if (!Double.isFinite(localNormal.x) || !Double.isFinite(localNormal.y) || !Double.isFinite(localNormal.z)) return;
-            
-            Rapier3D.applyForce(sceneId, rid, localPoint.x - com.x, localPoint.y - com.y, localPoint.z - com.z, localNormal.x, localNormal.y, localNormal.z, true);
-        } catch (Exception ignored) {}
+        Vector3d localNormal = new Vector3d(normal).normalize().mul(impulse);
+        if (!Double.isFinite(localNormal.x) || !Double.isFinite(localNormal.y) || !Double.isFinite(localNormal.z)) return;
+        
+        Rapier3D.applyForce(sceneId, rid, localPoint.x - com.x, localPoint.y - com.y, localPoint.z - com.z, localNormal.x, localNormal.y, localNormal.z, true);
     }
 
     private static double mass(Object subLevel) {

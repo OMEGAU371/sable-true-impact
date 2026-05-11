@@ -1,0 +1,500 @@
+﻿[19:46:29] [Worker-ResourceReload-3/INFO] [Iris/]: DH Ready, binding Iris event handlers...
+[19:46:29] [Render thread/INFO] [Iris/]: Shaders are disabled because enableShaders is set to false in iris.properties
+[19:46:29] [Worker-ResourceReload-3/INFO] [Iris/]: DH Iris events bound.
+[19:46:29] [DH-PostClientInit Thread/INFO] [Di.se.di.co.wr.DependencySetup_neoforge/]: Setting DH Rendering API to: [OPEN_GL].
+[19:46:29] [Render thread/INFO] [ModernUI-MC/UIManager]: UI renderer initialized
+[19:46:29] [Render thread/INFO] [xa.ma.WorldMap/]: Loading Xaero's World Map - Stage 2/2
+[19:46:29] [Render thread/INFO] [xa.ma.WorldMap/]: New world map region cache hash code: 911366414
+[19:46:30] [Render thread/ERROR] [xa.ma.WorldMap/]: io exception while checking versions: Read timed out
+[19:46:30] [Render thread/INFO] [xa.ma.WorldMap/]: Registered player tracker system: map_synced
+[19:46:30] [Render thread/INFO] [xa.ma.WorldMap/]: Xaero's WorldMap Mod: Xaero's minimap found!
+[19:46:30] [Render thread/INFO] [xa.ma.WorldMap/]: Registered player tracker system: minimap_synced
+[19:46:30] [Render thread/INFO] [xa.ma.WorldMap/]: No Optifine!
+[19:46:30] [Render thread/INFO] [xa.ma.WorldMap/]: Xaero's World Map: No Vivecraft!
+[19:46:30] [Render thread/INFO] [xa.ma.WorldMap/]: Xaero's World Map: Iris found!
+[19:46:30] [Render thread/WARN] [ne.ne.fm.DeferredWorkQueue/LOADING]: Mod 'xaeroworldmap' took 1.473 s to run a deferred task.
+[19:46:30] [Render thread/INFO] [xa.mi.XaeroMinimap/]: Loading Xaero's Minimap - Stage 2/2
+[19:46:32] [Render thread/WARN] [xa.hu.mi.MinimapLogs/]: io exception while checking versions: Read timed out
+[19:46:32] [Render thread/INFO] [xa.hu.mi.MinimapLogs/]: Registered player tracker system: minimap_synced
+[19:46:32] [Render thread/INFO] [xa.hu.mi.MinimapLogs/]: Xaero's Minimap: World Map found!
+[19:46:32] [Render thread/INFO] [xa.hu.mi.MinimapLogs/]: No Optifine!
+[19:46:32] [Render thread/INFO] [xa.hu.mi.MinimapLogs/]: Xaero's Minimap: No Vivecraft!
+[19:46:32] [Render thread/INFO] [xa.hu.mi.MinimapLogs/]: Xaero's Minimap: Iris found!
+[19:46:32] [Render thread/WARN] [ne.ne.fm.DeferredWorkQueue/LOADING]: Mod 'xaerominimap' took 1.375 s to run a deferred task.
+[19:46:32] [Render thread/INFO] [xa.li.XaeroLib/]: Loading XaeroLib common 2/2!
+[19:46:32] [Render thread/INFO] [xa.li.XaeroLib/]: Loading XaeroLib client 2/2!
+[19:46:32] [Render thread/INFO] [de.lo.gn.Gears/]: GnKinetics CAPABILITIES SETUP
+[19:46:32] [Worker-ResourceReload-18/WARN] [minecraft/ModelManager]: Missing textures in model create_connected:fan_ending_catalyst_dragons_breath#:
+    minecraft:textures/atlas/blocks.png:create_dragons_plus:fluid/dragon_breath_flow
+[19:46:32] [Worker-ResourceReload-18/WARN] [minecraft/ModelManager]: Missing textures in model create_connected:fan_enriched_catalyst#:
+    minecraft:textures/atlas/blocks.png:createnuclear:block/enriched_soul_soil
+    minecraft:textures/atlas/blocks.png:createnuclear:block/enriching/campfire/enriching_flame
+[19:46:32] [Worker-ResourceReload-18/WARN] [minecraft/ModelManager]: Missing textures in model tfmg:block/fuse_block/fuse#standalone:
+    minecraft:textures/atlas/blocks.png:tfmg:block/fuse_block
+[19:46:32] [Worker-ResourceReload-18/WARN] [minecraft/ModelManager]: Missing textures in model tfmg:constantan_truss#axis=y,waterlogged=false:
+    minecraft:textures/atlas/blocks.png:tfmg:block/constantan_truss_truss
+[19:46:32] [Worker-ResourceReload-18/WARN] [minecraft/ModelManager]: Missing textures in model tfmg:constantan_truss#axis=z,waterlogged=true:
+    minecraft:textures/atlas/blocks.png:tfmg:block/constantan_truss_truss
+[19:46:32] [Worker-ResourceReload-18/WARN] [minecraft/ModelManager]: Missing textures in model create_connected:fan_ending_catalyst_dragons_breath#inventory:
+    minecraft:textures/atlas/blocks.png:create_dragons_plus:fluid/dragon_breath_flow
+[19:46:32] [Worker-ResourceReload-18/WARN] [minecraft/ModelManager]: Missing textures in model create_connected:fan_enriched_catalyst#inventory:
+    minecraft:textures/atlas/blocks.png:createnuclear:block/enriched_soul_soil
+    minecraft:textures/atlas/blocks.png:createnuclear:block/enriching/campfire/enriching_flame
+[19:46:32] [Worker-ResourceReload-18/WARN] [minecraft/ModelManager]: Missing textures in model tfmg:constantan_truss#axis=x,waterlogged=true:
+    minecraft:textures/atlas/blocks.png:tfmg:block/constantan_truss_truss
+[19:46:32] [Worker-ResourceReload-18/WARN] [minecraft/ModelManager]: Missing textures in model tfmg:constantan_truss#inventory:
+    minecraft:textures/atlas/blocks.png:tfmg:block/constantan_truss_truss
+[19:46:34] [Render thread/INFO] [Veil/]: Loaded 0 shader modifications
+[19:46:34] [Render thread/INFO] [Veil/]: Loaded 29 shaders from: pinwheel/shaders/program
+[19:46:34] [Worker-ResourceReload-18/INFO] [sn.ja.Jade/]: Start loading plugin from net.mehvahdjukaar.supplementaries.integration.JadeCompat
+[19:46:34] [Worker-ResourceReload-18/INFO] [sn.ja.Jade/]: Start loading plugin from dev.emythiel.createitemdrawers.compat.Waila
+[19:46:34] [Worker-ResourceReload-18/INFO] [sn.ja.Jade/]: Start loading plugin from snownee.jade.addon.vanilla.VanillaPlugin
+[19:46:34] [Worker-ResourceReload-18/INFO] [sn.ja.Jade/]: Start loading plugin from snownee.jade.addon.universal.UniversalPlugin
+[19:46:34] [Worker-ResourceReload-18/INFO] [sn.ja.Jade/]: Start loading plugin from snownee.jade.addon.debug.DebugPlugin
+[19:46:34] [Worker-ResourceReload-18/INFO] [sn.ja.Jade/]: Start loading plugin from snownee.jade.addon.core.CorePlugin
+[19:46:34] [Worker-ResourceReload-18/INFO] [sn.ja.Jade/]: Start loading plugin from snownee.jade.addon.access.AccessibilityPlugin
+[19:46:34] [Worker-ResourceReload-18/INFO] [sn.ja.Jade/]: Start loading plugin from fr.lucreeper74.createmetallurgy.compat.jade.CreateMetallurgyJade
+[19:46:34] [Worker-ResourceReload-18/INFO] [sn.ja.Jade/]: Start loading plugin from snownee.jade.addon.JadeAddonsBase
+[19:46:34] [Worker-ResourceReload-9/INFO] [PonderIndex/]: Registering Ponder Scenes took 312.0 ms
+[19:46:34] [Worker-ResourceReload-9/INFO] [PonderIndex/]: Registering Ponder Tags took 16.45 ms
+[19:46:35] [Render thread/WARN] [minecraft/SoundEngine]: Missing sound for event: minecraft:item.goat_horn.play
+[19:46:35] [Render thread/WARN] [minecraft/SoundEngine]: Missing sound for event: minecraft:entity.goat.screaming.horn_break
+[19:46:35] [Render thread/WARN] [minecraft/SoundEngine]: Missing sound for event: supplementaries:entity.plunderer.cannon_use
+[19:46:35] [Render thread/WARN] [minecraft/SoundEngine]: Missing sound for event: sounds:item.hard_metal.hold
+[19:46:35] [Render thread/WARN] [minecraft/SoundEngine]: Missing sound for event: sounds:item.shiny_metal.hold
+[19:46:35] [Render thread/INFO] [mojang/Library]: OpenAL initialized on device OpenAL Soft on 鎵０鍣?(Realtek(R) Audio)
+[19:46:35] [Render thread/INFO] [minecraft/SoundEngine]: Sound engine started
+[19:46:35] [Render thread/INFO] [ModernUI-MC/Init]: Font 'Noto Sans' failed to load or invalid
+[19:46:35] [Render thread/INFO] [ModernUI-MC/Init]: Font 'San Francisco' failed to load or invalid
+[19:46:35] [Render thread/INFO] [ModernUI-MC/Init]: Font 'Open Sans' failed to load or invalid
+[19:46:35] [Render thread/INFO] [ModernUI-MC/Init]: Font 'STHeiti' failed to load or invalid
+[19:46:35] [Render thread/INFO] [ModernUI-MC/Init]: Reloaded typeface: FontCollection{mFamilies=[Google Noto Color Emoji, Shanggu Sans ST Medium, Source Han Sans CN Medium, Segoe UI Variable, Segoe UI, SimHei, Segoe UI Symbol, mui-i18n-compat], mExclusiveEastAsianBits=null}
+[19:46:35] [Render thread/INFO] [ModernUI-MC/Glyph]: Reloaded glyph manager
+[19:46:35] [Render thread/INFO] [ModernUI-MC/TextLayout]: Reloaded text layout engine, res level: 2 to 2, locale: en_US, layout RTL: false
+[19:46:35] [Render thread/INFO] [minecraft/TextureAtlas]: Created: 4096x2048x4 minecraft:textures/atlas/blocks.png-atlas
+[19:46:35] [Render thread/INFO] [minecraft/TextureAtlas]: Created: 256x256x4 minecraft:textures/atlas/signs.png-atlas
+[19:46:35] [Render thread/INFO] [minecraft/TextureAtlas]: Created: 512x512x4 minecraft:textures/atlas/shield_patterns.png-atlas
+[19:46:35] [Render thread/INFO] [minecraft/TextureAtlas]: Created: 512x512x4 minecraft:textures/atlas/banner_patterns.png-atlas
+[19:46:35] [Render thread/INFO] [minecraft/TextureAtlas]: Created: 2048x2048x4 minecraft:textures/atlas/armor_trims.png-atlas
+[19:46:35] [Render thread/INFO] [minecraft/TextureAtlas]: Created: 256x256x4 minecraft:textures/atlas/chest.png-atlas
+[19:46:35] [Render thread/INFO] [minecraft/TextureAtlas]: Created: 128x64x4 minecraft:textures/atlas/decorated_pot.png-atlas
+[19:46:35] [Render thread/INFO] [minecraft/TextureAtlas]: Created: 512x256x4 minecraft:textures/atlas/beds.png-atlas
+[19:46:35] [Render thread/INFO] [minecraft/TextureAtlas]: Created: 512x512x4 minecraft:textures/atlas/shulker_boxes.png-atlas
+[19:46:35] [Render thread/INFO] [minecraft/TextureAtlas]: Created: 1024x512x0 minecraft:textures/atlas/particles.png-atlas
+[19:46:35] [Render thread/INFO] [minecraft/TextureAtlas]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
+[19:46:35] [Render thread/INFO] [minecraft/TextureAtlas]: Created: 256x128x0 minecraft:textures/atlas/mob_effects.png-atlas
+[19:46:35] [Render thread/INFO] [minecraft/TextureAtlas]: Created: 256x256x0 minecraft:textures/atlas/map_decorations.png-atlas
+[19:46:35] [Render thread/INFO] [minecraft/TextureAtlas]: Created: 1024x512x0 minecraft:textures/atlas/gui.png-atlas
+[19:46:35] [Render thread/WARN] [minecraft/ShaderInstance]: Shader rendertype_entity_translucent_emissive could not find sampler named Sampler2 in the specified shader program.
+[19:46:36] [Render thread/INFO] [minecraft/TextureAtlas]: Created: 256x256x0 jei:textures/atlas/gui.png-atlas
+[19:46:36] [Render thread/INFO] [xa.li.XaeroLib/]: Successfully reloaded the XaeroLib shaders!
+[19:46:36] [Render thread/INFO] [ne.ne.ne.cl.en.an.js.AnimationLoader/]: Loaded 0 entity animations
+[19:46:36] [Render thread/INFO] [Veil/]: Loaded 3 framebuffers
+[19:46:36] [Render thread/INFO] [Veil/]: Compiled 69 vanilla shaders in 107.3 ms
+[19:46:36] [Render thread/INFO] [Veil/]: Loaded 6 post pipelines
+[19:46:36] [Render thread/INFO] [Veil/]: Loaded 4 render types
+[19:46:36] [Render thread/INFO] [Veil/]: Enabled bloom pipeline
+[19:46:36] [Render thread/INFO] [Veil/]: Loaded 0 quasar particles
+[19:46:36] [Render thread/INFO] [Veil/]: Loaded 0 templates
+[19:46:36] [Render thread/INFO] [Veil/]: Loaded 0 modules
+[19:46:36] [Render thread/INFO] [flywheel/backend/shaders/]: Loaded 113 shader sources in 30.976 ms
+[19:46:36] [Render thread/INFO] [co.si.cr.Create/]: Loaded 58 train hat configurations.
+[19:46:36] [Render thread/INFO] [Di.se.di.co.ja.up.SelfUpdater/]: Checking for Distant Horizons update
+[19:46:36] [Render thread/INFO] [Di.se.di.co.ja.up.SelfUpdater/]: Distant Horizons already up to date.
+[19:46:36] [Render thread/INFO] [Iris/]: Creating pipeline for dimension minecraft:overworld
+[19:46:37] [Render thread/INFO] [Veil/]: Finished uploading vanilla shaders
+[19:46:38] [Render thread/WARN] [ModernFix/]: Game took 65.754 seconds to start
+[19:46:47] [Render thread/INFO] [ModernUI-MC/TextLayout]: Reloaded text layout engine, res level: 2 to 6, locale: en_US, layout RTL: false
+[19:46:49] [Render thread/WARN] [ne.ne.ne.co.CommonHooks/WP]: The following mods have version differences that were not resolved:
+sabletrueimpact (version 1.3.11 -> 1.4.0)
+Things may not work well.
+[19:46:49] [Render thread/INFO] [co.si.cr.Create/]: Created 157 recipes which will be injected into the game
+[19:46:49] [Render thread/INFO] [co.si.cr.Create/]: Created 0 tags which will be injected into the game
+[19:46:49] [Render thread/INFO] [Moonlight/]: Resource cache state for SERVER_DATA: needs regeneration
+[19:46:49] [Render thread/INFO] [Moonlight/]: Deleting directory: D:\.minecraft\versions\鑸┖锛乗dynamic-data-pack-cache\supplementaries-generated_pack
+[19:46:49] [Render thread/INFO] [Moonlight/]: Cleared cache pack resources at D:\.minecraft\versions\鑸┖锛乗dynamic-data-pack-cache\supplementaries-generated_pack in 1.386 ms
+[19:46:49] [Render thread/INFO] [Moonlight/]: Starting runtime resource generation for pack type SERVER_DATA with generators [supplementaries:generated_pack]
+[19:46:49] [Render thread/INFO] [Moonlight/]: Regenerating Dynamic SERVER_DATA Resources Provider [supplementaries:generated_pack], requested by strategy CACHED_FOLDER
+[19:46:49] [pool-35-thread-2/WARN] [Supplementaries/]: Could not find Sign for wood createdieselgenerators:chip_wood. Does this block even exist? It should! Skipping way sign recipe generation
+[19:46:49] [pool-35-thread-2/INFO] [Supplementaries/]: Generated 10 sign post recipes
+[19:46:49] [Render thread/INFO] [Moonlight/]: Generated runtime SERVER_DATA for pack supplementaries:generated_pack in 34.14 ms
+[19:46:49] [Render thread/INFO] [Moonlight/]: Populated search tree for pack at D:\.minecraft\versions\鑸┖锛乗dynamic-data-pack-cache\supplementaries-generated_pack in 1.055 ms
+[19:46:49] [Render thread/INFO] [Moonlight/]: Finished runtime resources generation for 1 packs in a total of 37.38 ms 
+[19:46:49] [Worker-ResourceReload-20/ERROR] [minecraft/LootDataType]: Couldn't parse element ResourceKey[minecraft:root / minecraft:loot_table]:tracks:blocks/suspension_track - Not a valid resource location: Tracks:suspension_track Non [a-z0-9_.-] character in namespace of location: Tracks:suspension_track; Not a valid resource location: Tracks:blocks/suspension_track Non [a-z0-9_.-] character in namespace of location: Tracks:blocks/suspension_track
+[19:46:49] [Worker-ResourceReload-20/ERROR] [minecraft/LootDataType]: Couldn't parse element ResourceKey[minecraft:root / minecraft:loot_table]:tracks:blocks/track_drive_wheel - Not a valid resource location: Tracks:track_drive_wheel Non [a-z0-9_.-] character in namespace of location: Tracks:track_drive_wheel; Not a valid resource location: Tracks:blocks/track_drive_wheel Non [a-z0-9_.-] character in namespace of location: Tracks:blocks/track_drive_wheel
+[19:46:49] [Worker-ResourceReload-20/ERROR] [minecraft/LootDataType]: Couldn't parse element ResourceKey[minecraft:root / minecraft:loot_table]:tracks:blocks/track_mount - Not a valid resource location: Tracks:track_mount Non [a-z0-9_.-] character in namespace of location: Tracks:track_mount; Not a valid resource location: Tracks:blocks/track_mount Non [a-z0-9_.-] character in namespace of location: Tracks:blocks/track_mount
+[19:46:49] [Worker-ResourceReload-20/WARN] [minecraft/ReloadableServerRegistries]: Found loot table element validation problem in {minecraft:loot_table:minecraft:chests/pillager_outpost}.pools[6].entries[0]: Unknown loot table called supplementaries:inject/pillager_quiver
+[19:46:49] [Worker-ResourceReload-20/WARN] [minecraft/ReloadableServerRegistries]: Found loot table element validation problem in {minecraft:loot_table:supplementaries:loot/galleon/safe}.pools[0].entries[3]: Unreachable entry!
+[19:46:49] [Worker-ResourceReload-20/WARN] [minecraft/ReloadableServerRegistries]: Found loot table element validation problem in {minecraft:loot_table:supplementaries:loot/galleon/safe}.pools[2].entries[1]: Unreachable entry!
+[19:46:49] [Worker-ResourceReload-20/INFO] [co.sk.wo.ex.pl.PlatformCommandManager/]: Registering commands with com.sk89q.worldedit.neoforge.NeoForgePlatform
+[19:46:50] [Worker-ResourceReload-14/ERROR] [minecraft/TagLoader]: Couldn't read tag list minecraft:mineable/axe from minecraft:tags/block/mineable/axe.json in data pack mod/tracks
+java.lang.IllegalStateException: Failed to parse either. First: Not a valid resource location: Tracks:track_mount Non [a-z0-9_.-] character in namespace of location: Tracks:track_mount; Second: Not a JSON object: "Tracks:track_mount"
+	at MC-BOOTSTRAP/datafixerupper@8.0.16/com.mojang.serialization.DataResult$Error.getOrThrow(DataResult.java:287) ~[datafixerupper-8.0.16.jar%23114!/:?] {}
+	at MC-BOOTSTRAP/datafixerupper@8.0.16/com.mojang.serialization.DataResult.getOrThrow(DataResult.java:81) ~[datafixerupper-8.0.16.jar%23114!/:?] {re:mixin}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.tags.TagLoader.load(TagLoader.java:53) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:classloading}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.tags.TagLoader.loadAndBuild(TagLoader.java:118) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:classloading}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.tags.TagManager.lambda$createLoader$3(TagManager.java:46) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:classloading}
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1768) [?:?] {}
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.exec(CompletableFuture.java:1760) [?:?] {}
+	at java.base/java.util.concurrent.ForkJoinTask.doExec(ForkJoinTask.java:387) [?:?] {}
+	at java.base/java.util.concurrent.ForkJoinPool$WorkQueue.topLevelExec(ForkJoinPool.java:1312) [?:?] {}
+	at java.base/java.util.concurrent.ForkJoinPool.scan(ForkJoinPool.java:1843) [?:?] {re:mixin,re:computing_frames}
+	at java.base/java.util.concurrent.ForkJoinPool.runWorker(ForkJoinPool.java:1808) [?:?] {re:mixin,re:computing_frames}
+	at java.base/java.util.concurrent.ForkJoinWorkerThread.run(ForkJoinWorkerThread.java:188) [?:?] {re:mixin}
+[19:46:50] [Worker-ResourceReload-14/ERROR] [minecraft/TagLoader]: Couldn't read tag list minecraft:mineable/pickaxe from minecraft:tags/block/mineable/pickaxe.json in data pack mod/tracks
+java.lang.IllegalStateException: Failed to parse either. First: Not a valid resource location: Tracks:track_drive_wheel Non [a-z0-9_.-] character in namespace of location: Tracks:track_drive_wheel; Second: Not a JSON object: "Tracks:track_drive_wheel"; Failed to parse either. First: Not a valid resource location: Tracks:suspension_track Non [a-z0-9_.-] character in namespace of location: Tracks:suspension_track; Second: Not a JSON object: "Tracks:suspension_track"; Failed to parse either. First: Not a valid resource location: Tracks:track_mount Non [a-z0-9_.-] character in namespace of location: Tracks:track_mount; Second: Not a JSON object: "Tracks:track_mount"
+	at MC-BOOTSTRAP/datafixerupper@8.0.16/com.mojang.serialization.DataResult$Error.getOrThrow(DataResult.java:287) ~[datafixerupper-8.0.16.jar%23114!/:?] {}
+	at MC-BOOTSTRAP/datafixerupper@8.0.16/com.mojang.serialization.DataResult.getOrThrow(DataResult.java:81) ~[datafixerupper-8.0.16.jar%23114!/:?] {re:mixin}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.tags.TagLoader.load(TagLoader.java:53) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:classloading}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.tags.TagLoader.loadAndBuild(TagLoader.java:118) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:classloading}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.tags.TagManager.lambda$createLoader$3(TagManager.java:46) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:classloading}
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1768) [?:?] {}
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.exec(CompletableFuture.java:1760) [?:?] {}
+	at java.base/java.util.concurrent.ForkJoinTask.doExec(ForkJoinTask.java:387) [?:?] {}
+	at java.base/java.util.concurrent.ForkJoinPool$WorkQueue.topLevelExec(ForkJoinPool.java:1312) [?:?] {}
+	at java.base/java.util.concurrent.ForkJoinPool.scan(ForkJoinPool.java:1843) [?:?] {re:mixin,re:computing_frames}
+	at java.base/java.util.concurrent.ForkJoinPool.runWorker(ForkJoinPool.java:1808) [?:?] {re:mixin,re:computing_frames}
+	at java.base/java.util.concurrent.ForkJoinWorkerThread.run(ForkJoinWorkerThread.java:188) [?:?] {re:mixin}
+[19:46:50] [Worker-ResourceReload-14/ERROR] [minecraft/TagLoader]: Couldn't read tag list create:safe_nbt from create:tags/block/safe_nbt.json in data pack mod/tracks
+java.lang.IllegalStateException: Failed to parse either. First: Not a valid resource location: Tracks:track_drive_wheel Non [a-z0-9_.-] character in namespace of location: Tracks:track_drive_wheel; Second: Not a JSON object: "Tracks:track_drive_wheel"; Failed to parse either. First: Not a valid resource location: Tracks:suspension_track Non [a-z0-9_.-] character in namespace of location: Tracks:suspension_track; Second: Not a JSON object: "Tracks:suspension_track"; Failed to parse either. First: Not a valid resource location: Tracks:track_mount Non [a-z0-9_.-] character in namespace of location: Tracks:track_mount; Second: Not a JSON object: "Tracks:track_mount"
+	at MC-BOOTSTRAP/datafixerupper@8.0.16/com.mojang.serialization.DataResult$Error.getOrThrow(DataResult.java:287) ~[datafixerupper-8.0.16.jar%23114!/:?] {}
+	at MC-BOOTSTRAP/datafixerupper@8.0.16/com.mojang.serialization.DataResult.getOrThrow(DataResult.java:81) ~[datafixerupper-8.0.16.jar%23114!/:?] {re:mixin}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.tags.TagLoader.load(TagLoader.java:53) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:classloading}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.tags.TagLoader.loadAndBuild(TagLoader.java:118) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:classloading}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.tags.TagManager.lambda$createLoader$3(TagManager.java:46) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:classloading}
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1768) [?:?] {}
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.exec(CompletableFuture.java:1760) [?:?] {}
+	at java.base/java.util.concurrent.ForkJoinTask.doExec(ForkJoinTask.java:387) [?:?] {}
+	at java.base/java.util.concurrent.ForkJoinPool$WorkQueue.topLevelExec(ForkJoinPool.java:1312) [?:?] {}
+	at java.base/java.util.concurrent.ForkJoinPool.scan(ForkJoinPool.java:1843) [?:?] {re:mixin,re:computing_frames}
+	at java.base/java.util.concurrent.ForkJoinPool.runWorker(ForkJoinPool.java:1808) [?:?] {re:mixin,re:computing_frames}
+	at java.base/java.util.concurrent.ForkJoinWorkerThread.run(ForkJoinWorkerThread.java:188) [?:?] {re:mixin}
+[19:46:50] [Render thread/INFO] [minecraft/RecipeManager]: Loaded 5346 recipes
+[19:46:50] [Render thread/INFO] [minecraft/AdvancementTree]: Loaded 4430 advancements
+[19:46:50] [Render thread/INFO] [Moonlight/]: Applied 17 data villager trades
+[19:46:50] [Render thread/INFO] [Moonlight/]: Failed to load custom color set definition {"id":"quark:rune","colors":{"default":"quark:blank_rune"},"replace":false}. Ignoring
+[19:46:50] [Render thread/INFO] [Moonlight/]: Failed to load custom color set definition {"id":"quark:shard","colors":{"default":"quark:clear_shard"},"replace":false}. Ignoring
+[19:46:50] [Render thread/INFO] [Supplementaries/]: Loaded 29 flute songs
+[19:46:50] [Render thread/INFO] [co.dr.tf.TFMG/]: Added 8 Engine Fuel Types
+[19:46:50] [Render thread/INFO] [Supplementaries/]: Registering custom dispenser behaviors
+[19:46:50] [Render thread/WARN] [ModernFix/]: Initial datapack load took 1.777 s
+[19:46:50] [Render thread/INFO] [Vista/]: Restored 0 cached videos from disk
+[19:46:50] [Render thread/INFO] [Vista/]: Media Cache initialized at D:\.minecraft\versions\鑸┖锛乗vista_web_content_cache, max size = 512 MB
+[19:46:51] [Server thread/INFO] [minecraft/IntegratedServer]: Starting integrated minecraft server version 1.21.1
+[19:46:51] [Server thread/INFO] [minecraft/MinecraftServer]: Generating keypair
+[19:46:51] [Server thread/WARN] [ne.ne.fm.co.ConfigTracker/CONFIG]: Configuration file D:\.minecraft\versions\鑸┖锛乗config\sabletrueimpact-server.toml is not correct. Correcting
+[19:46:51] [Server thread/INFO] [Di.se.di.co.wo.AbstractDhWorld/]: Started DhWorld of type CLIENT_SERVER
+[19:46:51] [Server thread/INFO] [de.ry.sa.Sable/]: Assigned physics scene ID 0 to minecraft:overworld
+[2026-05-11T11:46:51.274007000Z] [[32mINFO[0m] (sable_rapier) Rapier initialized scene 0
+[19:46:51] [Server thread/INFO] [Di.se.di.ne.NeoforgeClientProxy/]: level load
+[19:46:51] [DH-Full Data Migration Thread[0]/INFO] [Di.se.di.co.fi.fu.V2.DataMigratorV1/]: No migration necessary.
+[19:46:51] [Server thread/INFO] [Di.se.di.co.le.AbstractDhServerLevel/]: Started DhClientServerLevel for [Wrapped{ServerLevel[鏂扮殑涓栫晫]@minecraft:overworld}] at [[LocalSaveStructure@(D:\.minecraft\versions\鑸┖锛乗saves\鏂扮殑涓栫晫 (2)\data)]].
+[19:46:51] [Server thread/INFO] [de.ry.sa.Sable/]: Assigned physics scene ID 1 to minecraft:the_end
+[2026-05-11T11:46:51.529949400Z] [[32mINFO[0m] (sable_rapier) Rapier initialized scene 1
+[19:46:51] [Server thread/INFO] [Di.se.di.ne.NeoforgeClientProxy/]: level load
+[19:46:51] [DH-Full Data Migration Thread[0]/INFO] [Di.se.di.co.fi.fu.V2.DataMigratorV1/]: No migration necessary.
+[19:46:51] [Server thread/INFO] [Di.se.di.co.le.AbstractDhServerLevel/]: Started DhClientServerLevel for [Wrapped{ServerLevel[鏂扮殑涓栫晫]@minecraft:the_end}] at [[LocalSaveStructure@(D:\.minecraft\versions\鑸┖锛乗saves\鏂扮殑涓栫晫 (2)\DIM1\data;D:\.minecraft\versions\鑸┖锛乗saves\鏂扮殑涓栫晫 (2)\data)]].
+[19:46:51] [Server thread/INFO] [de.ry.sa.Sable/]: Assigned physics scene ID 2 to minecraft:the_nether
+[2026-05-11T11:46:51.566163700Z] [[32mINFO[0m] (sable_rapier) Rapier initialized scene 2
+[19:46:51] [Server thread/INFO] [Di.se.di.ne.NeoforgeClientProxy/]: level load
+[19:46:51] [DH-Full Data Migration Thread[0]/INFO] [Di.se.di.co.fi.fu.V2.DataMigratorV1/]: No migration necessary.
+[19:46:51] [Server thread/INFO] [Di.se.di.co.le.AbstractDhServerLevel/]: Started DhClientServerLevel for [Wrapped{ServerLevel[鏂扮殑涓栫晫]@minecraft:the_nether}] at [[LocalSaveStructure@(D:\.minecraft\versions\鑸┖锛乗saves\鏂扮殑涓栫晫 (2)\DIM-1\data;D:\.minecraft\versions\鑸┖锛乗saves\鏂扮殑涓栫晫 (2)\DIM1\data;D:\.minecraft\versions\鑸┖锛乗saves\鏂扮殑涓栫晫 (2)\data)]].
+[19:46:51] [Server thread/INFO] [minecraft/MinecraftServer]: Preparing start region for dimension minecraft:overworld
+[19:46:51] [Render thread/INFO] [minecraft/LoggerChunkProgressListener]: Preparing spawn area: 0%
+[19:46:51] [Render thread/INFO] [minecraft/LoggerChunkProgressListener]: Time elapsed: 368 ms
+[19:46:51] [Server thread/INFO] [ne.ne.ne.se.pe.PermissionAPI/]: Successfully initialized permission handler neoforge:default_handler
+[19:46:51] [Server thread/INFO] [de.lo.gn.Gears/]: GnKinetics SERVER SETUP
+[19:46:53] [Server thread/INFO] [de.ry.sa.Sable/]: Assigned physics scene ID 3 to minecraft:server_faucet_test_level
+[2026-05-11T11:46:53.997214900Z] [[32mINFO[0m] (sable_rapier) Rapier initialized scene 3
+[19:46:54] [Server thread/INFO] [Di.se.di.ne.NeoforgeClientProxy/]: level unload
+[19:46:54] [Server thread/INFO] [de.ry.sa.Sable/]: Assigned physics scene ID 4 to minecraft:server_projectile_test_level
+[2026-05-11T11:46:54.074455100Z] [[32mINFO[0m] (sable_rapier) Rapier initialized scene 4
+[19:46:54] [Server thread/ERROR] [minecraft/MinecraftServer]: Encountered an unexpected exception
+net.minecraft.ReportedException: Exception ticking world
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.server.MinecraftServer.tickChildren(MinecraftServer.java:1041) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B,pl:mixin:A}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.server.MinecraftServer.tickServer(MinecraftServer.java:917) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B,pl:mixin:A}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.client.server.IntegratedServer.tickServer(IntegratedServer.java:110) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:runtimedistcleaner:A,re:classloading,pl:mixin:APP:modernfix-modernfix.mixins.json:perf.thread_priorities.IntegratedServerMixin from mod modernfix,pl:mixin:APP:modernfix-modernfix.mixins.json:perf.suspend_integrated_server_during_load.IntegratedServerMixin from mod modernfix,pl:mixin:APP:sable.mixins.json:toast.IntegratedServerMixin from mod sable,pl:mixin:APP:lithostitched.mixins.json:client.IntegratedServerMixin from mod lithostitched,pl:mixin:A,pl:runtimedistcleaner:A}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.server.MinecraftServer.runServer(MinecraftServer.java:707) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B,pl:mixin:A}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.server.MinecraftServer.lambda$spin$2(MinecraftServer.java:267) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B,pl:mixin:A}
+	at java.base/java.lang.Thread.run(Thread.java:1583) [?:?] {re:mixin}
+Caused by: java.lang.ExceptionInInitializerError
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.physics.impl.rapier.RapierPhysicsPipeline.redirect$ekp000$sabletrueimpact$applyElasticPairReaction(RapierPhysicsPipeline.java:746) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:classloading,pl:mixin:APP:sabletrueimpact.mixins.json:RapierPhysicsPipelineMixin from mod sabletrueimpact,pl:mixin:A}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.physics.impl.rapier.RapierPhysicsPipeline.processCollisionEffects(RapierPhysicsPipeline.java:218) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:classloading,pl:mixin:APP:sabletrueimpact.mixins.json:RapierPhysicsPipelineMixin from mod sabletrueimpact,pl:mixin:A}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.physics.impl.rapier.RapierPhysicsPipeline.postPhysicsTicks(RapierPhysicsPipeline.java:204) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:classloading,pl:mixin:APP:sabletrueimpact.mixins.json:RapierPhysicsPipelineMixin from mod sabletrueimpact,pl:mixin:A}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.sublevel.system.SubLevelPhysicsSystem.tickPipelinePhysics(SubLevelPhysicsSystem.java:275) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:classloading,pl:mixin:APP:sabletrueimpact.mixins.json:SableCollisionMixin from mod sabletrueimpact,pl:mixin:A}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.sublevel.system.SubLevelPhysicsSystem.tick(SubLevelPhysicsSystem.java:224) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:classloading,pl:mixin:APP:sabletrueimpact.mixins.json:SableCollisionMixin from mod sabletrueimpact,pl:mixin:A}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.api.sublevel.SubLevelContainer.lambda$tick$0(SubLevelContainer.java:145) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:computing_frames,re:classloading}
+	at MC-BOOTSTRAP/it.unimi.dsi.fastutil@8.5.12/it.unimi.dsi.fastutil.objects.ObjectArrayList.forEach(ObjectArrayList.java:748) ~[fastutil-8.5.12.jar%23129!/:?] {re:mixin}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.api.sublevel.SubLevelContainer.tick(SubLevelContainer.java:145) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:computing_frames,re:classloading}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer.tick(ServerSubLevelContainer.java:73) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:computing_frames,re:classloading}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.server.level.ServerLevel.handler$dok000$sable$tickPlotContainer(ServerLevel.java:10033) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B,pl:mixin:APP:createbigcannons.mixins.json:ServerLevelMixin from mod createbigcannons,pl:mixin:APP:xaeroworldmap.mixins.json:MixinServerWorld from mod xaeroworldmap,pl:mixin:APP:modernfix-modernfix.mixins.json:perf.cache_strongholds.ServerLevelMixin from mod modernfix,pl:mixin:APP:veil.network.mixins.json:NetworkServerLevelMixin from mod veil,pl:mixin:APP:supplementaries-common.mixins.json:ServerLevelMixin from mod supplementaries,pl:mixin:APP:moonlight-common.mixins.json:ServerLevelMixin from mod moonlight,pl:mixin:APP:powergrid.mixins.json:LightningAccessor from mod powergrid,pl:mixin:APP:create.mixins.json:accessor.ServerLevelAccessor from mod create,pl:mixin:APP:sable.mixins.json:block_decal_render.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:entity.entity_aabb_lookup.LevelsMixin from mod sable,pl:mixin:APP:sable.mixins.json:entity.entity_kicking.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:entity.server_entities_tick.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:explosion.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:particle.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:physics.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:plot.LevelsMixin from mod sable,pl:mixin:APP:sable.mixins.json:plot.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:water_occlusion.LevelsMixin from mod sable,pl:mixin:A}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.server.level.ServerLevel.tick(ServerLevel.java) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B,pl:mixin:APP:createbigcannons.mixins.json:ServerLevelMixin from mod createbigcannons,pl:mixin:APP:xaeroworldmap.mixins.json:MixinServerWorld from mod xaeroworldmap,pl:mixin:APP:modernfix-modernfix.mixins.json:perf.cache_strongholds.ServerLevelMixin from mod modernfix,pl:mixin:APP:veil.network.mixins.json:NetworkServerLevelMixin from mod veil,pl:mixin:APP:supplementaries-common.mixins.json:ServerLevelMixin from mod supplementaries,pl:mixin:APP:moonlight-common.mixins.json:ServerLevelMixin from mod moonlight,pl:mixin:APP:powergrid.mixins.json:LightningAccessor from mod powergrid,pl:mixin:APP:create.mixins.json:accessor.ServerLevelAccessor from mod create,pl:mixin:APP:sable.mixins.json:block_decal_render.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:entity.entity_aabb_lookup.LevelsMixin from mod sable,pl:mixin:APP:sable.mixins.json:entity.entity_kicking.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:entity.server_entities_tick.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:explosion.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:particle.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:physics.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:plot.LevelsMixin from mod sable,pl:mixin:APP:sable.mixins.json:plot.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:water_occlusion.LevelsMixin from mod sable,pl:mixin:A}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.server.MinecraftServer.tickChildren(MinecraftServer.java:1037) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B,pl:mixin:A}
+	... 5 more
+Caused by: java.lang.RuntimeException: java.lang.NoSuchMethodException: dev.ryanhcode.sable.sublevel.ServerSubLevel.wakeUp()
+	at TRANSFORMER/sabletrueimpact@1.4.0/com.example.sabletrueimpact.ElasticPairReaction.findMethod(ElasticPairReaction.java:387) ~[sabletrueimpact-1.4.0.jar%23286!/:?] {re:mixin,re:classloading}
+	at TRANSFORMER/sabletrueimpact@1.4.0/com.example.sabletrueimpact.ElasticPairReaction.<clinit>(ElasticPairReaction.java:34) ~[sabletrueimpact-1.4.0.jar%23286!/:?] {re:mixin,re:classloading}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.physics.impl.rapier.RapierPhysicsPipeline.redirect$ekp000$sabletrueimpact$applyElasticPairReaction(RapierPhysicsPipeline.java:746) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:classloading,pl:mixin:APP:sabletrueimpact.mixins.json:RapierPhysicsPipelineMixin from mod sabletrueimpact,pl:mixin:A}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.physics.impl.rapier.RapierPhysicsPipeline.processCollisionEffects(RapierPhysicsPipeline.java:218) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:classloading,pl:mixin:APP:sabletrueimpact.mixins.json:RapierPhysicsPipelineMixin from mod sabletrueimpact,pl:mixin:A}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.physics.impl.rapier.RapierPhysicsPipeline.postPhysicsTicks(RapierPhysicsPipeline.java:204) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:classloading,pl:mixin:APP:sabletrueimpact.mixins.json:RapierPhysicsPipelineMixin from mod sabletrueimpact,pl:mixin:A}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.sublevel.system.SubLevelPhysicsSystem.tickPipelinePhysics(SubLevelPhysicsSystem.java:275) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:classloading,pl:mixin:APP:sabletrueimpact.mixins.json:SableCollisionMixin from mod sabletrueimpact,pl:mixin:A}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.sublevel.system.SubLevelPhysicsSystem.tick(SubLevelPhysicsSystem.java:224) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:classloading,pl:mixin:APP:sabletrueimpact.mixins.json:SableCollisionMixin from mod sabletrueimpact,pl:mixin:A}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.api.sublevel.SubLevelContainer.lambda$tick$0(SubLevelContainer.java:145) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:computing_frames,re:classloading}
+	at MC-BOOTSTRAP/it.unimi.dsi.fastutil@8.5.12/it.unimi.dsi.fastutil.objects.ObjectArrayList.forEach(ObjectArrayList.java:748) ~[fastutil-8.5.12.jar%23129!/:?] {re:mixin}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.api.sublevel.SubLevelContainer.tick(SubLevelContainer.java:145) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:computing_frames,re:classloading}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer.tick(ServerSubLevelContainer.java:73) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:computing_frames,re:classloading}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.server.level.ServerLevel.handler$dok000$sable$tickPlotContainer(ServerLevel.java:10033) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B,pl:mixin:APP:createbigcannons.mixins.json:ServerLevelMixin from mod createbigcannons,pl:mixin:APP:xaeroworldmap.mixins.json:MixinServerWorld from mod xaeroworldmap,pl:mixin:APP:modernfix-modernfix.mixins.json:perf.cache_strongholds.ServerLevelMixin from mod modernfix,pl:mixin:APP:veil.network.mixins.json:NetworkServerLevelMixin from mod veil,pl:mixin:APP:supplementaries-common.mixins.json:ServerLevelMixin from mod supplementaries,pl:mixin:APP:moonlight-common.mixins.json:ServerLevelMixin from mod moonlight,pl:mixin:APP:powergrid.mixins.json:LightningAccessor from mod powergrid,pl:mixin:APP:create.mixins.json:accessor.ServerLevelAccessor from mod create,pl:mixin:APP:sable.mixins.json:block_decal_render.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:entity.entity_aabb_lookup.LevelsMixin from mod sable,pl:mixin:APP:sable.mixins.json:entity.entity_kicking.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:entity.server_entities_tick.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:explosion.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:particle.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:physics.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:plot.LevelsMixin from mod sable,pl:mixin:APP:sable.mixins.json:plot.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:water_occlusion.LevelsMixin from mod sable,pl:mixin:A}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.server.level.ServerLevel.tick(ServerLevel.java) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B,pl:mixin:APP:createbigcannons.mixins.json:ServerLevelMixin from mod createbigcannons,pl:mixin:APP:xaeroworldmap.mixins.json:MixinServerWorld from mod xaeroworldmap,pl:mixin:APP:modernfix-modernfix.mixins.json:perf.cache_strongholds.ServerLevelMixin from mod modernfix,pl:mixin:APP:veil.network.mixins.json:NetworkServerLevelMixin from mod veil,pl:mixin:APP:supplementaries-common.mixins.json:ServerLevelMixin from mod supplementaries,pl:mixin:APP:moonlight-common.mixins.json:ServerLevelMixin from mod moonlight,pl:mixin:APP:powergrid.mixins.json:LightningAccessor from mod powergrid,pl:mixin:APP:create.mixins.json:accessor.ServerLevelAccessor from mod create,pl:mixin:APP:sable.mixins.json:block_decal_render.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:entity.entity_aabb_lookup.LevelsMixin from mod sable,pl:mixin:APP:sable.mixins.json:entity.entity_kicking.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:entity.server_entities_tick.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:explosion.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:particle.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:physics.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:plot.LevelsMixin from mod sable,pl:mixin:APP:sable.mixins.json:plot.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:water_occlusion.LevelsMixin from mod sable,pl:mixin:A}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.server.MinecraftServer.tickChildren(MinecraftServer.java:1037) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B,pl:mixin:A}
+	... 5 more
+Caused by: java.lang.NoSuchMethodException: dev.ryanhcode.sable.sublevel.ServerSubLevel.wakeUp()
+	at java.base/java.lang.Class.getMethod(Class.java:2395) ~[?:?] {re:mixin}
+	at TRANSFORMER/sabletrueimpact@1.4.0/com.example.sabletrueimpact.ElasticPairReaction.findMethod(ElasticPairReaction.java:387) ~[sabletrueimpact-1.4.0.jar%23286!/:?] {re:mixin,re:classloading}
+	at TRANSFORMER/sabletrueimpact@1.4.0/com.example.sabletrueimpact.ElasticPairReaction.<clinit>(ElasticPairReaction.java:34) ~[sabletrueimpact-1.4.0.jar%23286!/:?] {re:mixin,re:classloading}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.physics.impl.rapier.RapierPhysicsPipeline.redirect$ekp000$sabletrueimpact$applyElasticPairReaction(RapierPhysicsPipeline.java:746) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:classloading,pl:mixin:APP:sabletrueimpact.mixins.json:RapierPhysicsPipelineMixin from mod sabletrueimpact,pl:mixin:A}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.physics.impl.rapier.RapierPhysicsPipeline.processCollisionEffects(RapierPhysicsPipeline.java:218) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:classloading,pl:mixin:APP:sabletrueimpact.mixins.json:RapierPhysicsPipelineMixin from mod sabletrueimpact,pl:mixin:A}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.physics.impl.rapier.RapierPhysicsPipeline.postPhysicsTicks(RapierPhysicsPipeline.java:204) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:classloading,pl:mixin:APP:sabletrueimpact.mixins.json:RapierPhysicsPipelineMixin from mod sabletrueimpact,pl:mixin:A}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.sublevel.system.SubLevelPhysicsSystem.tickPipelinePhysics(SubLevelPhysicsSystem.java:275) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:classloading,pl:mixin:APP:sabletrueimpact.mixins.json:SableCollisionMixin from mod sabletrueimpact,pl:mixin:A}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.sublevel.system.SubLevelPhysicsSystem.tick(SubLevelPhysicsSystem.java:224) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:classloading,pl:mixin:APP:sabletrueimpact.mixins.json:SableCollisionMixin from mod sabletrueimpact,pl:mixin:A}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.api.sublevel.SubLevelContainer.lambda$tick$0(SubLevelContainer.java:145) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:computing_frames,re:classloading}
+	at MC-BOOTSTRAP/it.unimi.dsi.fastutil@8.5.12/it.unimi.dsi.fastutil.objects.ObjectArrayList.forEach(ObjectArrayList.java:748) ~[fastutil-8.5.12.jar%23129!/:?] {re:mixin}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.api.sublevel.SubLevelContainer.tick(SubLevelContainer.java:145) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:computing_frames,re:classloading}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer.tick(ServerSubLevelContainer.java:73) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:computing_frames,re:classloading}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.server.level.ServerLevel.handler$dok000$sable$tickPlotContainer(ServerLevel.java:10033) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B,pl:mixin:APP:createbigcannons.mixins.json:ServerLevelMixin from mod createbigcannons,pl:mixin:APP:xaeroworldmap.mixins.json:MixinServerWorld from mod xaeroworldmap,pl:mixin:APP:modernfix-modernfix.mixins.json:perf.cache_strongholds.ServerLevelMixin from mod modernfix,pl:mixin:APP:veil.network.mixins.json:NetworkServerLevelMixin from mod veil,pl:mixin:APP:supplementaries-common.mixins.json:ServerLevelMixin from mod supplementaries,pl:mixin:APP:moonlight-common.mixins.json:ServerLevelMixin from mod moonlight,pl:mixin:APP:powergrid.mixins.json:LightningAccessor from mod powergrid,pl:mixin:APP:create.mixins.json:accessor.ServerLevelAccessor from mod create,pl:mixin:APP:sable.mixins.json:block_decal_render.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:entity.entity_aabb_lookup.LevelsMixin from mod sable,pl:mixin:APP:sable.mixins.json:entity.entity_kicking.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:entity.server_entities_tick.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:explosion.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:particle.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:physics.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:plot.LevelsMixin from mod sable,pl:mixin:APP:sable.mixins.json:plot.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:water_occlusion.LevelsMixin from mod sable,pl:mixin:A}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.server.level.ServerLevel.tick(ServerLevel.java) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B,pl:mixin:APP:createbigcannons.mixins.json:ServerLevelMixin from mod createbigcannons,pl:mixin:APP:xaeroworldmap.mixins.json:MixinServerWorld from mod xaeroworldmap,pl:mixin:APP:modernfix-modernfix.mixins.json:perf.cache_strongholds.ServerLevelMixin from mod modernfix,pl:mixin:APP:veil.network.mixins.json:NetworkServerLevelMixin from mod veil,pl:mixin:APP:supplementaries-common.mixins.json:ServerLevelMixin from mod supplementaries,pl:mixin:APP:moonlight-common.mixins.json:ServerLevelMixin from mod moonlight,pl:mixin:APP:powergrid.mixins.json:LightningAccessor from mod powergrid,pl:mixin:APP:create.mixins.json:accessor.ServerLevelAccessor from mod create,pl:mixin:APP:sable.mixins.json:block_decal_render.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:entity.entity_aabb_lookup.LevelsMixin from mod sable,pl:mixin:APP:sable.mixins.json:entity.entity_kicking.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:entity.server_entities_tick.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:explosion.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:particle.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:physics.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:plot.LevelsMixin from mod sable,pl:mixin:APP:sable.mixins.json:plot.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:water_occlusion.LevelsMixin from mod sable,pl:mixin:A}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.server.MinecraftServer.tickChildren(MinecraftServer.java:1037) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B,pl:mixin:A}
+	... 5 more
+[19:46:54] [Server thread/FATAL] [ne.ne.ne.co.NeoForgeMod/]: Preparing crash report with UUID e2944d49-e708-40f4-aafd-72a0d693f7c1
+[19:46:54] [Server thread/ERROR] [minecraft/MinecraftServer]: This crash report has been saved to: D:\.minecraft\versions\鑸┖锛乗crash-reports\crash-2026-05-11_19.46.54-server.txt
+[19:46:54] [Server thread/INFO] [minecraft/MinecraftServer]: Stopping server
+[19:46:54] [Server thread/INFO] [minecraft/MinecraftServer]: Saving players
+[19:46:54] [Server thread/INFO] [minecraft/MinecraftServer]: Saving worlds
+[19:46:54] [Render thread/FATAL] [ne.ne.ne.co.NeoForgeMod/]: Preparing crash report with UUID 6957e3b9-8f8e-42f4-8a62-5aec2417499e
+[19:46:54] [Render thread/INFO] [STDOUT/]: [net.minecraft.server.Bootstrap:realStdoutPrintln:135]: ---- Minecraft Crash Report ----
+
+// Lets see if this is repro or cosmic radiation
+Please make sure this issue is not caused by Sable before reporting it to other mod authors.
+If you cannot reproduce it without Sable, file a report on the issue tracker
+https://github.com/ryanhcode/sable/issues
+
+// Hey, that tickles! Hehehe!
+
+Time: 2026-05-11 19:46:54
+Description: Exception ticking world
+
+java.lang.ExceptionInInitializerError: null
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.physics.impl.rapier.RapierPhysicsPipeline.redirect$ekp000$sabletrueimpact$applyElasticPairReaction(RapierPhysicsPipeline.java:746) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:classloading,pl:mixin:APP:sabletrueimpact.mixins.json:RapierPhysicsPipelineMixin from mod sabletrueimpact,pl:mixin:A}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.physics.impl.rapier.RapierPhysicsPipeline.processCollisionEffects(RapierPhysicsPipeline.java:218) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:classloading,pl:mixin:APP:sabletrueimpact.mixins.json:RapierPhysicsPipelineMixin from mod sabletrueimpact,pl:mixin:A}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.physics.impl.rapier.RapierPhysicsPipeline.postPhysicsTicks(RapierPhysicsPipeline.java:204) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:classloading,pl:mixin:APP:sabletrueimpact.mixins.json:RapierPhysicsPipelineMixin from mod sabletrueimpact,pl:mixin:A}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.sublevel.system.SubLevelPhysicsSystem.tickPipelinePhysics(SubLevelPhysicsSystem.java:275) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:classloading,pl:mixin:APP:sabletrueimpact.mixins.json:SableCollisionMixin from mod sabletrueimpact,pl:mixin:A}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.sublevel.system.SubLevelPhysicsSystem.tick(SubLevelPhysicsSystem.java:224) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:classloading,pl:mixin:APP:sabletrueimpact.mixins.json:SableCollisionMixin from mod sabletrueimpact,pl:mixin:A}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.api.sublevel.SubLevelContainer.lambda$tick$0(SubLevelContainer.java:145) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:computing_frames,re:classloading}
+	at MC-BOOTSTRAP/it.unimi.dsi.fastutil@8.5.12/it.unimi.dsi.fastutil.objects.ObjectArrayList.forEach(ObjectArrayList.java:748) ~[fastutil-8.5.12.jar%23129!/:?] {re:mixin}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.api.sublevel.SubLevelContainer.tick(SubLevelContainer.java:145) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:computing_frames,re:classloading}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer.tick(ServerSubLevelContainer.java:73) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:computing_frames,re:classloading}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.server.level.ServerLevel.handler$dok000$sable$tickPlotContainer(ServerLevel.java:10033) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B,pl:mixin:APP:createbigcannons.mixins.json:ServerLevelMixin from mod createbigcannons,pl:mixin:APP:xaeroworldmap.mixins.json:MixinServerWorld from mod xaeroworldmap,pl:mixin:APP:modernfix-modernfix.mixins.json:perf.cache_strongholds.ServerLevelMixin from mod modernfix,pl:mixin:APP:veil.network.mixins.json:NetworkServerLevelMixin from mod veil,pl:mixin:APP:supplementaries-common.mixins.json:ServerLevelMixin from mod supplementaries,pl:mixin:APP:moonlight-common.mixins.json:ServerLevelMixin from mod moonlight,pl:mixin:APP:powergrid.mixins.json:LightningAccessor from mod powergrid,pl:mixin:APP:create.mixins.json:accessor.ServerLevelAccessor from mod create,pl:mixin:APP:sable.mixins.json:block_decal_render.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:entity.entity_aabb_lookup.LevelsMixin from mod sable,pl:mixin:APP:sable.mixins.json:entity.entity_kicking.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:entity.server_entities_tick.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:explosion.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:particle.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:physics.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:plot.LevelsMixin from mod sable,pl:mixin:APP:sable.mixins.json:plot.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:water_occlusion.LevelsMixin from mod sable,pl:mixin:A}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.server.level.ServerLevel.tick(ServerLevel.java) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B,pl:mixin:APP:createbigcannons.mixins.json:ServerLevelMixin from mod createbigcannons,pl:mixin:APP:xaeroworldmap.mixins.json:MixinServerWorld from mod xaeroworldmap,pl:mixin:APP:modernfix-modernfix.mixins.json:perf.cache_strongholds.ServerLevelMixin from mod modernfix,pl:mixin:APP:veil.network.mixins.json:NetworkServerLevelMixin from mod veil,pl:mixin:APP:supplementaries-common.mixins.json:ServerLevelMixin from mod supplementaries,pl:mixin:APP:moonlight-common.mixins.json:ServerLevelMixin from mod moonlight,pl:mixin:APP:powergrid.mixins.json:LightningAccessor from mod powergrid,pl:mixin:APP:create.mixins.json:accessor.ServerLevelAccessor from mod create,pl:mixin:APP:sable.mixins.json:block_decal_render.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:entity.entity_aabb_lookup.LevelsMixin from mod sable,pl:mixin:APP:sable.mixins.json:entity.entity_kicking.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:entity.server_entities_tick.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:explosion.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:particle.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:physics.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:plot.LevelsMixin from mod sable,pl:mixin:APP:sable.mixins.json:plot.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:water_occlusion.LevelsMixin from mod sable,pl:mixin:A}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.server.MinecraftServer.tickChildren(MinecraftServer.java:1037) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B,pl:mixin:A}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.server.MinecraftServer.tickServer(MinecraftServer.java:917) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B,pl:mixin:A}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.client.server.IntegratedServer.tickServer(IntegratedServer.java:110) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:runtimedistcleaner:A,re:classloading,pl:mixin:APP:modernfix-modernfix.mixins.json:perf.thread_priorities.IntegratedServerMixin from mod modernfix,pl:mixin:APP:modernfix-modernfix.mixins.json:perf.suspend_integrated_server_during_load.IntegratedServerMixin from mod modernfix,pl:mixin:APP:sable.mixins.json:toast.IntegratedServerMixin from mod sable,pl:mixin:APP:lithostitched.mixins.json:client.IntegratedServerMixin from mod lithostitched,pl:mixin:A,pl:runtimedistcleaner:A}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.server.MinecraftServer.runServer(MinecraftServer.java:707) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B,pl:mixin:A}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.server.MinecraftServer.lambda$spin$2(MinecraftServer.java:267) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B,pl:mixin:A}
+	at java.base/java.lang.Thread.run(Thread.java:1583) ~[?:?] {re:mixin}
+Caused by: java.lang.RuntimeException: java.lang.NoSuchMethodException: dev.ryanhcode.sable.sublevel.ServerSubLevel.wakeUp()
+	at TRANSFORMER/sabletrueimpact@1.4.0/com.example.sabletrueimpact.ElasticPairReaction.findMethod(ElasticPairReaction.java:387) ~[?:?] {re:mixin,re:classloading}
+	at TRANSFORMER/sabletrueimpact@1.4.0/com.example.sabletrueimpact.ElasticPairReaction.<clinit>(ElasticPairReaction.java:34) ~[?:?] {re:mixin,re:classloading}
+	... 17 more
+Caused by: java.lang.NoSuchMethodException: dev.ryanhcode.sable.sublevel.ServerSubLevel.wakeUp()
+	at java.base/java.lang.Class.getMethod(Class.java:2395) ~[?:?] {re:mixin}
+	at TRANSFORMER/sabletrueimpact@1.4.0/com.example.sabletrueimpact.ElasticPairReaction.findMethod(ElasticPairReaction.java:387) ~[?:?] {re:mixin,re:classloading}
+	at TRANSFORMER/sabletrueimpact@1.4.0/com.example.sabletrueimpact.ElasticPairReaction.<clinit>(ElasticPairReaction.java:34) ~[?:?] {re:mixin,re:classloading}
+	... 17 more
+
+
+A detailed walkthrough of the error, its code path and all known details is as follows:
+---------------------------------------------------------------------------------------
+
+-- Head --
+Thread: Render thread
+Stacktrace:
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.physics.impl.rapier.RapierPhysicsPipeline.redirect$ekp000$sabletrueimpact$applyElasticPairReaction(RapierPhysicsPipeline.java:746) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:classloading,pl:mixin:APP:sabletrueimpact.mixins.json:RapierPhysicsPipelineMixin from mod sabletrueimpact,pl:mixin:A}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.physics.impl.rapier.RapierPhysicsPipeline.processCollisionEffects(RapierPhysicsPipeline.java:218) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:classloading,pl:mixin:APP:sabletrueimpact.mixins.json:RapierPhysicsPipelineMixin from mod sabletrueimpact,pl:mixin:A}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.physics.impl.rapier.RapierPhysicsPipeline.postPhysicsTicks(RapierPhysicsPipeline.java:204) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:classloading,pl:mixin:APP:sabletrueimpact.mixins.json:RapierPhysicsPipelineMixin from mod sabletrueimpact,pl:mixin:A}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.sublevel.system.SubLevelPhysicsSystem.tickPipelinePhysics(SubLevelPhysicsSystem.java:275) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:classloading,pl:mixin:APP:sabletrueimpact.mixins.json:SableCollisionMixin from mod sabletrueimpact,pl:mixin:A}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.sublevel.system.SubLevelPhysicsSystem.tick(SubLevelPhysicsSystem.java:224) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:classloading,pl:mixin:APP:sabletrueimpact.mixins.json:SableCollisionMixin from mod sabletrueimpact,pl:mixin:A}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.api.sublevel.SubLevelContainer.lambda$tick$0(SubLevelContainer.java:145) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:computing_frames,re:classloading}
+	at MC-BOOTSTRAP/it.unimi.dsi.fastutil@8.5.12/it.unimi.dsi.fastutil.objects.ObjectArrayList.forEach(ObjectArrayList.java:748) ~[fastutil-8.5.12.jar%23129!/:?] {re:mixin}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.api.sublevel.SubLevelContainer.tick(SubLevelContainer.java:145) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:computing_frames,re:classloading}
+	at TRANSFORMER/sable@1.2.2/dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer.tick(ServerSubLevelContainer.java:73) ~[sable-neoforge-1.21.1-1.2.2.jar%23285!/:1.2.2] {re:mixin,re:computing_frames,re:classloading}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.server.level.ServerLevel.handler$dok000$sable$tickPlotContainer(ServerLevel.java:10033) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B,pl:mixin:APP:createbigcannons.mixins.json:ServerLevelMixin from mod createbigcannons,pl:mixin:APP:xaeroworldmap.mixins.json:MixinServerWorld from mod xaeroworldmap,pl:mixin:APP:modernfix-modernfix.mixins.json:perf.cache_strongholds.ServerLevelMixin from mod modernfix,pl:mixin:APP:veil.network.mixins.json:NetworkServerLevelMixin from mod veil,pl:mixin:APP:supplementaries-common.mixins.json:ServerLevelMixin from mod supplementaries,pl:mixin:APP:moonlight-common.mixins.json:ServerLevelMixin from mod moonlight,pl:mixin:APP:powergrid.mixins.json:LightningAccessor from mod powergrid,pl:mixin:APP:create.mixins.json:accessor.ServerLevelAccessor from mod create,pl:mixin:APP:sable.mixins.json:block_decal_render.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:entity.entity_aabb_lookup.LevelsMixin from mod sable,pl:mixin:APP:sable.mixins.json:entity.entity_kicking.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:entity.server_entities_tick.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:explosion.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:particle.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:physics.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:plot.LevelsMixin from mod sable,pl:mixin:APP:sable.mixins.json:plot.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:water_occlusion.LevelsMixin from mod sable,pl:mixin:A}
+-- Affected level --
+Details:
+	All players: 0 total; []
+	Chunk stats: 841
+	Level dimension: minecraft:overworld
+	Level spawn location: World: (0,0,0), Section: (at 0,0,0 in 0,0,0; chunk contains blocks 0,-64,0 to 15,319,15), Region: (0,0; contains chunks 0,0 to 31,31, blocks 0,-64,0 to 511,319,511)
+	Level time: 10879 game time, 10879 day time
+	Level name: 鏂扮殑涓栫晫
+	Level game mode: Game mode: creative (ID 1). Hardcore: false. Commands: true
+	Level weather: Rain time: 80281 (now: false), thunder time: 111616 (now: false)
+	Known server brands: neoforge
+	Removed feature flags: 
+	Level was modded: true
+	Level storage version: 0x04ABD - Anvil
+	Loaded entity count: 0
+Stacktrace:
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.server.level.ServerLevel.fillReportDetails(ServerLevel.java:1721) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B,pl:mixin:APP:createbigcannons.mixins.json:ServerLevelMixin from mod createbigcannons,pl:mixin:APP:xaeroworldmap.mixins.json:MixinServerWorld from mod xaeroworldmap,pl:mixin:APP:modernfix-modernfix.mixins.json:perf.cache_strongholds.ServerLevelMixin from mod modernfix,pl:mixin:APP:veil.network.mixins.json:NetworkServerLevelMixin from mod veil,pl:mixin:APP:supplementaries-common.mixins.json:ServerLevelMixin from mod supplementaries,pl:mixin:APP:moonlight-common.mixins.json:ServerLevelMixin from mod moonlight,pl:mixin:APP:powergrid.mixins.json:LightningAccessor from mod powergrid,pl:mixin:APP:create.mixins.json:accessor.ServerLevelAccessor from mod create,pl:mixin:APP:sable.mixins.json:block_decal_render.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:entity.entity_aabb_lookup.LevelsMixin from mod sable,pl:mixin:APP:sable.mixins.json:entity.entity_kicking.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:entity.server_entities_tick.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:explosion.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:particle.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:physics.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:plot.LevelsMixin from mod sable,pl:mixin:APP:sable.mixins.json:plot.ServerLevelMixin from mod sable,pl:mixin:APP:sable.mixins.json:water_occlusion.LevelsMixin from mod sable,pl:mixin:A}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.server.MinecraftServer.tickChildren(MinecraftServer.java:1040) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B,pl:mixin:A}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.server.MinecraftServer.tickServer(MinecraftServer.java:917) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B,pl:mixin:A}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.client.server.IntegratedServer.tickServer(IntegratedServer.java:110) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:runtimedistcleaner:A,re:classloading,pl:mixin:APP:modernfix-modernfix.mixins.json:perf.thread_priorities.IntegratedServerMixin from mod modernfix,pl:mixin:APP:modernfix-modernfix.mixins.json:perf.suspend_integrated_server_during_load.IntegratedServerMixin from mod modernfix,pl:mixin:APP:sable.mixins.json:toast.IntegratedServerMixin from mod sable,pl:mixin:APP:lithostitched.mixins.json:client.IntegratedServerMixin from mod lithostitched,pl:mixin:A,pl:runtimedistcleaner:A}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.server.MinecraftServer.runServer(MinecraftServer.java:707) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B,pl:mixin:A}
+	at TRANSFORMER/minecraft@1.21.1/net.minecraft.server.MinecraftServer.lambda$spin$2(MinecraftServer.java:267) ~[client-1.21.1-20240808.144430-srg.jar%23239!/:?] {re:mixin,pl:accesstransformer:B,re:classloading,pl:accesstransformer:B,pl:mixin:A}
+	at java.base/java.lang.Thread.run(Thread.java:1583) ~[?:?] {re:mixin}
+
+
+-- System Details --
+Details:
+	Minecraft Version: 1.21.1
+	Minecraft Version ID: 1.21.1
+	Operating System: Windows 11 (amd64) version 10.0
+	Java Version: 21.0.3, Microsoft
+	Java VM Version: OpenJDK 64-Bit Server VM (mixed mode), Microsoft
+	Memory: 658438360 bytes (627 MiB) / 2885681152 bytes (2752 MiB) up to 66571993088 bytes (63488 MiB)
+	CPUs: 28
+	Processor Vendor: GenuineIntel
+	Processor Name: Intel(R) Core(TM) i7-14700HX
+	Identifier: Intel64 Family 6 Model 183 Stepping 1
+	Microarchitecture: Raptor Lake
+	Frequency (GHz): 2.30
+	Number of physical packages: 1
+	Number of physical CPUs: 20
+	Number of logical CPUs: 28
+	Graphics card #0 name: NVIDIA GeForce RTX 4070 Laptop GPU
+	Graphics card #0 vendor: NVIDIA
+	Graphics card #0 VRAM (MiB): 8188.00
+	Graphics card #0 deviceId: VideoController1
+	Graphics card #0 versionInfo: 32.0.15.7242
+	Graphics card #1 name: Intel(R) UHD Graphics
+	Graphics card #1 vendor: Intel Corporation
+	Graphics card #1 VRAM (MiB): 2048.00
+	Graphics card #1 deviceId: VideoController2
+	Graphics card #1 versionInfo: 32.0.101.6790
+	Memory slot #0 capacity (MiB): 32768.00
+	Memory slot #0 clockSpeed (GHz): 5.60
+	Memory slot #0 type: Unknown
+	Memory slot #1 capacity (MiB): 32768.00
+	Memory slot #1 clockSpeed (GHz): 5.60
+	Memory slot #1 type: Unknown
+	Virtual memory max (MiB): 70875.87
+	Virtual memory used (MiB): 39008.30
+	Swap memory total (MiB): 5632.00
+	Swap memory used (MiB): 3220.27
+	Space in storage for jna.tmpdir (MiB): available: 126568.92, total: 667284.00
+	Space in storage for org.lwjgl.system.SharedLibraryExtractPath (MiB): available: 126568.92, total: 667284.00
+	Space in storage for io.netty.native.workdir (MiB): available: 126568.92, total: 667284.00
+	Space in storage for java.io.tmpdir (MiB): available: 27616.20, total: 307201.00
+	Space in storage for workdir (MiB): available: 126568.92, total: 667284.00
+	JVM Flags: 12 total; -XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe.heapdump -XX:-OmitStackTraceInFastThrow -Xmx63488m -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:G1HeapRegionSize=32M -XX:MaxGCPauseMillis=50 -XX:+PerfDisableSharedMem -XX:MinHeapFreeRatio=25 -XX:MaxHeapFreeRatio=40
+	Loaded Shaderpack: (off)
+	Server Running: true
+	Player Count: 0 / 8; []
+	Active Data Packs: create:dynamic_data, vanilla, mod_data, mod/sodium, mod/createbigcannons (incompatible), mod/fabric_renderer_api_v1, mod/bits_n_bobs, mod/copycats (incompatible), mod/customskinloader (incompatible), mod/jei (incompatible), mod/lithostitched, mod/xaerolib (incompatible), mod/aeronautics (incompatible), mod/aeronautics_bundled, mod/trender (incompatible), mod/ritchiesprojectilelib (incompatible), mod/xaeroworldmap (incompatible), mod/neoforge, mod/modernfix (incompatible), mod/fabric_block_view_api_v2, mod/iris, mod/veil (incompatible), mod/escalated (incompatible), mod/simulated (incompatible), mod/createdieselgenerators (incompatible), mod/clientsort, mod/distanthorizons (incompatible), mod/cloth_config (incompatible), mod/supplementaries, mod/create_item_drawers, mod/tfmg, mod/offroad (incompatible), mod/vista, mod/create_connected (incompatible), mod/moonlight, mod/fabric_api_base, mod/jade (incompatible), mod/sounds (incompatible), mod/sablecompanion, mod/xaerominimap (incompatible), mod/jecharacters (incompatible), mod/entityculling (incompatible), mod/ftbultimine (incompatible), mod/immediatelyfast (incompatible), mod/worldedit (incompatible), mod/createmetallurgy (incompatible), mod/architectury (incompatible), mod/ftblibrary (incompatible), mod/powergrid (incompatible), mod/ferritecore (incompatible), mod/yet_another_config_lib_v3 (incompatible), mod/vistafix, mod/lanserverproperties, mod/modernui (incompatible), mod/transition (incompatible), mod/fabric_rendering_data_attachment_v1, mod/mru (incompatible), mod/jadeaddons (incompatible), mod/colorwheel, mod/flywheel (incompatible), mod/ponder (incompatible), mod/create (incompatible), mod/sable, mod/sabletrueimpact, mod/gnkinetics, mod/create_vibrant_vaults, mod/tracks, mod/reconstructedwands (incompatible), mod/imblocker (incompatible), supplementaries:generated_pack
+	Available Data Packs: bundle, trade_rebalance, vanilla, mod/aeronautics (incompatible), mod/aeronautics_bundled, mod/architectury (incompatible), mod/bits_n_bobs, mod/clientsort, mod/cloth_config (incompatible), mod/colorwheel, mod/copycats (incompatible), mod/create (incompatible), mod/create_connected (incompatible), mod/create_item_drawers, mod/create_vibrant_vaults, mod/createbigcannons (incompatible), mod/createdieselgenerators (incompatible), mod/createmetallurgy (incompatible), mod/customskinloader (incompatible), mod/distanthorizons (incompatible), mod/entityculling (incompatible), mod/escalated (incompatible), mod/fabric_api_base, mod/fabric_block_view_api_v2, mod/fabric_renderer_api_v1, mod/fabric_rendering_data_attachment_v1, mod/ferritecore (incompatible), mod/flywheel (incompatible), mod/ftblibrary (incompatible), mod/ftbultimine (incompatible), mod/gnkinetics, mod/imblocker (incompatible), mod/immediatelyfast (incompatible), mod/iris, mod/jade (incompatible), mod/jadeaddons (incompatible), mod/jecharacters (incompatible), mod/jei (incompatible), mod/lanserverproperties, mod/lithostitched, mod/modernfix (incompatible), mod/modernui (incompatible), mod/moonlight, mod/mru (incompatible), mod/neoforge, mod/offroad (incompatible), mod/ponder (incompatible), mod/powergrid (incompatible), mod/reconstructedwands (incompatible), mod/ritchiesprojectilelib (incompatible), mod/sable, mod/sablecompanion, mod/sabletrueimpact, mod/simulated (incompatible), mod/sodium, mod/sounds (incompatible), mod/supplementaries, mod/tfmg, mod/tracks, mod/transition (incompatible), mod/trender (incompatible), mod/veil (incompatible), mod/vista, mod/vistafix, mod/worldedit (incompatible), mod/xaerolib (incompatible), mod/xaerominimap (incompatible), mod/xaeroworldmap (incompatible), mod/yet_another_config_lib_v3 (incompatible), mod_data, supplementaries:generated_pack, create:dynamic_data
+	Enabled Feature Flags: minecraft:vanilla
+	World Generation: Stable
+	World Seed: 4918656824504070535
+	Type: Integrated Server (map_client.txt)
+	Is Modded: Definitely; Client brand changed to 'neoforge'; Server brand changed to 'neoforge'
+	Launched Version: 鑸┖锛?	ModLauncher: 11.0.5+main.901c6ea8
+	ModLauncher launch target: forgeclient
+	ModLauncher services: 
+		sponge-mixin-0.15.2+mixin.0.8.7.jar mixin PLUGINSERVICE 
+		loader-4.0.42.jar slf4jfixer PLUGINSERVICE 
+		loader-4.0.42.jar runtime_enum_extender PLUGINSERVICE 
+		at-modlauncher-10.0.1.jar accesstransformer PLUGINSERVICE 
+		loader-4.0.42.jar runtimedistcleaner PLUGINSERVICE 
+		modlauncher-11.0.5.jar mixin TRANSFORMATIONSERVICE 
+		modlauncher-11.0.5.jar fml TRANSFORMATIONSERVICE 
+	FML Language Providers: 
+		javafml@4.0
+		lowcodefml@4.0
+		minecraft@4.0
+	Mod List: 
+		architectury-13.0.8-neoforge.jar                  |Architectury                  |architectury                  |13.0.8              |Manifest: NOSIGNATURE
+		clientsort-neoforge-2.2.1+1.21.1.jar              |ClientSort                    |clientsort                    |2.2.1+1.21.1        |Manifest: NOSIGNATURE
+		cloth-config-15.0.140-neoforge.jar                |Cloth Config v15 API          |cloth_config                  |15.0.140            |Manifest: NOSIGNATURE
+		colorwheel-neoforge-1.2.5+mc1.21.1.jar            |Colorwheel                    |colorwheel                    |1.2.5+mc1.21.1      |Manifest: NOSIGNATURE
+		[鏈烘鍔ㄥ姏] create-1.21.1-6.0.10.jar                   |Create                        |create                        |6.0.10              |Manifest: NOSIGNATURE
+		dev.eriksonn.aeronautics.aeronautics-neoforge-1.21|Create Aeronautics            |aeronautics                   |1.2.1               |Manifest: NOSIGNATURE
+		create-aeronautics-bundled-1.21.1-1.2.1.jar       |Create Aeronautics            |aeronautics_bundled           |1.2.1               |Manifest: NOSIGNATURE
+		[鏈烘鍔ㄥ姏锛氱伀鐐甝 createbigcannons-5.11.3+mc.1.21.1.jar   |Create Big Cannons            |createbigcannons              |5.11.3              |Manifest: NOSIGNATURE
+		bits_n_bobs-0.0.44.jar                            |Create Bits 'n' Bobs          |bits_n_bobs                   |0.0.44              |Manifest: NOSIGNATURE
+		[鏈烘鍔ㄥ姏锛氭煷娌瑰姩鍔沒 createdieselgenerators-1.21.1-1.3.11.j|Create Diesel Generators      |createdieselgenerators        |1.21.1-1.3.11       |Manifest: NOSIGNATURE
+		createmetallurgy-1.0.1-1.21.1.jar                 |Create Metallurgy             |createmetallurgy              |1.0.1               |Manifest: NOSIGNATURE
+		dev.ryanhcode.offroad.offroad-neoforge-1.21.1-1.2.|Create Offroad                |offroad                       |1.2.1               |Manifest: NOSIGNATURE
+		dev.simulated_team.simulated.simulated-neoforge-1.|Create Simulated              |simulated                     |1.2.1               |Manifest: NOSIGNATURE
+		tracks-neoforge-1.21.1-1.0.1.jar                  |Create Tracks                 |tracks                        |1.0.1               |Manifest: NOSIGNATURE
+		[鏈烘鍔ㄥ姏锛氬垱鎰忎紶鍔╙ create_connected-1.1.16-mc1.21.1.jar  |Create: Connected             |create_connected              |1.1.16-mc1.21.1     |Manifest: NOSIGNATURE
+		[鏈烘鍔ㄥ姏锛氫吉瑁呮柟鍧?] copycats-3.0.4+mc.1.21.1-neoforge.jar|Create: Copycats+             |copycats                      |3.0.4+mc.1.21.1-neof|Manifest: NOSIGNATURE
+		[鏈烘鍔ㄥ姏锛氳嚜鍔ㄦ壎姊痌 escalated-1.3.0-mc.1.21.1.jar         |Create: Escalated             |escalated                     |1.3.0               |Manifest: NOSIGNATURE
+		[鏈烘鍔ㄥ姏锛氱墿鍝佹娊灞塢 create_item_drawers-mc1.21.1+1.2.1.jar|Create: Item Drawers          |create_item_drawers           |1.2.1               |Manifest: NOSIGNATURE
+		[鏈烘鍔ㄥ姏锛氫氦閿欑數缃慮 powergrid-mc1.21.1-0.5.5.1.jar        |Create: Power Grid            |powergrid                     |0.5.5.1             |Manifest: NOSIGNATURE
+		[鏈烘鍔ㄥ姏锛氬伐涓氶暱璺痌 tfmg-1.2.0.jar                        |Create: The Factory Must Grow |tfmg                          |1.2.0               |Manifest: NOSIGNATURE
+		[鏈烘鍔ㄥ姏锛氱偒褰╅噾搴揮 create_vibrant_vaults-0.3.2.jar       |Create: Vibrant Vaults        |create_vibrant_vaults         |0.3.2               |Manifest: NOSIGNATURE
+		[涓囩敤鐨偆琛ヤ竵] CustomSkinLoader_Universal-14.28.jar     |CustomSkinLoader              |customskinloader              |14.28               |Manifest: 4a:31:8b:cf:34:eb:d0:13:f3:19:39:d5:d2:b9:12:78:b5:f2:8d:91:3e:6f:8f:ed:97:48:00:69:e1:30:3a:54
+		DistantHorizons-3.0.3-b-1.21.1-fabric-neoforge.jar|Distant Horizons              |distanthorizons               |3.0.3-b             |Manifest: NOSIGNATURE
+		[瀹炰綋娓叉煋鏈哄埗浼樺寲] entityculling-neoforge-1.10.2-mc1.21.1.|EntityCulling                 |entityculling                 |1.10.2              |Manifest: NOSIGNATURE
+		[閾佹哀浣撶鑺痌 ferritecore-7.0.3-neoforge.jar            |Ferrite Core                  |ferritecore                   |7.0.3               |Manifest: 41:ce:50:66:d1:a0:05:ce:a1:0e:02:85:9b:46:64:e0:bf:2e:cf:60:30:9a:fe:0c:27:e0:63:66:9a:84:ce:8a
+		flywheel-neoforge-1.21.1-1.0.6.jar                |Flywheel                      |flywheel                      |1.0.6               |Manifest: NOSIGNATURE
+		fabric-api-base-0.4.42+d1308ded19.jar             |Forgified Fabric API Base     |fabric_api_base               |0.4.42+d1308ded19   |Manifest: NOSIGNATURE
+		fabric-block-view-api-v2-1.0.10+9afaaf8c19.jar    |Forgified Fabric BlockView API|fabric_block_view_api_v2      |1.0.10+9afaaf8c19   |Manifest: NOSIGNATURE
+		fabric-renderer-api-v1-3.4.0+acb05a3919.jar       |Forgified Fabric Renderer API |fabric_renderer_api_v1        |3.4.0+acb05a3919    |Manifest: NOSIGNATURE
+		fabric-rendering-data-attachment-v1-0.3.48+73761d2|Forgified Fabric Rendering Dat|fabric_rendering_data_attachme|0.3.48+73761d2e19   |Manifest: NOSIGNATURE
+		ftb-library-neoforge-2101.1.31.jar                |FTB Library                   |ftblibrary                    |2101.1.31           |Manifest: NOSIGNATURE
+		[杩為攣鐮村潖] ftb-ultimine-neoforge-2101.1.13.jar        |FTB Ultimine                  |ftbultimine                   |2101.1.13           |Manifest: NOSIGNATURE
+		GnKinetics-1.21.1-1.0m.jar                        |Gears n' Kinetics             |gnkinetics                    |1.0m                |Manifest: NOSIGNATURE
+		[杈撳叆娉曞啿绐佷慨澶峕 IMBlocker-5.5.3-neoforge+1.20.6-1.21.8.j|IMBlocker                     |imblocker                     |5.5.3               |Manifest: NOSIGNATURE
+		ImmediatelyFast-NeoForge-1.6.10+1.21.1.jar        |ImmediatelyFast               |immediatelyfast               |1.6.10+1.21.1       |Manifest: NOSIGNATURE
+		iris-neoforge-1.8.12+mc1.21.1.jar                 |Iris                          |iris                          |1.8.12-snapshot+mc1.|Manifest: NOSIGNATURE
+		[鐜?馃攳] Jade-1.21.1-NeoForge-15.10.5.jar           |Jade                          |jade                          |15.10.5+neoforge    |Manifest: NOSIGNATURE
+		JadeAddons-1.21.1-NeoForge-6.1.0.jar              |Jade Addons                   |jadeaddons                    |6.1.0+neoforge      |Manifest: NOSIGNATURE
+		[閫氱敤鎷奸煶鎼滅储] jecharacters-1.21-neoforge-4.5.23.jar    |Just Enough Characters        |jecharacters                  |4.5.23              |Manifest: NOSIGNATURE
+		[JEI鐗╁搧绠＄悊鍣╙ jei-1.21.1-neoforge-19.27.0.340.jar    |Just Enough Items             |jei                           |19.27.0.340         |Manifest: NOSIGNATURE
+		[鑷畾涔夊眬鍩熺綉鑱旀満] lanserverproperties-1.13.2-neoforge.jar|Lan Server Properties         |lanserverproperties           |1.13.2              |Manifest: NOSIGNATURE
+		lithostitched-1.7.3-neoforge-21.1.jar             |Lithostitched                 |lithostitched                 |1.7.3               |Manifest: NOSIGNATURE
+		mru-1.0.19+LTS+1.21.1+neoforge.jar                |M.R.U                         |mru                           |1.0.19+LTS+1.21.1+ne|Manifest: NOSIGNATURE
+		client-1.21.1-20240808.144430-srg.jar             |Minecraft                     |minecraft                     |1.21.1              |Manifest: a1:d4:5e:04:4f:d3:d6:e0:7b:37:97:cf:77:b0:de:ad:4a:47:ce:8c:96:49:5f:0a:cf:8c:ae:b2:6d:4b:8a:3f
+		[鐜颁唬鍖?UI] ModernUI-NeoForge-1.21.1-3.12.0.2-univers|Modern UI                     |modernui                      |3.12.0.2            |Manifest: 01:c4:52:25:b1:6e:5f:ac:fe:88:35:7e:cf:65:2f:69:1d:56:db:2b:93:f8:dd:7c:93:47:04:8c:e4:22:13:91
+		[鐜颁唬鍖栦慨澶峕 modernfix-neoforge-5.27.7+mc1.21.1.jar    |ModernFix                     |modernfix                     |5.27.7+mc1.21.1     |Manifest: NOSIGNATURE
+		moonlight-neoforge-1.21.1-3.0.7.jar               |Moonlight Lib                 |moonlight                     |1.21.1-3.0.7        |Manifest: NOSIGNATURE
+		neoforge-21.1.226-universal.jar                   |NeoForge                      |neoforge                      |21.1.226            |Manifest: NOSIGNATURE
+		ponder-neoforge-1.0.82+mc1.21.1.jar               |Ponder                        |ponder                        |1.0.82+mc1.21.1     |Manifest: NOSIGNATURE
+		reconstructedwands-neoforge-1.21.1-1.0.0.jar      |REConstructed Wands           |reconstructedwands            |1.0.0               |Manifest: NOSIGNATURE
+		ritchiesprojectilelib-2.1.2+mc.1.21.1-neoforge.jar|Ritchie's Projectile Library  |ritchiesprojectilelib         |2.1.2               |Manifest: NOSIGNATURE
+		sable-neoforge-1.21.1-1.2.2.jar                   |Sable                         |sable                         |1.2.2               |Manifest: NOSIGNATURE
+		sable-companion-common-1.21.1-1.6.0.jar           |Sable Companion               |sablecompanion                |1.6.0               |Manifest: NOSIGNATURE
+		sabletrueimpact-1.4.0.jar                         |Sable True Impact             |sabletrueimpact               |1.4.0               |Manifest: NOSIGNATURE
+		[閽燷 sodium-neoforge-0.6.13+mc1.21.1.jar           |Sodium                        |sodium                        |0.6.13+mc1.21.1     |Manifest: NOSIGNATURE
+		sounds-2.4.22+lts+1.21.1-neoforge.jar             |Sounds                        |sounds                        |2.4.22+lts          |Manifest: NOSIGNATURE
+		[閿﹁嚧瑁呴グ] supplementaries-neoforge-1.21.1-3.6.4.jar  |Supplementaries               |supplementaries               |1.21.1-3.6.4        |Manifest: NOSIGNATURE
+		TRansition-1.0.19-1.21.1-neoforge-SNAPSHOT.jar    |TRansition                    |transition                    |1.0.19              |Manifest: NOSIGNATURE
+		TRender-1.0.13-1.21.1-neoforge-SNAPSHOT.jar       |TRender                       |trender                       |1.0.13              |Manifest: NOSIGNATURE
+		veil-neoforge-1.21.1-4.0.0.jar                    |Veil                          |veil                          |4.0.0               |Manifest: NOSIGNATURE
+		vista-neoforge-1.21.1-4.3.1.jar                   |Vista                         |vista                         |1.21.1-4.3.1        |Manifest: NOSIGNATURE
+		VistaAeronauricsFix-1.0.1.jar                     |Vista Aeronautics Fix         |vistafix                      |1.0.1               |Manifest: NOSIGNATURE
+		[鍒涗笘绁瀅 worldedit-mod-7.3.8.jar                     |WorldEdit                     |worldedit                     |7.3.8+6939-7d32b45  |Manifest: NOSIGNATURE
+		[Xaero鐨勫皬鍦板浘] xaerominimap-neoforge-1.21.1-25.3.13.j|Xaero's Minimap               |xaerominimap                  |25.3.13             |Manifest: NOSIGNATURE
+		[Xaero鐨勪笘鐣屽湴鍥綸 xaeroworldmap-neoforge-1.21.1-1.40.16|Xaero's World Map             |xaeroworldmap                 |1.40.16             |Manifest: NOSIGNATURE
+		xaerolib-neoforge-1.21.1-1.1.15.jar               |XaeroLib                      |xaerolib                      |1.1.15              |Manifest: NOSIGNATURE
+		yet_another_config_lib_v3-3.8.2+1.21.1-neoforge.ja|YetAnotherConfigLib           |yet_another_config_lib_v3     |3.8.2+1.21.1-neoforg|Manifest: NOSIGNATURE
+	Crash Report UUID: 6957e3b9-8f8e-42f4-8a62-5aec2417499e
+	FML: 4.0.42
+	NeoForge: 21.1.226
+	Flywheel Backend: flywheel:indirect
+	Fragments: Back Stack Index: 0
+FragmentManager misc state:
+  mHost=icyllis.modernui.mc.UIManager$HostCallbacks@4a8c6cf4
+  mContainer=icyllis.modernui.mc.UIManager$HostCallbacks@4a8c6cf4
+  mCurState=7 mStateSaved=false mStopped=false mDestroyed=false
+
+[19:46:54] [Render thread/INFO] [STDOUT/]: [net.minecraft.server.Bootstrap:realStdoutPrintln:135]: #@!@# Game crashed! Crash report saved to: #@!@# D:\.minecraft\versions\鑸┖锛乗crash-reports\crash-2026-05-11_19.46.54-server.txt
