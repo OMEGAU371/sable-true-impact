@@ -31,6 +31,7 @@ public final class ElasticPairReaction {
     private static final Method GET_CENTER_OF_MASS_METHOD = findMethod("dev.ryanhcode.sable.api.physics.mass.MassData", "getCenterOfMass");
     private static final Method LOGICAL_POSE_METHOD = findMethod("dev.ryanhcode.sable.sublevel.SubLevel", "logicalPose");
     private static final Method ROTATION_POINT_METHOD = findMethod("dev.ryanhcode.sable.companion.math.Pose3d", "rotationPoint");
+    private static final Method WAKE_UP_METHOD = findMethod("dev.ryanhcode.sable.sublevel.ServerSubLevel", "wakeUp");
 
     private ElasticPairReaction() {}
 
@@ -324,11 +325,26 @@ public final class ElasticPairReaction {
     }
 
     private static void applyImpulse(int sceneId, Object subLevel, Vector3d localPoint, Vector3d normal, double impulse) {
+        if (subLevel == null) return;
+        
+        // Safety: Prevent NaN or infinite forces entering Rapier
+        if (!Double.isFinite(impulse) || Math.abs(impulse) <= 1e-6) return;
+        if (!Double.isFinite(localPoint.x) || !Double.isFinite(localPoint.y) || !Double.isFinite(localPoint.z)) return;
+        if (!Double.isFinite(normal.x) || !Double.isFinite(normal.y) || !Double.isFinite(normal.z)) return;
+
         Vector3d com = centerOfMass(subLevel);
         Integer rid = runtimeId(subLevel);
         if (normal.lengthSquared() < 1e-8 || com == null || rid == null) return;
-        Vector3d localNormal = new Vector3d(normal).normalize().mul(impulse);
-        Rapier3D.applyForce(sceneId, rid, localPoint.x - com.x, localPoint.y - com.y, localPoint.z - com.z, localNormal.x, localNormal.y, localNormal.z, true);
+
+        try {
+            // Force wake up the island before pushing it to avoid "island should be awake" panic
+            WAKE_UP_METHOD.invoke(subLevel);
+            
+            Vector3d localNormal = new Vector3d(normal).normalize().mul(impulse);
+            if (!Double.isFinite(localNormal.x) || !Double.isFinite(localNormal.y) || !Double.isFinite(localNormal.z)) return;
+            
+            Rapier3D.applyForce(sceneId, rid, localPoint.x - com.x, localPoint.y - com.y, localPoint.z - com.z, localNormal.x, localNormal.y, localNormal.z, true);
+        } catch (Exception ignored) {}
     }
 
     private static double mass(Object subLevel) {

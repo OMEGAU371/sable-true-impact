@@ -141,12 +141,7 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.IntValue CUMULATIVE_BLOCK_DAMAGE_MAX_ENTRIES;
     public static final ModConfigSpec.BooleanValue ENABLE_PERFORMANCE_LOGGING;
     public static final ModConfigSpec.IntValue PERFORMANCE_LOG_INTERVAL_TICKS;
-
-    // Performance & Safety Limits
-    public static final ModConfigSpec.IntValue SUBLEVEL_FRACTURE_MIN_BLOCKS_LIMIT;
-    public static final ModConfigSpec.IntValue GLOBAL_MAX_FRACTURES_PER_TICK;
-    public static final ModConfigSpec.BooleanValue ENABLE_SMART_RAY_CULLING;
-
+    
     // Distant Horizons Proxy Configs
     public static final ModConfigSpec.BooleanValue ENABLE_DH_SUBLEVEL_PROXY_LOD;
     public static final ModConfigSpec.DoubleValue DH_SUBLEVEL_PROXY_MIN_DISTANCE;
@@ -337,12 +332,6 @@ public final class TrueImpactConfig {
         BUILDER.push("performance");
         ENABLE_PERFORMANCE_LOGGING = BUILDER.define("enablePerformanceLogging", false);
         PERFORMANCE_LOG_INTERVAL_TICKS = BUILDER.defineInRange("performanceLogIntervalTicks", 200, 20, 72000);
-        SUBLEVEL_FRACTURE_MIN_BLOCKS_LIMIT = BUILDER.comment("Minimum number of blocks a SubLevel must have to be eligible for further splitting. Prevents 'atomization' that kills physics performance.")
-                .defineInRange("subLevelFractureMinBlocksLimit", 16, 1, 10000);
-        GLOBAL_MAX_FRACTURES_PER_TICK = BUILDER.comment("Global safety cap on how many new SubLevels can be created via fracture per tick. Prevents lag spikes during massive explosions.")
-                .defineInRange("globalMaxFracturesPerTick", 4, 1, 64);
-        ENABLE_SMART_RAY_CULLING = BUILDER.comment("If true, shockwave rays are only fired towards the bounding boxes of nearby SubLevels instead of in all directions.")
-                .define("enableSmartRayCulling", true);
         BUILDER.pop();
         
         BUILDER.push("distantHorizons");
