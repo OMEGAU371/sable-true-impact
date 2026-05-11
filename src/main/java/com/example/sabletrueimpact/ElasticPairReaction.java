@@ -132,10 +132,6 @@ public final class ElasticPairReaction {
             Vector3d rotation = rotationPoint(subLevel);
             if (level == null || rotation == null) return;
 
-            double threshold = TrueImpactConfig.TERRAIN_IMPACT_FORCE_THRESHOLD.get();
-            if (!isFlat && totalForce < threshold) return;
-            if (isFlat && totalForce < threshold * 0.5) return;
-
             points.sort((a, b) -> Double.compare(b.force, a.force));
             
             if (isFlat) {
@@ -241,51 +237,50 @@ public final class ElasticPairReaction {
     }
 
     private static void damageTerrain(ServerLevel level, BlockPos center, Vector3d normal, double energy) {
-        level.getServer().execute(() -> {
-            PriorityQueue<TerrainNode> queue = new PriorityQueue<>(Comparator.comparingDouble(TerrainNode::cost));
-            Set<BlockPos> visited = new HashSet<>();
-            Vector3d direction = new Vector3d(normal).normalize();
-            if (direction.lengthSquared() < 0.1) direction.set(0, -1, 0);
+        PriorityQueue<TerrainNode> queue = new PriorityQueue<>(Comparator.comparingDouble(TerrainNode::cost));
+        Set<BlockPos> visited = new HashSet<>();
+        Vector3d direction = new Vector3d(normal).normalize();
+        if (direction.lengthSquared() < 0.1) direction.set(0, -1, 0);
 
-            queue.add(new TerrainNode(center.immutable(), energy, 0.0));
-            visited.add(center.immutable());
-            int broken = 0;
+        queue.add(new TerrainNode(center.immutable(), energy, 0.0));
+        visited.add(center.immutable());
+        int broken = 0;
 
-            TrueImpactConfig.QualityMode qm = TrueImpactConfig.PERFORMANCE_QUALITY_MODE.get();
-            int maxBlocks = qm.maxTerrainBlocks;
-            while (!queue.isEmpty() && broken < maxBlocks) {
-                TerrainNode node = queue.poll();
-                BlockPos pos = node.pos();
-                BlockState state = level.getBlockState(pos);
-                if (state.isAir() || state.getDestroySpeed(level, pos) < 0 || state.is(Blocks.BEDROCK)) continue;
+        TrueImpactConfig.QualityMode qm = TrueImpactConfig.PERFORMANCE_QUALITY_MODE.get();
+        int maxBlocks = qm.maxTerrainBlocks;
+        
+        while (!queue.isEmpty() && broken < maxBlocks) {
+            TerrainNode node = queue.poll();
+            BlockPos pos = node.pos();
+            BlockState state = level.getBlockState(pos);
+            if (state.isAir() || state.getDestroySpeed(level, pos) < 0 || state.is(Blocks.BEDROCK)) continue;
 
-                double strength = (state.getDestroySpeed(level, pos) * TrueImpactConfig.HARDNESS_STRENGTH_FACTOR.get())
-                        + (state.getBlock().getExplosionResistance() * TrueImpactConfig.BLAST_STRENGTH_FACTOR.get())
-                        + TrueImpactConfig.BASE_STRENGTH.get();
-                if (state.getDestroySpeed(level, pos) < 1.0f) strength *= TrueImpactConfig.SOFT_BLOCK_STRENGTH_MULTIPLIER.get();
-                
-                double materialThreshold = Math.max(MaterialImpactProperties.breakThreshold(state, strength), 1.0);
-                double yield = node.energy() / materialThreshold;
+            double strength = (state.getDestroySpeed(level, pos) * TrueImpactConfig.HARDNESS_STRENGTH_FACTOR.get())
+                    + (state.getBlock().getExplosionResistance() * TrueImpactConfig.BLAST_STRENGTH_FACTOR.get())
+                    + TrueImpactConfig.BASE_STRENGTH.get();
+            if (state.getDestroySpeed(level, pos) < 1.0f) strength *= TrueImpactConfig.SOFT_BLOCK_STRENGTH_MULTIPLIER.get();
+            
+            double materialThreshold = Math.max(MaterialImpactProperties.breakThreshold(state, strength), 1.0);
+            double yield = node.energy() / materialThreshold;
 
-                if (yield >= TrueImpactConfig.TERRAIN_IMPACT_BREAK_YIELD.get()) {
-                    level.destroyBlock(pos, true);
-                    broken++;
-                    double remaining = (node.energy() - materialThreshold) * 0.55;
-                    if (remaining > materialThreshold * 0.2) {
-                        for (Direction dir : Direction.values()) {
-                            BlockPos next = pos.relative(dir).immutable();
-                            if (visited.add(next)) {
-                                double bias = 1.0 + Math.max(0.0, new Vector3d(dir.getStepX(), dir.getStepY(), dir.getStepZ()).dot(direction)) * 0.8;
-                                queue.add(new TerrainNode(next, remaining * bias, node.cost() + 1.0 / bias));
-                            }
+            if (yield >= TrueImpactConfig.TERRAIN_IMPACT_BREAK_YIELD.get()) {
+                level.destroyBlock(pos, true);
+                broken++;
+                double remaining = (node.energy() - materialThreshold) * 0.55;
+                if (remaining > materialThreshold * 0.2) {
+                    for (Direction dir : Direction.values()) {
+                        BlockPos next = pos.relative(dir).immutable();
+                        if (visited.add(next)) {
+                            double bias = 1.0 + Math.max(0.0, new Vector3d(dir.getStepX(), dir.getStepY(), dir.getStepZ()).dot(direction)) * 0.8;
+                            queue.add(new TerrainNode(next, remaining * bias, node.cost() + 1.0 / bias));
                         }
                     }
-                } else if (TrueImpactConfig.ENABLE_CRACKS.get() && yield > TrueImpactConfig.CRACK_YIELD_THRESHOLD.get()) {
-                    BlockDamageAccumulator.apply(level, pos, MaterialImpactProperties.fatigueDamage(state, node.energy() - materialThreshold), 
-                        materialThreshold * TrueImpactConfig.TERRAIN_IMPACT_BREAK_YIELD.get(), pos.hashCode());
                 }
+            } else if (TrueImpactConfig.ENABLE_CRACKS.get() && yield > TrueImpactConfig.CRACK_YIELD_THRESHOLD.get()) {
+                BlockDamageAccumulator.apply(level, pos, MaterialImpactProperties.fatigueDamage(state, node.energy() - materialThreshold), 
+                    materialThreshold * TrueImpactConfig.TERRAIN_IMPACT_BREAK_YIELD.get(), pos.hashCode());
             }
-        });
+        }
     }
 
     private static void collectExplosion(List<ExplosionCandidate> list, ServerLevel level, Vector3d point, double force, double mass) {
