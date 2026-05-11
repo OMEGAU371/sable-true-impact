@@ -16,9 +16,10 @@ import org.joml.Vector3d;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.List;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
@@ -48,6 +49,7 @@ public final class ElasticPairReaction {
         Vector3d normalA = new Vector3d();
         Vector3d normalB = new Vector3d();
         BlockPos.MutableBlockPos blockPos = new BlockPos.MutableBlockPos();
+        List<ExplosionCandidate> explosionCandidates = new ArrayList<>();
 
         for (int i = 0; i < collisions.length / 15; i++) {
             int start = i * 15;
@@ -68,7 +70,8 @@ public final class ElasticPairReaction {
                 applyTerrainImpact(subLevelA != null ? subLevelA : subLevelB,
                         subLevelA != null ? localPointA : localPointB,
                         subLevelA != null ? normalA : normalB,
-                        forceAmount);
+                        forceAmount,
+                        explosionCandidates);
                 continue;
             }
             if (subLevelA == null) {
@@ -86,11 +89,20 @@ public final class ElasticPairReaction {
                 continue;
             }
 
+            double threshold = TrueImpactConfig.PAIR_REACTION_FORCE_THRESHOLD.get();
+            if (forceAmount < threshold) {
+                continue;
+            }
+
             double massA = Math.max(mass(subLevelA), 1.0);
             double massB = Math.max(mass(subLevelB), 1.0);
             double reducedMass = (massA * massB) / (massA + massB);
+            
+            // Soften impulse near threshold to prevent sudden 'kicks'
+            double softening = Math.min(1.0, (forceAmount - threshold) / Math.max(threshold, 100.0));
             double cappedForce = Math.min(forceAmount, TrueImpactConfig.PAIR_REACTION_MAX_IMPULSE.get());
-            double impulse = cappedForce * restitution * TrueImpactConfig.PAIR_REACTION_SCALE.get();
+            double impulse = cappedForce * restitution * TrueImpactConfig.PAIR_REACTION_SCALE.get() * softening;
+            
             impulse = Math.min(impulse, reducedMass * TrueImpactConfig.PAIR_REACTION_MAX_VELOCITY_CHANGE.get());
             if (impulse <= 1.0E-6) {
                 continue;
@@ -102,12 +114,14 @@ public final class ElasticPairReaction {
             Vector3d rotationPointA = rotationPoint(subLevelA);
             if (rotationPointA != null) {
                 Vector3d globalPoint = new Vector3d(localPointA).add(rotationPointA);
-                tryImpactExplosion(level(subLevelA), globalPoint, forceAmount, Math.max(mass(subLevelA), mass(subLevelB)));
+                collectExplosion(explosionCandidates, level(subLevelA), globalPoint, forceAmount, Math.max(mass(subLevelA), mass(subLevelB)));
             }
         }
+        
+        processExplosions(explosionCandidates);
     }
 
-    private static void applyTerrainImpact(Object subLevel, Vector3d localPoint, Vector3d normal, double forceAmount) {
+    private static void applyTerrainImpact(Object subLevel, Vector3d localPoint, Vector3d normal, double forceAmount, List<ExplosionCandidate> explosions) {
         if (!TrueImpactConfig.ENABLE_TERRAIN_IMPACT_DAMAGE.get()
                 || forceAmount < TrueImpactConfig.TERRAIN_IMPACT_FORCE_THRESHOLD.get()
                 || (TrueImpactConfig.ELASTIC_BLOCKS_BREAK_BLOCKS.get() == false && isElasticSubLevel(subLevel))) {
@@ -138,7 +152,7 @@ public final class ElasticPairReaction {
             damageTerrain(level, center, normal, energy);
         }
         damageEntities(level, new Vec3(globalPoint.x, globalPoint.y, globalPoint.z), energy);
-        tryImpactExplosion(level, globalPoint, forceAmount, mass(subLevel));
+        collectExplosion(explosions, level, globalPoint, forceAmount, mass(subLevel));
     }
 
     private static boolean isForgivenStepContact(Vector3d terrainPoint, Vector3d normal) {
@@ -245,33 +259,53 @@ public final class ElasticPairReaction {
         });
     }
 
-    private static void tryImpactExplosion(ServerLevel level, Vector3d point, double force, double mass) {
+    private static void collectExplosion(List<ExplosionCandidate> list, ServerLevel level, Vector3d point, double force, double mass) {
         if (!TrueImpactConfig.ENABLE_IMPACT_EXPLOSIONS.get()
                 || force < TrueImpactConfig.IMPACT_EXPLOSION_FORCE_THRESHOLD.get()
                 || mass < TrueImpactConfig.IMPACT_EXPLOSION_MASS_THRESHOLD.get()) {
             return;
         }
-
         double rawRadius = Math.sqrt(force * mass) * TrueImpactConfig.IMPACT_EXPLOSION_SCALE.get();
         float radius = (float) Math.min(TrueImpactConfig.IMPACT_EXPLOSION_MAX_RADIUS.get(), rawRadius);
-
-        if (radius < 1.0f) {
-            return;
+        if (radius >= 1.0f) {
+            list.add(new ExplosionCandidate(level, point, radius, force));
         }
-
-        boolean fire = level.getRandom().nextDouble() < TrueImpactConfig.IMPACT_EXPLOSION_FIRE_CHANCE.get();
-        level.getServer().execute(() -> {
-            level.explode(
-                    null,
-                    null,
-                    null,
-                    point.x, point.y, point.z,
-                    radius,
-                    fire,
-                    Level.ExplosionInteraction.BLOCK
-            );
-        });
     }
+
+    private static void processExplosions(List<ExplosionCandidate> candidates) {
+        if (candidates.isEmpty()) return;
+        
+        // Sort by force descending
+        candidates.sort((a, b) -> Double.compare(b.force, a.force));
+        
+        List<ExplosionCandidate> toTrigger = new ArrayList<>();
+        double coalesceRadiusSq = Math.pow(TrueImpactConfig.IMPACT_EXPLOSION_COALESCE_RADIUS.get(), 2);
+        int max = TrueImpactConfig.IMPACT_EXPLOSION_MAX_PER_BATCH.get();
+        
+        for (ExplosionCandidate cand : candidates) {
+            if (toTrigger.size() >= max) break;
+            
+            boolean suppressed = false;
+            for (ExplosionCandidate active : toTrigger) {
+                if (active.point.distanceSquared(cand.point) < coalesceRadiusSq) {
+                    suppressed = true;
+                    break;
+                }
+            }
+            if (!suppressed) {
+                toTrigger.add(cand);
+            }
+        }
+        
+        for (ExplosionCandidate e : toTrigger) {
+            boolean fire = e.level.getRandom().nextDouble() < TrueImpactConfig.IMPACT_EXPLOSION_FIRE_CHANCE.get();
+            e.level.getServer().execute(() -> {
+                e.level.explode(null, null, null, e.point.x, e.point.y, e.point.z, e.radius, fire, Level.ExplosionInteraction.BLOCK);
+            });
+        }
+    }
+
+    private record ExplosionCandidate(ServerLevel level, Vector3d point, float radius, double force) {}
 
     private record TerrainNode(BlockPos pos, double energy, double cost) {
     }

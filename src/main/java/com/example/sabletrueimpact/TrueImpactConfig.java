@@ -53,6 +53,7 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.DoubleValue PAIR_REACTION_SCALE;
     public static final ModConfigSpec.DoubleValue PAIR_REACTION_MAX_IMPULSE;
     public static final ModConfigSpec.DoubleValue PAIR_REACTION_MAX_VELOCITY_CHANGE;
+    public static final ModConfigSpec.DoubleValue PAIR_REACTION_FORCE_THRESHOLD;
     public static final ModConfigSpec.BooleanValue ENABLE_TERRAIN_IMPACT_DAMAGE;
     public static final ModConfigSpec.DoubleValue TERRAIN_IMPACT_DAMAGE_SCALE;
     public static final ModConfigSpec.DoubleValue TERRAIN_IMPACT_FORCE_THRESHOLD;
@@ -124,6 +125,8 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.DoubleValue IMPACT_EXPLOSION_SCALE;
     public static final ModConfigSpec.DoubleValue IMPACT_EXPLOSION_MAX_RADIUS;
     public static final ModConfigSpec.DoubleValue IMPACT_EXPLOSION_FIRE_CHANCE;
+    public static final ModConfigSpec.IntValue IMPACT_EXPLOSION_MAX_PER_BATCH;
+    public static final ModConfigSpec.DoubleValue IMPACT_EXPLOSION_COALESCE_RADIUS;
     public static final ModConfigSpec.BooleanValue ENABLE_MATERIAL_TOUGHNESS;
     public static final ModConfigSpec.DoubleValue DEFAULT_MATERIAL_STRENGTH_MULTIPLIER;
     public static final ModConfigSpec.DoubleValue DEFAULT_MATERIAL_TOUGHNESS_MULTIPLIER;
@@ -232,6 +235,8 @@ public final class TrueImpactConfig {
                 .defineInRange("pairReactionMaxImpulse", 250.0, 0.0, 1000000.0);
         PAIR_REACTION_MAX_VELOCITY_CHANGE = BUILDER.comment("Caps approximate velocity change from one pair reaction impulse.")
                 .defineInRange("pairReactionMaxVelocityChange", 3.0, 0.0, 1000.0);
+        PAIR_REACTION_FORCE_THRESHOLD = BUILDER.comment("Minimum collision force required to trigger a pair reaction impulse. Prevents micro-jitter and 'bumping' on light touches.")
+                .defineInRange("pairReactionForceThreshold", 50.0, 0.0, 1000000.0);
         BUILDER.pop();
 
         BUILDER.push("terrainImpact");
@@ -376,7 +381,7 @@ public final class TrueImpactConfig {
         ENABLE_IMPACT_EXPLOSIONS = BUILDER.comment("If true, massive high-energy crashes can trigger standard Minecraft explosions at the impact point.")
                 .define("enableImpactExplosions", false);
         IMPACT_EXPLOSION_FORCE_THRESHOLD = BUILDER.comment("Minimum collision force (before mass scaling) to trigger an impact explosion.")
-                .defineInRange("impactExplosionForceThreshold", 2500.0, 0.0, 1000000000.0);
+                .defineInRange("impactExplosionForceThreshold", 5000.0, 0.0, 1000000000.0);
         IMPACT_EXPLOSION_MASS_THRESHOLD = BUILDER.comment("Minimum Sable structure mass required to trigger an impact explosion.")
                 .defineInRange("impactExplosionMassThreshold", 15.0, 0.0, 1000000.0);
         IMPACT_EXPLOSION_SCALE = BUILDER.comment("Scales total impact energy (force * mass) into explosion radius.")
@@ -385,6 +390,10 @@ public final class TrueImpactConfig {
                 .defineInRange("impactExplosionMaxRadius", 12.0, 0.0, 64.0);
         IMPACT_EXPLOSION_FIRE_CHANCE = BUILDER.comment("Chance (0.0 to 1.0) that an impact explosion creates fire. 0.0 disables fire entirely.")
                 .defineInRange("impactExplosionFireChance", 0.0, 0.0, 1.0);
+        IMPACT_EXPLOSION_MAX_PER_BATCH = BUILDER.comment("Maximum number of explosions that can fire from a single collision batch. Prevents a crash from spawning dozens of simultaneous explosion sound sources and freezing physics-audio mods.")
+                .defineInRange("impactExplosionMaxPerBatch", 1, 1, 64);
+        IMPACT_EXPLOSION_COALESCE_RADIUS = BUILDER.comment("Explosions within this distance (blocks) of a stronger explosion in the same batch are suppressed. Keeps one big boom instead of many small ones.")
+                .defineInRange("impactExplosionCoalesceRadius", 16.0, 0.0, 256.0);
         BUILDER.pop();
 
         BUILDER.push("materialToughness");
