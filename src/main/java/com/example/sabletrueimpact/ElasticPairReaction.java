@@ -31,7 +31,6 @@ public final class ElasticPairReaction {
     private static final Method GET_CENTER_OF_MASS_METHOD = findMethod("dev.ryanhcode.sable.api.physics.mass.MassData", "getCenterOfMass");
     private static final Method LOGICAL_POSE_METHOD = findMethod("dev.ryanhcode.sable.sublevel.SubLevel", "logicalPose");
     private static final Method ROTATION_POINT_METHOD = findMethod("dev.ryanhcode.sable.companion.math.Pose3d", "rotationPoint");
-    private static final Method RESTITUTION_METHOD = findMethod("dev.ryanhcode.sable.sublevel.SubLevel", "restitution");
 
     private ElasticPairReaction() {}
 
@@ -41,7 +40,6 @@ public final class ElasticPairReaction {
         }
         TrueImpactPerformance.recordCollisionBatch(collisions.length / 15);
 
-        // Group collisions by SubLevel pair using UUID or runtimeId
         java.util.Map<Integer, CollisionCluster> clusters = new java.util.HashMap<>();
         List<ExplosionCandidate> explosionCandidates = new ArrayList<>();
 
@@ -144,9 +142,14 @@ public final class ElasticPairReaction {
         }
 
         private void processPairReaction(List<ExplosionCandidate> explosions) {
+            BlockPos.MutableBlockPos tmpPos = new BlockPos.MutableBlockPos();
             for (PointData p : points) {
                 if (p.slA == null || p.slB == null) continue;
-                double res = restitution(p.slA) * restitution(p.slB);
+                
+                BlockState stateA = localState(p.slA, p.local, tmpPos);
+                BlockState stateB = localState(p.slB, p.local, tmpPos);
+                double res = Math.max(PhysicsBlockPropertyHelper.getRestitution(stateA), PhysicsBlockPropertyHelper.getRestitution(stateB));
+                
                 double threshold = TrueImpactConfig.PAIR_REACTION_FORCE_THRESHOLD.get();
                 if (p.force < threshold) continue;
 
@@ -354,10 +357,6 @@ public final class ElasticPairReaction {
         try { return ((Number) RUNTIME_ID_FIELD.get(subLevel)).intValue(); } catch (Exception e) { return null; }
     }
 
-    private static double restitution(Object subLevel) {
-        try { return ((Number) RESTITUTION_METHOD.invoke(subLevel)).doubleValue(); } catch (Exception e) { return 0.0; }
-    }
-
     private static double number(Object target, String methodName) throws Exception {
         return ((Number) target.getClass().getMethod(methodName).invoke(target)).doubleValue();
     }
@@ -368,6 +367,14 @@ public final class ElasticPairReaction {
 
     private static Method findMethod(String cl, String m) {
         try { Method method = Class.forName(cl).getMethod(m); method.setAccessible(true); return method; } catch (Exception e) { throw new RuntimeException(e); }
+    }
+
+    private static BlockState localState(Object subLevel, Vector3d localPoint, BlockPos.MutableBlockPos blockPos) {
+        ServerLevel level = level(subLevel);
+        Vector3d rotationPoint = rotationPoint(subLevel);
+        if (level == null || rotationPoint == null) return Blocks.AIR.defaultBlockState();
+        blockPos.set(localPoint.x + rotationPoint.x, localPoint.y + rotationPoint.y, localPoint.z + rotationPoint.z);
+        return level.getBlockState(blockPos);
     }
 
     private record PointData(Vector3d local, Vector3d normal, double force, Object slA, Object slB) {}
