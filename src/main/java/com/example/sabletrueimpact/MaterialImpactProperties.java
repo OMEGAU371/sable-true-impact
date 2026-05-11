@@ -29,7 +29,7 @@ public final class MaterialImpactProperties {
     }
 
     public static double breakThreshold(BlockState state, double baseStrength) {
-        return baseStrength * strengthMultiplier(state) * toughnessMultiplier(state);
+        return baseStrength * strengthMultiplier(state) * toughnessMultiplier(state) * TrueImpactConfig.GLOBAL_STRENGTH_SCALE.get();
     }
 
     public static double displayStrength(BlockState state, double baseStrength) {
