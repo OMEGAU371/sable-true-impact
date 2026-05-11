@@ -334,6 +334,8 @@ public final class ElasticPairReaction {
 
     private static void applyImpulse(int sceneId, Object slA, Object slB, Vector3d localPoint, Vector3d normal, double impulseA, double impulseB) {
         if (slA == null || slB == null) return;
+        if (slA instanceof net.minecraft.world.entity.Entity eA && eA.isRemoved()) return;
+        if (slB instanceof net.minecraft.world.entity.Entity eB && eB.isRemoved()) return;
         
         if (WAKE_UP_METHOD != null) {
             try {
@@ -384,6 +386,7 @@ public final class ElasticPairReaction {
     }
 
     private static Integer runtimeId(Object subLevel) {
+        if (subLevel instanceof net.minecraft.world.entity.Entity e && e.isRemoved()) return null;
         try { return ((Number) RUNTIME_ID_FIELD.get(subLevel)).intValue(); } catch (Exception e) { return null; }
     }
 

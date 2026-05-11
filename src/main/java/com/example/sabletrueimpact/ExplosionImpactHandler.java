@@ -164,12 +164,12 @@ public final class ExplosionImpactHandler {
         try {
             Class<?> subLevelClass = Class.forName("dev.ryanhcode.sable.sublevel.SubLevel");
             List<net.minecraft.world.entity.Entity> entities = level.getEntities((net.minecraft.world.entity.Entity)null, searchArea, e -> {
-                return subLevelClass.isInstance(e);
+                return !e.isRemoved() && subLevelClass.isInstance(e);
             });
             
             for (net.minecraft.world.entity.Entity e : entities) {
-                // Avoid duplicates if the entity is already in the container
-                if (nearby.stream().noneMatch(entry -> entry.subLevel() == e)) {
+                // Avoid duplicates and ensure the entity is still valid
+                if (!e.isRemoved() && nearby.stream().noneMatch(entry -> entry.subLevel() == e)) {
                     AABB bounds = (AABB) BOUNDING_BOX.invoke(e);
                     nearby.add(new SubLevelEntry(e, bounds));
                 }
