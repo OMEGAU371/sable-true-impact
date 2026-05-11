@@ -193,24 +193,18 @@ public final class ElasticPairReaction {
         ServerLevel level = level(subLevel);
         if (level == null) return;
 
-        // CRITICAL: Calculate energy and damage terrain BEFORE triggering sub-level fracture.
-        // Once a sub-level fractures, its mass data may become invalid or significantly reduced.
+        SubLevelFracture.tryFracture(subLevel, localPoint, normal, forceAmount);
+        
         if (TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.get()) {
-            double currentMass = mass(subLevel);
-            double massFactor = Math.min(TrueImpactConfig.TERRAIN_IMPACT_MAX_EFFECTIVE_MASS.get(), 
-                                       Math.pow(Math.max(currentMass, 1.0), TrueImpactConfig.TERRAIN_IMPACT_MASS_EXPONENT.get()));
-            
+            double mass = Math.min(TrueImpactConfig.TERRAIN_IMPACT_MAX_EFFECTIVE_MASS.get(), Math.pow(Math.max(mass(subLevel), 1.0), TrueImpactConfig.TERRAIN_IMPACT_MASS_EXPONENT.get()));
             double force = scaledForce(forceAmount, TrueImpactConfig.TERRAIN_IMPACT_FORCE_THRESHOLD.get(), TrueImpactConfig.TERRAIN_IMPACT_FORCE_EXPONENT.get());
-            double energy = force * massFactor * TrueImpactConfig.TERRAIN_IMPACT_DAMAGE_SCALE.get() * TrueImpactConfig.DAMAGE_SCALE.get();
+            double energy = force * mass * TrueImpactConfig.TERRAIN_IMPACT_DAMAGE_SCALE.get() * TrueImpactConfig.DAMAGE_SCALE.get();
             
             BlockPos center = BlockPos.containing(globalPoint.x, globalPoint.y, globalPoint.z);
             damageTerrain(level, center, normal, energy);
             damageEntities(level, new Vec3(globalPoint.x, globalPoint.y, globalPoint.z), energy);
-            collectExplosion(explosions, level, globalPoint, forceAmount, currentMass);
+            collectExplosion(explosions, level, globalPoint, forceAmount, mass(subLevel));
         }
-
-        // Now safe to fracture the structure itself
-        SubLevelFracture.tryFracture(subLevel, localPoint, normal, forceAmount);
     }
 
     private static boolean isForgivenStepContact(Vector3d terrainPoint, Vector3d normal) {
@@ -319,30 +313,16 @@ public final class ElasticPairReaction {
         if (level == null) return false;
         try {
             Method getPlot = subLevel.getClass().getMethod("getPlot");
-            getPlot.setAccessible(true);
             Object plot = getPlot.invoke(subLevel);
-            
-            Method getBox = plot.getClass().getMethod("getBoundingBox");
-            getBox.setAccessible(true);
-            Object box = getBox.invoke(plot);
-            
+            Object box = plot.getClass().getMethod("getBoundingBox").invoke(plot);
             int minX = (int) number(box, "minX"); int minY = (int) number(box, "minY"); int minZ = (int) number(box, "minZ");
             int maxX = (int) number(box, "maxX"); int maxY = (int) number(box, "maxY"); int maxZ = (int) number(box, "maxZ");
-            
             BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
             int limit = TrueImpactConfig.ELASTIC_SUBLEVEL_SCAN_LIMIT.get();
-            
-            for (int x = minX; x <= maxX; x++) {
-                for (int y = minY; y <= maxY; y++) {
-                    for (int z = minZ; z <= maxZ; z++) {
-                        if (limit-- <= 0) return false;
-                        BlockState state = level.getBlockState(pos.set(x, y, z));
-                        if (PhysicsBlockPropertyHelper.getRestitution(state) >= TrueImpactConfig.BOUNCE_RESPONSE_THRESHOLD.get()) {
-                            return true;
-                        }
-                    }
-                }
-            }
+            for (int x = minX; x <= maxX && limit-- > 0; x++)
+                for (int y = minY; y <= maxY && limit-- > 0; y++)
+                    for (int z = minZ; z <= maxZ && limit-- > 0; z++)
+                        if (PhysicsBlockPropertyHelper.getRestitution(level.getBlockState(pos.set(x, y, z))) >= TrueImpactConfig.BOUNCE_RESPONSE_THRESHOLD.get()) return true;
         } catch (Exception ignored) {}
         return false;
     }
@@ -413,8 +393,8 @@ public final class ElasticPairReaction {
         try { Field field = Class.forName(cl).getDeclaredField(f); field.setAccessible(true); return field; } catch (Exception e) { return null; }
     }
 
-    private static Method findMethod(String cl, String m, Class<?>... params) {
-        try { Method method = Class.forName(cl).getMethod(m, params); method.setAccessible(true); return method; } catch (Exception e) { return null; }
+    private static Method findMethod(String cl, String m) {
+        try { Method method = Class.forName(cl).getMethod(m); method.setAccessible(true); return method; } catch (Exception e) { return null; }
     }
 
     private static BlockState localState(Object subLevel, Vector3d localPoint, BlockPos.MutableBlockPos blockPos) {
