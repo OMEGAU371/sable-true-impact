@@ -55,7 +55,7 @@ public final class ExplosionImpactHandler {
             
             TrueImpactConfig.QualityMode qm = TrueImpactConfig.PERFORMANCE_QUALITY_MODE.get();
             double searchRadius = radius * TrueImpactConfig.EXPLOSION_IMPACT_RADIUS_MULTIPLIER.get();
-            List<SubLevelEntry> nearby = nearbySubLevels(container, center, searchRadius);
+            List<SubLevelEntry> nearby = nearbySubLevels(container, level, center, searchRadius);
             if (nearby.isEmpty()) return;
 
             WaveScan scan = scanShockwave(level, center, radius, searchRadius, nearby, qm.raySamples);
@@ -147,16 +147,34 @@ public final class ExplosionImpactHandler {
         return a.pressure() >= b.pressure() ? a : b;
     }
 
-    private static List<SubLevelEntry> nearbySubLevels(Object container, Vec3 center, double searchRadius) throws Exception {
+    private static List<SubLevelEntry> nearbySubLevels(Object container, ServerLevel level, Vec3 center, double searchRadius) throws Exception {
         List<SubLevelEntry> nearby = new ArrayList<>();
-        Iterable<?> all = (Iterable<?>) GET_ALL_SUBLEVELS.invoke(container);
         AABB searchArea = new AABB(center, center).inflate(searchRadius);
+
+        // 1. Scan central Sable container
+        Iterable<?> all = (Iterable<?>) GET_ALL_SUBLEVELS.invoke(container);
         for (Object sl : all) {
             AABB bounds = (AABB) BOUNDING_BOX.invoke(sl);
             if (bounds.intersects(searchArea)) {
                 nearby.add(new SubLevelEntry(sl, bounds));
             }
         }
+
+        // 2. Scan World Entities (Crucial for Blueprints and newly placed structures)
+        // Some blueprint systems (Aeronautics/Sable Blueprints) might hold SubLevels as entities before registration
+        Class<?> subLevelClass = Class.forName("dev.ryanhcode.sable.sublevel.SubLevel");
+        List<net.minecraft.world.entity.Entity> entities = level.getEntities((net.minecraft.world.entity.Entity)null, searchArea, e -> {
+            return subLevelClass.isInstance(e);
+        });
+        
+        for (net.minecraft.world.entity.Entity e : entities) {
+            // Avoid duplicates if the entity is already in the container
+            if (nearby.stream().noneMatch(entry -> entry.subLevel() == e)) {
+                AABB bounds = (AABB) BOUNDING_BOX.invoke(e);
+                nearby.add(new SubLevelEntry(e, bounds));
+            }
+        }
+
         return nearby;
     }
 
