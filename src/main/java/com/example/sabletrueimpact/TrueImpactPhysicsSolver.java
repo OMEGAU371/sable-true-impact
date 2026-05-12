@@ -127,8 +127,8 @@ public class TrueImpactPhysicsSolver {
                 angleMultiplier = Math.max(0.1, dot); // 10% damage for pure scrapes
             }
 
-            double restitution = clamp01(PhysicsBlockPropertyHelper.getRestitution(state));
-            double friction = Math.max(0.0, PhysicsBlockPropertyHelper.getFriction(state));
+            double restitution = clamp01(MaterialImpactProperties.getRestitution(state, PhysicsBlockPropertyHelper.getRestitution(state)));
+            double friction = Math.max(0.0, MaterialImpactProperties.getFriction(state, PhysicsBlockPropertyHelper.getFriction(state)));
             boolean fragile = state.is(SABLE_FRAGILE);
 
             // Distributed kinetic energy. Sable's restitution/friction are treated as material response:
@@ -173,7 +173,9 @@ public class TrueImpactPhysicsSolver {
             }
 
             boolean canBreakWorldBlocks = TrueImpactConfig.ENABLE_BLOCK_BREAKING.get()
-                    && TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.get();
+                    && TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.get()
+                    && TrueImpactConfig.ENABLE_WORLD_DESTRUCTION.get()
+                    && MaterialImpactProperties.isDestructible(state, true);
 
             if (canBreakWorldBlocks
                     && impactVelocity >= elasticPropagationVelocity

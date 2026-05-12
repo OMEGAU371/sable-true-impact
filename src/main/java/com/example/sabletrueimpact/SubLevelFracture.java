@@ -45,6 +45,7 @@ public final class SubLevelFracture {
     public static void tryFracture(Object subLevel, Vector3d localPoint, Vector3d normal, double forceAmount) {
         if (!TrueImpactConfig.ENABLE_TRUE_IMPACT.get()
                 || !TrueImpactConfig.ENABLE_SUBLEVEL_FRACTURE.get()
+                || !TrueImpactConfig.ENABLE_PHYSICAL_DESTRUCTION.get()
                 || subLevel == null
                 || forceAmount < TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_THRESHOLD.get()
                 || TrueImpactConfig.SUBLEVEL_FRACTURE_MAX_BLOCKS.get() <= 0) {
@@ -190,7 +191,8 @@ public final class SubLevelFracture {
                 break;
             }
             BlockState current = level.getBlockState(candidate.pos());
-            if (current.isAir() || current.is(Blocks.BEDROCK) || current.getDestroySpeed(level, candidate.pos()) < 0.0f) {
+            if (current.isAir() || current.is(Blocks.BEDROCK) || current.getDestroySpeed(level, candidate.pos()) < 0.0f
+                    || !MaterialImpactProperties.isDestructible(current, true)) {
                 continue;
             }
             boolean brokeFromFatigue = BlockDamageAccumulator.apply(

@@ -139,8 +139,13 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.DoubleValue CUMULATIVE_BLOCK_DAMAGE_SCALE;
     public static final ModConfigSpec.IntValue CUMULATIVE_BLOCK_DAMAGE_DECAY_TICKS;
     public static final ModConfigSpec.IntValue CUMULATIVE_BLOCK_DAMAGE_MAX_ENTRIES;
-    public static final ModConfigSpec.BooleanValue ENABLE_PERFORMANCE_LOGGING;
     public static final ModConfigSpec.IntValue PERFORMANCE_LOG_INTERVAL_TICKS;
+    public static final ModConfigSpec.BooleanValue ENABLE_PERFORMANCE_LOGGING;
+    
+    public static final ModConfigSpec.ConfigValue<java.util.List<? extends String>> CUSTOM_BLOCK_PROPERTIES;
+    public static final ModConfigSpec.BooleanValue ENABLE_PHYSICAL_DESTRUCTION;
+    public static final ModConfigSpec.BooleanValue ENABLE_WORLD_DESTRUCTION;
+    public static final ModConfigSpec.ConfigValue<java.util.List<? extends String>> DESTRUCTIBLE_OVERRIDES;
 
     public static final ModConfigSpec SPEC;
 
@@ -433,6 +438,17 @@ public final class TrueImpactConfig {
                 .define("enablePerformanceLogging", false);
         PERFORMANCE_LOG_INTERVAL_TICKS = BUILDER.comment("How often performance counters are logged when enablePerformanceLogging is true.")
                 .defineInRange("performanceLogIntervalTicks", 200, 20, 72000);
+        BUILDER.pop();
+
+        BUILDER.push("customization");
+        CUSTOM_BLOCK_PROPERTIES = BUILDER.comment("List of custom block physical properties overrides. Format: 'modid:blockid,strength,toughness,friction,elasticity,mass,destructible'. Example: 'minecraft:obsidian,6.0,8.0,0.5,0.2,50.0,true'")
+                .defineListAllowEmpty(java.util.List.of("customBlockProperties"), java.util.ArrayList::new, o -> o instanceof String);
+        ENABLE_PHYSICAL_DESTRUCTION = BUILDER.comment("Global toggle for internal physical structure destruction (SubLevel Fracture).")
+                .define("enablePhysicalDestruction", true);
+        ENABLE_WORLD_DESTRUCTION = BUILDER.comment("Global toggle for world block destruction (Terrain/Blocks hit by physical structures).")
+                .define("enableWorldDestruction", true);
+        DESTRUCTIBLE_OVERRIDES = BUILDER.comment("Explicit list of block IDs or tags to mark as destructible (true) or indestructible (false). Format: 'modid:blockid,true' or 'tag:modid:tagname,false'. Overrides other settings.")
+                .defineListAllowEmpty(java.util.List.of("destructibleOverrides"), java.util.ArrayList::new, o -> o instanceof String);
         BUILDER.pop();
 
         SPEC = BUILDER.build();

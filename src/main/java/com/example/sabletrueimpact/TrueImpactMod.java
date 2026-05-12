@@ -5,6 +5,7 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
+import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.common.NeoForge;
 
@@ -14,6 +15,10 @@ public class TrueImpactMod {
 
     public TrueImpactMod(IEventBus modEventBus, ModContainer modContainer) {
         modContainer.registerConfig(ModConfig.Type.SERVER, TrueImpactConfig.SPEC);
+
+        modEventBus.addListener(this::onConfigLoad);
+        modEventBus.addListener(this::onConfigReload);
+
         NeoForge.EVENT_BUS.register(ExplosionImpactHandler.class);
         NeoForge.EVENT_BUS.register(EntityImpactHandler.class);
         NeoForge.EVENT_BUS.register(SubLevelFracture.class);
@@ -21,5 +26,13 @@ public class TrueImpactMod {
         if (FMLEnvironment.dist == Dist.CLIENT) {
             NeoForge.EVENT_BUS.register(GogglesBlockTooltipHandler.class);
         }
+    }
+
+    private void onConfigLoad(ModConfigEvent.Loading event) {
+        MaterialImpactProperties.reload();
+    }
+
+    private void onConfigReload(ModConfigEvent.Reloading event) {
+        MaterialImpactProperties.reload();
     }
 }
