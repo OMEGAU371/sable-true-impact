@@ -7,6 +7,13 @@ public final class TrueImpactConfig {
 
     public static final ModConfigSpec.BooleanValue ENABLE_TRUE_IMPACT;
     public static final ModConfigSpec.DoubleValue GLOBAL_STRENGTH_SCALE;
+    public static final ModConfigSpec.DoubleValue GLOBAL_BLOCK_STRENGTH_SCALE;
+    public static final ModConfigSpec.DoubleValue GLOBAL_BLOCK_TOUGHNESS_SCALE;
+    public static final ModConfigSpec.DoubleValue GLOBAL_BRITTLENESS_SCALE;
+    public static final ModConfigSpec.DoubleValue GLOBAL_FRICTION_SCALE;
+    public static final ModConfigSpec.DoubleValue GLOBAL_RESTITUTION_SCALE;
+    public static final ModConfigSpec.DoubleValue GLOBAL_MASS_SCALE;
+
     public static final ModConfigSpec.BooleanValue ENABLE_SOIL_COMPACTION;
     public static final ModConfigSpec.DoubleValue SOIL_COMPACTION_MIN_VELOCITY;
     public static final ModConfigSpec.DoubleValue SOIL_COMPACTION_MAX_VELOCITY;
@@ -127,9 +134,6 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.IntValue IMPACT_EXPLOSION_MAX_PER_BATCH;
     public static final ModConfigSpec.DoubleValue IMPACT_EXPLOSION_COALESCE_RADIUS;
     public static final ModConfigSpec.BooleanValue ENABLE_MATERIAL_TOUGHNESS;
-    public static final ModConfigSpec.DoubleValue DEFAULT_MATERIAL_STRENGTH_MULTIPLIER;
-    public static final ModConfigSpec.DoubleValue DEFAULT_MATERIAL_TOUGHNESS_MULTIPLIER;
-    public static final ModConfigSpec.DoubleValue DEFAULT_MATERIAL_BRITTLENESS;
     public static final ModConfigSpec.DoubleValue BLAST_TOUGHNESS_FACTOR;
     public static final ModConfigSpec.DoubleValue BLAST_BRITTLENESS_DECAY;
     public static final ModConfigSpec.BooleanValue ENABLE_GOGGLES_BLOCK_TOOLTIP;
@@ -148,10 +152,30 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec SPEC;
 
     static {
-        ENABLE_TRUE_IMPACT = BUILDER.comment("Master switch for all Sable True Impact behavior. If false, the mod keeps loading but adds no impact damage, cracks, fracture, entity damage, or reaction effects.")
+        BUILDER.push("general");
+        ENABLE_TRUE_IMPACT = BUILDER.comment("Master switch for all Sable True Impact behavior.")
                 .define("enableTrueImpact", true);
-        GLOBAL_STRENGTH_SCALE = BUILDER.comment("One-knob global strength multiplier. Set to 0.5 for a gentler experience, 2.0 for more destructive impacts. Multiplies all impact damage and fracture power uniformly.")
+        GLOBAL_STRENGTH_SCALE = BUILDER.comment("Global multiplier for impact damage and fracture power.")
                 .defineInRange("globalStrengthScale", 1.0, 0.0, 1000.0);
+        GLOBAL_BLOCK_STRENGTH_SCALE = BUILDER.comment("Global multiplier for block strength (how much force is needed to start damage).")
+                .defineInRange("globalBlockStrengthScale", 1.0, 0.0, 1000000.0);
+        GLOBAL_BLOCK_TOUGHNESS_SCALE = BUILDER.comment("Global multiplier for block toughness (how much energy is absorbed before breaking).")
+                .defineInRange("globalBlockToughnessScale", 1.0, 0.0, 1000000.0);
+        GLOBAL_BRITTLENESS_SCALE = BUILDER.comment("Global multiplier for block brittleness (how easily cracks spread).")
+                .defineInRange("globalBrittlenessScale", 1.0, 0.0, 100.0);
+        GLOBAL_FRICTION_SCALE = BUILDER.comment("Global multiplier for all block friction values.")
+                .defineInRange("globalFrictionScale", 1.0, 0.0, 10.0);
+        GLOBAL_RESTITUTION_SCALE = BUILDER.comment("Global multiplier for all block restitution (bounciness) values.")
+                .defineInRange("globalRestitutionScale", 1.0, 0.0, 2.0);
+        GLOBAL_MASS_SCALE = BUILDER.comment("Global multiplier for all block mass values.")
+                .defineInRange("globalMassScale", 1.0, 0.0, 100.0);
+        
+        HARDNESS_STRENGTH_FACTOR = BUILDER.comment("Strength added per 1.0 of vanilla block hardness. Hardness mainly resists the start of damage (Yield Point).")
+                .defineInRange("hardnessStrengthFactor", 2.0, 0.0, 1000.0);
+        BLAST_TOUGHNESS_FACTOR = BUILDER.comment("How much a block's vanilla explosion resistance contributes to its physical toughness (impact absorption).")
+                .defineInRange("blastToughnessFactor", 0.5, 0.0, 1000.0);
+        BUILDER.pop();
+
         ENABLE_SOIL_COMPACTION = BUILDER.comment("If true, light impacts on grass/podzol/mycelium compress the soil into dirt instead of breaking or ignoring the block. Heavy impacts still break the block normally.")
                 .define("enableSoilCompaction", true);
         SOIL_COMPACTION_MIN_VELOCITY = BUILDER.comment("Minimum impact velocity to trigger soil compaction (grass → dirt). Below this, impacts are too gentle to do anything.")
@@ -206,7 +230,6 @@ public final class TrueImpactConfig {
                 .defineInRange("maxEffectiveMass", 100.0, 1.0, 100000.0);
         SOFT_BLOCK_STRENGTH_MULTIPLIER = BUILDER.comment("Extra strength multiplier for soft blocks like dirt/grass. 1.0 keeps soil softer than wood and stone.")
                 .defineInRange("softBlockStrengthMultiplier", 1.0, 1.0, 1000.0);
-        HARDNESS_STRENGTH_FACTOR = BUILDER.defineInRange("hardnessStrengthFactor", 20.0, 0.0, 1000.0);
         BASE_STRENGTH = BUILDER.comment("Flat base strength. Keep this low enough that material hardness still matters.")
                 .defineInRange("baseStrength", 12.0, 0.0, 1000.0);
         CRACK_YIELD_THRESHOLD = BUILDER.defineInRange("crackYieldThreshold", 1.15, 0.0, 1000.0);
@@ -401,14 +424,6 @@ public final class TrueImpactConfig {
         BUILDER.push("materialToughness");
         ENABLE_MATERIAL_TOUGHNESS = BUILDER.comment("If true, selected materials receive separate strength, toughness, and brittleness multipliers.")
                 .define("enableMaterialToughness", true);
-        DEFAULT_MATERIAL_STRENGTH_MULTIPLIER = BUILDER.comment("Default material strength multiplier for blocks without an override.")
-                .defineInRange("defaultMaterialStrengthMultiplier", 1.0, 0.0, 1000000.0);
-        DEFAULT_MATERIAL_TOUGHNESS_MULTIPLIER = BUILDER.comment("Default material toughness multiplier for blocks without an override.")
-                .defineInRange("defaultMaterialToughnessMultiplier", 1.0, 0.0, 1000000.0);
-        DEFAULT_MATERIAL_BRITTLENESS = BUILDER.comment("Default brittleness multiplier. Lower means impact over-stress accumulates damage more slowly.")
-                .defineInRange("defaultMaterialBrittleness", 1.0, 0.0, 1000000.0);
-        BLAST_TOUGHNESS_FACTOR = BUILDER.comment("How much a block's vanilla explosion resistance contributes to its physical toughness (impact absorption).")
-                .defineInRange("blastToughnessFactor", 0.5, 0.0, 1000.0);
         BLAST_BRITTLENESS_DECAY = BUILDER.comment("Scale for how much explosion resistance reduces a material's brittleness. High blast resistance makes materials more 'ductile'.")
                 .defineInRange("blastBrittlenessDecay", 0.01, 0.0, 1.0);
         BUILDER.pop();

@@ -90,17 +90,20 @@ public final class MaterialImpactProperties {
 
     public static double getFriction(BlockState state, double original) {
         Properties props = CUSTOM_OVERRIDES.get(state.getBlock());
-        return props != null ? props.friction() : original;
+        double base = props != null ? props.friction() : original;
+        return base * TrueImpactConfig.GLOBAL_FRICTION_SCALE.get();
     }
 
     public static double getRestitution(BlockState state, double original) {
         Properties props = CUSTOM_OVERRIDES.get(state.getBlock());
-        return props != null ? props.elasticity() : original;
+        double base = props != null ? props.elasticity() : original;
+        return base * TrueImpactConfig.GLOBAL_RESTITUTION_SCALE.get();
     }
 
     public static double getMass(BlockState state, double original) {
         Properties props = CUSTOM_OVERRIDES.get(state.getBlock());
-        return props != null ? props.mass() : original;
+        double base = props != null ? props.mass() : original;
+        return base * TrueImpactConfig.GLOBAL_MASS_SCALE.get();
     }
 
     public static boolean isDestructible(BlockState state, boolean original) {
@@ -137,16 +140,14 @@ public final class MaterialImpactProperties {
 
         // Universal Scaling Algorithm:
         // 1. Strength Multiplier: Base multiplier from config.
-        double strengthMult = TrueImpactConfig.DEFAULT_MATERIAL_STRENGTH_MULTIPLIER.get();
+        double strengthMult = TrueImpactConfig.GLOBAL_BLOCK_STRENGTH_SCALE.get();
 
         // 2. Toughness Multiplier: Scales with Blast Resistance.
-        // High blast resistance (Netherite, Obsidian) significantly increases the energy needed to break the block.
-        double toughnessMult = TrueImpactConfig.DEFAULT_MATERIAL_TOUGHNESS_MULTIPLIER.get()
+        double toughnessMult = TrueImpactConfig.GLOBAL_BLOCK_TOUGHNESS_SCALE.get()
                 * (1.0 + blast * TrueImpactConfig.BLAST_TOUGHNESS_FACTOR.get());
 
         // 3. Brittleness: Inversely proportional to Blast Resistance.
-        // High blast resistance materials are more 'ductile' and resist chain-fracture.
-        double brittleness = TrueImpactConfig.DEFAULT_MATERIAL_BRITTLENESS.get()
+        double brittleness = TrueImpactConfig.GLOBAL_BRITTLENESS_SCALE.get()
                 / (1.0 + blast * TrueImpactConfig.BLAST_BRITTLENESS_DECAY.get());
 
         return new Properties(
