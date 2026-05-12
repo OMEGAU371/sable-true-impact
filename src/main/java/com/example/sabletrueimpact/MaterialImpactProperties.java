@@ -2,6 +2,8 @@ package com.example.sabletrueimpact;
 
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -104,6 +106,13 @@ public final class MaterialImpactProperties {
         Properties props = CUSTOM_OVERRIDES.get(state.getBlock());
         double base = props != null ? props.mass() : original;
         return base * TrueImpactConfig.GLOBAL_MASS_SCALE.get();
+    }
+
+    public static double getDefenseValue(BlockState state, Level level, BlockPos pos) {
+        float hardness = Math.max(0.05f, state.getDestroySpeed(level, pos));
+        double baseStrength = TrueImpactConfig.BASE_STRENGTH.get()
+                + hardness * TrueImpactConfig.HARDNESS_STRENGTH_FACTOR.get();
+        return breakThreshold(state, baseStrength);
     }
 
     public static boolean isDestructible(BlockState state, boolean original) {

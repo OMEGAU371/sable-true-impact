@@ -153,6 +153,15 @@ public final class ElasticPairReaction {
                 double threshold = TrueImpactConfig.PAIR_REACTION_FORCE_THRESHOLD.get();
                 if (p.force < threshold) continue;
 
+                // Ship-vs-Ship Dominance: Compare defensive values
+                double defenseA = MaterialImpactProperties.getDefenseValue(stateA, level(p.slA), BlockPos.ZERO);
+                double defenseB = MaterialImpactProperties.getDefenseValue(stateB, level(p.slB), BlockPos.ZERO);
+                double ratioAB = defenseA / Math.max(0.01, defenseB);
+                
+                // Buff harder ship, punish softer ship
+                double bufferA = 1.0 / Math.max(1.0, Math.pow(ratioAB, 0.5));
+                double bufferB = 1.0 / Math.max(1.0, Math.pow(1.0 / ratioAB, 0.5));
+
                 double massA = Math.max(mass(p.slA), 1.0);
                 double massB = Math.max(mass(p.slB), 1.0);
                 double reducedMass = (massA * massB) / (massA + massB);
@@ -162,13 +171,17 @@ public final class ElasticPairReaction {
                 impulse = Math.min(impulse, reducedMass * TrueImpactConfig.PAIR_REACTION_MAX_VELOCITY_CHANGE.get());
 
                 if (impulse > 1.0E-6) {
-                    applyImpulse(sceneId, p.slA, p.local, p.normal, impulse / massA);
-                    applyImpulse(sceneId, p.slB, p.local, p.normal, -impulse / massB);
+                    applyImpulse(sceneId, p.slA, p.local, p.normal, (impulse * bufferA) / massA);
+                    applyImpulse(sceneId, p.slB, p.local, p.normal, (-impulse * bufferB) / massB);
                     
                     Vector3d rot = rotationPoint(p.slA);
                     if (rot != null) {
                         collectExplosion(explosions, level(p.slA), new Vector3d(p.local).add(rot), p.force, Math.max(massA, massB));
                     }
+                    
+                    // Internal damage to both ships with dominance buffer
+                    SubLevelFracture.tryFracture(p.slA, p.local, p.normal, p.force * bufferA);
+                    SubLevelFracture.tryFracture(p.slB, p.local, p.normal.mul(-1, -1, -1), p.force * bufferB);
                 }
             }
         }
@@ -195,14 +208,14 @@ public final class ElasticPairReaction {
         BlockPos terrainPos = BlockPos.containing(globalPoint.x, globalPoint.y, globalPoint.z);
         BlockState terrainBlock = level.getBlockState(terrainPos);
 
-        float shipHardness = Math.max(0.1f, shipBlock.getDestroySpeed(level, BlockPos.ZERO));
-        float terrainHardness = Math.max(0.05f, terrainBlock.getDestroySpeed(level, terrainPos));
-        double hardnessRatio = shipHardness / terrainHardness;
+        // Standardized Defense Dominance
+        double shipDefense = MaterialImpactProperties.getDefenseValue(shipBlock, level, BlockPos.ZERO);
+        double terrainDefense = MaterialImpactProperties.getDefenseValue(terrainBlock, level, terrainPos);
+        double defenseRatio = shipDefense / Math.max(0.01, terrainDefense);
         
-        // Dominance: If ship is much harder, it "bullies" the terrain.
-        // We reduce the force applied to the ship's internal structure and increase the energy for terrain destruction.
-        double forceBuffer = 1.0 / Math.max(1.0, Math.pow(hardnessRatio, 0.75));
-        double energyBoost = Math.max(1.0, Math.min(10.0, hardnessRatio * 0.5));
+        // Dominance: If ship defense is much higher, it "bullies" the terrain.
+        double forceBuffer = 1.0 / Math.max(1.0, Math.pow(defenseRatio, 0.75));
+        double energyBoost = Math.max(1.0, Math.min(20.0, defenseRatio * 0.25));
 
         SubLevelFracture.tryFracture(subLevel, localPoint, normal, forceAmount * forceBuffer);
         
