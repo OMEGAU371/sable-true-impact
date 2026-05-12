@@ -159,8 +159,25 @@ public final class ElasticPairReaction {
                 double ratioAB = defenseA / Math.max(0.01, defenseB);
                 
                 // Buff harder ship, punish softer ship
-                double bufferA = 1.0 / Math.max(1.0, Math.pow(ratioAB, 0.5));
-                double bufferB = 1.0 / Math.max(1.0, Math.pow(1.0 / ratioAB, 0.5));
+                double bufferA = 1.0;
+                double bufferB = 1.0;
+                
+                if (ratioAB > 20.0) {
+                    bufferA = 0.0;
+                    bufferB = 1.0;
+                } else if (ratioAB < 0.05) {
+                    bufferA = 1.0;
+                    bufferB = 0.0;
+                } else {
+                    bufferA = 1.0 / Math.max(1.0, Math.pow(ratioAB, 0.8));
+                    bufferB = 1.0 / Math.max(1.0, Math.pow(1.0 / ratioAB, 0.8));
+                }
+
+                // Force Compression
+                double compressedForce = p.force;
+                if (p.force > 1000.0) {
+                    compressedForce = 1000.0 + Math.log10(p.force / 1000.0) * 500.0;
+                }
 
                 double massA = Math.max(mass(p.slA), 1.0);
                 double massB = Math.max(mass(p.slB), 1.0);
@@ -179,9 +196,9 @@ public final class ElasticPairReaction {
                         collectExplosion(explosions, level(p.slA), new Vector3d(p.local).add(rot), p.force, Math.max(massA, massB));
                     }
                     
-                    // Internal damage to both ships with dominance buffer
-                    SubLevelFracture.tryFracture(p.slA, p.local, p.normal, p.force * bufferA);
-                    SubLevelFracture.tryFracture(p.slB, p.local, p.normal.mul(-1, -1, -1), p.force * bufferB);
+                    // Internal damage with compressed force and immunity
+                    SubLevelFracture.tryFracture(p.slA, p.local, p.normal, compressedForce * bufferA);
+                    SubLevelFracture.tryFracture(p.slB, p.local, p.normal.mul(-1, -1, -1), compressedForce * bufferB);
                 }
             }
         }
@@ -213,15 +230,30 @@ public final class ElasticPairReaction {
         double terrainDefense = MaterialImpactProperties.getDefenseValue(terrainBlock, level, terrainPos);
         double defenseRatio = shipDefense / Math.max(0.01, terrainDefense);
         
-        // Dominance: If ship defense is much higher, it "bullies" the terrain.
-        double forceBuffer = 1.0 / Math.max(1.0, Math.pow(defenseRatio, 0.75));
-        double energyBoost = Math.max(1.0, Math.min(20.0, defenseRatio * 0.25));
+        // 1. Class Immunity: If ship is exponentially tougher than terrain, it takes ZERO damage.
+        // This is the "Tank vs Cookie" logic.
+        double forceBuffer = 1.0;
+        if (defenseRatio > 20.0) {
+            forceBuffer = 0.0;
+        } else {
+            forceBuffer = 1.0 / Math.max(1.0, Math.pow(defenseRatio, 1.2));
+        }
 
-        SubLevelFracture.tryFracture(subLevel, localPoint, normal, forceAmount * forceBuffer);
+        // 2. Force Compression: Logarithmic scaling for extreme impulses.
+        // This prevents numeric explosion from destroying ships instantly.
+        double compressedForce = forceAmount;
+        if (forceAmount > 1000.0) {
+            compressedForce = 1000.0 + Math.log10(forceAmount / 1000.0) * 500.0;
+        }
+
+        SubLevelFracture.tryFracture(subLevel, localPoint, normal, compressedForce * forceBuffer);
         
         if (TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.get()) {
             double mass = Math.min(TrueImpactConfig.TERRAIN_IMPACT_MAX_EFFECTIVE_MASS.get(), Math.pow(Math.max(mass(subLevel), 1.0), TrueImpactConfig.TERRAIN_IMPACT_MASS_EXPONENT.get()));
             double force = scaledForce(forceAmount, TrueImpactConfig.TERRAIN_IMPACT_FORCE_THRESHOLD.get(), TrueImpactConfig.TERRAIN_IMPACT_FORCE_EXPONENT.get());
+            
+            // Energy Boost: If ship is harder, terrain destruction is even more violent.
+            double energyBoost = Math.max(1.0, Math.min(50.0, defenseRatio * 0.5));
             double energy = force * mass * TrueImpactConfig.TERRAIN_IMPACT_DAMAGE_SCALE.get() * TrueImpactConfig.DAMAGE_SCALE.get() * energyBoost;
             
             damageTerrain(level, terrainPos, normal, energy);

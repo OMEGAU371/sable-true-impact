@@ -88,6 +88,9 @@ public final class StructuralStrengthAnalyzer {
             weakPlaneSpread = Math.max(weakPlaneSpread, continuity * seam);
         }
 
+        double materialQuality = state.getBlock().getExplosionResistance();
+        double qualityFactor = 1.0 + Math.log10(materialQuality + 1.0) * 2.0;
+
         connectionStrength += faceConnections * 0.22;
         connectionStrength += sameFaceConnections * 0.18;
         connectionStrength += adhesiveNeighbors * TrueImpactConfig.SUBLEVEL_FRACTURE_STICKY_RESISTANCE.get();
@@ -95,12 +98,19 @@ public final class StructuralStrengthAnalyzer {
         connectionStrength += diagonalInterlock(lookup, pos, state) * TrueImpactConfig.SUBLEVEL_FRACTURE_INTERLOCK_STRENGTH.get();
         connectionStrength += crossBracing(lookup, pos, state, strongestWeakDirection) * 0.75;
 
+        // Scale connection strength by material quality
+        connectionStrength *= qualityFactor;
+
         if (mixedFaceSeams == 0 && sameFaceConnections > 0) {
             seamWeakness *= 0.6;
         }
         if (isBeamLike(state)) {
             seamWeakness *= 0.45;
         }
+        
+        // Seams between harder materials are tougher
+        seamWeakness /= qualityFactor;
+
         return new Result(seamWeakness, Math.max(1.0, connectionStrength), weakPlaneSpread);
     }
 
