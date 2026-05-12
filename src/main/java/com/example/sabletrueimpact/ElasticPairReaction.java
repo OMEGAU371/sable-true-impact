@@ -190,15 +190,28 @@ public final class ElasticPairReaction {
         ServerLevel level = level(subLevel);
         if (level == null) return;
 
-        SubLevelFracture.tryFracture(subLevel, localPoint, normal, forceAmount);
+        BlockPos.MutableBlockPos tmpPos = new BlockPos.MutableBlockPos();
+        BlockState shipBlock = localState(subLevel, localPoint, tmpPos);
+        BlockPos terrainPos = BlockPos.containing(globalPoint.x, globalPoint.y, globalPoint.z);
+        BlockState terrainBlock = level.getBlockState(terrainPos);
+
+        float shipHardness = Math.max(0.1f, shipBlock.getDestroySpeed(level, BlockPos.ZERO));
+        float terrainHardness = Math.max(0.05f, terrainBlock.getDestroySpeed(level, terrainPos));
+        double hardnessRatio = shipHardness / terrainHardness;
+        
+        // Dominance: If ship is much harder, it "bullies" the terrain.
+        // We reduce the force applied to the ship's internal structure and increase the energy for terrain destruction.
+        double forceBuffer = 1.0 / Math.max(1.0, Math.pow(hardnessRatio, 0.75));
+        double energyBoost = Math.max(1.0, Math.min(10.0, hardnessRatio * 0.5));
+
+        SubLevelFracture.tryFracture(subLevel, localPoint, normal, forceAmount * forceBuffer);
         
         if (TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.get()) {
             double mass = Math.min(TrueImpactConfig.TERRAIN_IMPACT_MAX_EFFECTIVE_MASS.get(), Math.pow(Math.max(mass(subLevel), 1.0), TrueImpactConfig.TERRAIN_IMPACT_MASS_EXPONENT.get()));
             double force = scaledForce(forceAmount, TrueImpactConfig.TERRAIN_IMPACT_FORCE_THRESHOLD.get(), TrueImpactConfig.TERRAIN_IMPACT_FORCE_EXPONENT.get());
-            double energy = force * mass * TrueImpactConfig.TERRAIN_IMPACT_DAMAGE_SCALE.get() * TrueImpactConfig.DAMAGE_SCALE.get();
+            double energy = force * mass * TrueImpactConfig.TERRAIN_IMPACT_DAMAGE_SCALE.get() * TrueImpactConfig.DAMAGE_SCALE.get() * energyBoost;
             
-            BlockPos center = BlockPos.containing(globalPoint.x, globalPoint.y, globalPoint.z);
-            damageTerrain(level, center, normal, energy);
+            damageTerrain(level, terrainPos, normal, energy);
             damageEntities(level, new Vec3(globalPoint.x, globalPoint.y, globalPoint.z), energy);
             collectExplosion(explosions, level, globalPoint, forceAmount, mass(subLevel));
         }

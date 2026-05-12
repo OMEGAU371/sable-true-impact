@@ -161,14 +161,14 @@ public class TrueImpactPhysicsSolver {
                     && !TrueImpactConfig.ELASTIC_BLOCKS_BREAK_BLOCKS.get()
                     && !fragile) {
                 return new BlockSubLevelCollisionCallback.CollisionResult(
-                        reactionMotion(pos, hitPos, impactVelocity, Math.max(yieldRatio, 1.0), Math.max(restitution, 0.5)), false);
+                        reactionMotion(pos, hitPos, impactVelocity, Math.max(yieldRatio, 1.0), Math.max(restitution, 0.5), hardness), false);
             }
 
             if (restitution >= TrueImpactConfig.BOUNCE_RESPONSE_THRESHOLD.get()
                     && impactVelocity < TrueImpactConfig.ELASTIC_SHATTER_VELOCITY.get()
                     && !fragile) {
                 return new BlockSubLevelCollisionCallback.CollisionResult(
-                        reactionMotion(pos, hitPos, impactVelocity, Math.max(yieldRatio, 1.0), restitution), false);
+                        reactionMotion(pos, hitPos, impactVelocity, Math.max(yieldRatio, 1.0), restitution, hardness), false);
             }
 
             boolean canBreakWorldBlocks = TrueImpactConfig.ENABLE_BLOCK_BREAKING.get()
@@ -190,7 +190,7 @@ public class TrueImpactPhysicsSolver {
                     && yieldRatio > TrueImpactConfig.HEAVY_BREAK_YIELD_THRESHOLD.get()) {
                 if (yieldRatio < TrueImpactConfig.REACTION_YIELD_LIMIT.get()) {
                     return new BlockSubLevelCollisionCallback.CollisionResult(
-                            reactionMotion(pos, hitPos, impactVelocity, yieldRatio, restitution), false);
+                            reactionMotion(pos, hitPos, impactVelocity, yieldRatio, restitution, hardness), false);
                 }
                 // Medium break
                 level.destroyBlock(pos, true);
@@ -200,13 +200,13 @@ public class TrueImpactPhysicsSolver {
                     && yieldRatio > TrueImpactConfig.BREAK_YIELD_THRESHOLD.get()
                     && impactVelocity * yieldRatio > elasticBreakVelocity * (TrueImpactConfig.BREAK_YIELD_THRESHOLD.get() + 1.5)) {
                 return new BlockSubLevelCollisionCallback.CollisionResult(
-                        reactionMotion(pos, hitPos, impactVelocity, yieldRatio, restitution), false);
+                        reactionMotion(pos, hitPos, impactVelocity, yieldRatio, restitution, hardness), false);
             } else if (canBreakWorldBlocks
                     && impactVelocity >= elasticBreakVelocity
                     && yieldRatio > TrueImpactConfig.BREAK_YIELD_THRESHOLD.get()) {
                 // Gentle break
                 return new BlockSubLevelCollisionCallback.CollisionResult(
-                        reactionMotion(pos, hitPos, impactVelocity, yieldRatio, restitution), false);
+                        reactionMotion(pos, hitPos, impactVelocity, yieldRatio, restitution, hardness), false);
             } else if (TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.get()
                     && TrueImpactConfig.ENABLE_CRACKS.get()
                     && yieldRatio > TrueImpactConfig.CRACK_YIELD_THRESHOLD.get()) {
@@ -242,11 +242,16 @@ public class TrueImpactPhysicsSolver {
             return normal.mul(impactVelocity * restitution * TrueImpactConfig.BOUNCE_RESPONSE_SCALE.get());
         }
 
-        private static Vector3d reactionMotion(BlockPos pos, Vector3d hitPos, double impactVelocity, double yieldRatio, double restitution) {
+        private static Vector3d reactionMotion(BlockPos pos, Vector3d hitPos, double impactVelocity, double yieldRatio, double restitution, float hardness) {
             double response = Math.min(1.0, yieldRatio / Math.max(TrueImpactConfig.REACTION_YIELD_LIMIT.get(), 1.0));
             double elasticBonus = 1.0 + restitution;
+            
+            // Softness Buffer: Reduce reaction force if the world block is soft (dirt, plants, etc.)
+            // This prevents a single bamboo stalk from acting like a steel pole against a massive ship.
+            double softnessFactor = (hardness < 1.0f) ? Math.max(0.05, hardness) : 1.0;
+            
             return bounceMotion(pos, hitPos, impactVelocity, Math.max(0.15, restitution))
-                    .mul(TrueImpactConfig.REACTION_RESPONSE_SCALE.get() * response * elasticBonus);
+                    .mul(TrueImpactConfig.REACTION_RESPONSE_SCALE.get() * response * elasticBonus * softnessFactor);
         }
     }
 }
