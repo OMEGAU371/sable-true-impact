@@ -84,26 +84,32 @@ public class TrueImpactPhysicsSolver {
                 structuralIntegrity *= TrueImpactConfig.SOFT_BLOCK_STRENGTH_MULTIPLIER.get();
             }
 
-            // 2. Fetch Mass and Velocity Vector via SableReflector
+            // 2. Fetch Mass and Velocity Vector via Reflection
             double mass = TrueImpactConfig.FALLBACK_IMPACT_MASS.get();
             Vector3d velocityVec = new Vector3d(0, -1, 0); // Default to falling if unknown
             boolean hasVelocity = false;
             
-            Object[] subLevels = SableReflector.getSystemSubLevels(system);
-            if (subLevels != null && subLevels.length > 0) {
-                Object ship = subLevels[0];
-                mass = SableReflector.getMass(ship);
-                
-                // Try to get linear velocity
-                try {
-                    Vector3d v = SableReflector.getLinearVelocity(ship);
-                    if (v != null && v.lengthSquared() > 0.001) {
-                        velocityVec.set(v).normalize();
-                        hasVelocity = true;
+            try {
+                Object[] subLevels = (Object[]) system.getClass().getMethod("getSubLevels").invoke(system);
+                if (subLevels != null && subLevels.length > 0) {
+                    Object ship = subLevels[0];
+                    Object massTracker = ship.getClass().getMethod("getMassTracker").invoke(ship);
+                    mass = Math.max((double) massTracker.getClass().getMethod("getMass").invoke(massTracker), 1.0E-6);
+                    
+                    // Try to get linear velocity
+                    try {
+                        Object phys = ship.getClass().getMethod("getPhysics").invoke(ship);
+                        velocityVec = (Vector3d) phys.getClass().getMethod("getLinearVelocity").invoke(phys);
+                        if (velocityVec.lengthSquared() > 0.001) {
+                            velocityVec = new Vector3d(velocityVec).normalize();
+                            hasVelocity = true;
+                        }
+                    } catch (Exception e2) {
+                        // Ignore
                     }
-                } catch (Exception e2) {
-                    // Ignore
                 }
+            } catch (Exception e) {
+                // Ignore
             }
             mass = Math.max(mass, ElasticSubLevelDetector.nearbyMaxMass(level, pos, mass));
 
