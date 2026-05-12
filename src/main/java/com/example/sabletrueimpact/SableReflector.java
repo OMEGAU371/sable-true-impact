@@ -213,7 +213,19 @@ public final class SableReflector {
     }
 
     private static MethodHandle findMethod(Class<?> cl, String name, Class<?> rtype, Class<?>... ptypes) throws Exception {
-        Method m = cl.getMethod(name, ptypes);
+        Method m = null;
+        Class<?> current = cl;
+        while (current != null) {
+            try {
+                m = current.getDeclaredMethod(name, ptypes);
+                break;
+            } catch (NoSuchMethodException e) {
+                current = current.getSuperclass();
+            }
+        }
+        if (m == null) {
+            m = cl.getMethod(name, ptypes);
+        }
         m.setAccessible(true);
         return LOOKUP.unreflect(m);
     }
