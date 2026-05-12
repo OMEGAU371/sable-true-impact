@@ -18,10 +18,11 @@ public final class ImpactDamageAllocator {
             return 1.0;
         }
         
-        float hardness = Math.max(0.05f, state.getDestroySpeed(level, pos));
-        if (hardness < 0) {
+        float rawHardness = state.getDestroySpeed(level, pos);
+        if (rawHardness < 0.0f) {
             return 1_000_000.0;
         }
+        double hardness = Math.max(0.05, rawHardness);
 
         double baseStrength = TrueImpactConfig.BASE_STRENGTH.get() + hardness * TrueImpactConfig.HARDNESS_STRENGTH_FACTOR.get();
         double strength = Math.max(MaterialImpactProperties.displayStrength(state, baseStrength), 1.0);
@@ -38,25 +39,21 @@ public final class ImpactDamageAllocator {
         double selfResistance = impactResistance(level, selfPos, selfState);
         double targetResistance = impactResistance(level, targetPos, targetState);
 
-        // Soft-target protection: prevent heavy structures from breaking when hitting grass/crops
-        if (targetResistance < selfResistance * 0.08) {
-            double scale = Math.pow(targetResistance / Math.max(selfResistance, 1.0), TrueImpactConfig.MATERIAL_MATCHUP_EXPONENT.get());
-            double capped = Math.min(scale, 0.05);
-            if (TrueImpactConfig.ENABLE_DEBUG_IMPACT_LOGGING.get()) {
-                LOGGER.info("[TrueImpact] Soft-target protection triggered: self={}, target={}, scale={} -> capped={}", 
-                    selfState.getBlock().getName().getString(), targetState.getBlock().getName().getString(), scale, capped);
-            }
-            return Math.max(capped, TrueImpactConfig.MIN_SELF_DAMAGE_SCALE.get());
-        }
-
         double ratio = targetResistance / Math.max(selfResistance, 1.0);
         double scale = Math.pow(ratio, TrueImpactConfig.MATERIAL_MATCHUP_EXPONENT.get());
-        double finalScale = Math.max(TrueImpactConfig.MIN_SELF_DAMAGE_SCALE.get(), 
-                                    Math.min(scale, TrueImpactConfig.MAX_SELF_DAMAGE_SCALE.get()));
+        
+        double finalScale;
+        // Soft-target protection: prevent heavy structures from breaking when hitting grass/crops
+        if (targetResistance < selfResistance * 0.08) {
+            double capped = Math.min(scale, 0.05);
+            finalScale = Math.max(capped, TrueImpactConfig.MIN_SELF_DAMAGE_SCALE.get());
+        } else {
+            finalScale = Math.max(TrueImpactConfig.MIN_SELF_DAMAGE_SCALE.get(), 
+                                 Math.min(scale, TrueImpactConfig.MAX_SELF_DAMAGE_SCALE.get()));
+        }
 
         if (TrueImpactConfig.ENABLE_DEBUG_IMPACT_LOGGING.get()) {
-            LOGGER.info("[TrueImpact] Self Damage Scale: self={}, target={}, ratio={}, scale={} -> final={}", 
-                selfState.getBlock().getName().getString(), targetState.getBlock().getName().getString(), ratio, scale, finalScale);
+            logMatchup(level, selfPos, selfState, selfResistance, targetPos, targetState, targetResistance, finalScale, -1.0);
         }
 
         return finalScale;
@@ -76,10 +73,22 @@ public final class ImpactDamageAllocator {
                                     Math.min(scale, TrueImpactConfig.MAX_TARGET_DAMAGE_SCALE.get()));
 
         if (TrueImpactConfig.ENABLE_DEBUG_IMPACT_LOGGING.get()) {
-            LOGGER.info("[TrueImpact] Target Damage Scale: target={}, self={}, ratio={}, scale={} -> final={}", 
-                targetState.getBlock().getName().getString(), selfState.getBlock().getName().getString(), ratio, scale, finalScale);
+            logMatchup(level, selfPos, selfState, selfResistance, targetPos, targetState, targetResistance, -1.0, finalScale);
         }
 
         return finalScale;
+    }
+
+    private static void logMatchup(ServerLevel level, BlockPos selfPos, BlockState selfState, double selfRes, 
+                                 BlockPos targetPos, BlockState targetState, double targetRes, 
+                                 double selfScale, double targetScale) {
+        String selfId = selfState.getBlock().toString();
+        String targetId = targetState.getBlock().toString();
+        
+        LOGGER.info("[TrueImpact] Matchup Detection:");
+        LOGGER.info("  - Self: {} at {} (Res: {})", selfId, selfPos, String.format("%.2f", selfRes));
+        LOGGER.info("  - Target: {} at {} (Res: {})", targetId, targetPos, String.format("%.2f", targetRes));
+        if (selfScale >= 0) LOGGER.info("  - Self Fracture Scale: {}", String.format("%.4f", selfScale));
+        if (targetScale >= 0) LOGGER.info("  - Terrain Damage Scale: {}", String.format("%.4f", targetScale));
     }
 }

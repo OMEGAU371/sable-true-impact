@@ -112,7 +112,7 @@ public final class ElasticPairReaction {
 
             if (isTerrain) {
                 processTerrainImpact(isFlat, explosions);
-            } else {
+            } else if (TrueImpactConfig.ENABLE_PAIR_REACTION.get()) {
                 processPairReaction(explosions);
             }
         }
@@ -193,8 +193,14 @@ public final class ElasticPairReaction {
         // Material-aware scaling: determine damage split between structure and terrain
         BlockPos.MutableBlockPos selfPos = new BlockPos.MutableBlockPos();
         BlockState selfState = findNearestNonAirSubLevelState(subLevel, localPoint, selfPos);
-        BlockPos targetPos = BlockPos.containing(globalPoint.x, globalPoint.y, globalPoint.z);
-        BlockState targetState = level.getBlockState(targetPos);
+        
+        BlockPos.MutableBlockPos targetPos = new BlockPos.MutableBlockPos();
+        BlockState targetState = findNearestNonAirTerrainState(level, globalPoint, targetPos);
+
+        // Warning: if detection systems overlap, the split logic will use the same block for both sides
+        if (selfPos.equals(targetPos)) {
+            org.apache.logging.log4j.LogManager.getLogger().warn("[TrueImpact] Collision overlap: Self and Target position are identical at {}! Material matchup split may be incorrect.", selfPos);
+        }
 
         double selfFractureScale = ImpactDamageAllocator.damageScaleForSelf(level, selfPos, selfState, targetPos, targetState);
         double terrainDamageScale = ImpactDamageAllocator.damageScaleForTarget(level, targetPos, targetState, selfPos, selfState);
@@ -212,6 +218,44 @@ public final class ElasticPairReaction {
             damageEntities(level, new Vec3(globalPoint.x, globalPoint.y, globalPoint.z), energy);
             collectExplosion(explosions, level, globalPoint, forceAmount, mass(subLevel));
         }
+    }
+
+    private static BlockState findNearestNonAirTerrainState(ServerLevel level, Vector3d worldPoint, BlockPos.MutableBlockPos outPos) {
+        BlockPos center = BlockPos.containing(worldPoint.x, worldPoint.y, worldPoint.z);
+        BlockState direct = level.getBlockState(center);
+        if (!direct.isAir()) {
+            outPos.set(center);
+            return direct;
+        }
+
+        BlockPos nearestPos = null;
+        double minDistSq = Double.MAX_VALUE;
+        BlockState nearestState = Blocks.AIR.defaultBlockState();
+
+        for (int x = -1; x <= 1; x++) {
+            for (int y = -1; y <= 1; y++) {
+                for (int z = -1; z <= 1; z++) {
+                    BlockPos p = center.offset(x, y, z);
+                    BlockState s = level.getBlockState(p);
+                    if (!s.isAir()) {
+                        double d = p.distToCenterSqr(worldPoint.x, worldPoint.y, worldPoint.z);
+                        if (d < minDistSq) {
+                            minDistSq = d;
+                            nearestPos = p;
+                            nearestState = s;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (nearestPos != null) {
+            outPos.set(nearestPos);
+            return nearestState;
+        }
+
+        outPos.set(center);
+        return Blocks.AIR.defaultBlockState();
     }
 
     private static BlockState findNearestNonAirSubLevelState(Object subLevel, Vector3d localPoint, BlockPos.MutableBlockPos outPos) {
