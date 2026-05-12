@@ -253,15 +253,7 @@ public final class SubLevelFracture {
                     MaterialImpactProperties.displayToughness(state, baseResistance) * connectionStrength,
                     materialStrength);
             double impactFocus = impactFocus(offset.distanceSquared());
-            
-            // Stress Buffering: Tougher materials (like Netherite) distribute internal stress more effectively.
-            // We apply a logarithmic dampening to the raw stress if the material is significantly tough.
-            double stressBuffer = 1.0;
-            if (materialToughness > 500.0) {
-                stressBuffer = 1.0 / (1.0 + Math.log10(materialToughness / 100.0));
-            }
-            
-            double rawStress = fracturePower * structure.seamWeakness() * impactFocus * stressBuffer;
+            double rawStress = fracturePower * structure.seamWeakness() * impactFocus;
             double overStress = rawStress - materialStrength;
             if (overStress <= 0.0) {
                 continue;

@@ -153,32 +153,6 @@ public final class ElasticPairReaction {
                 double threshold = TrueImpactConfig.PAIR_REACTION_FORCE_THRESHOLD.get();
                 if (p.force < threshold) continue;
 
-                // Ship-vs-Ship Dominance: Compare defensive values
-                double defenseA = MaterialImpactProperties.getDefenseValue(stateA, level(p.slA), BlockPos.ZERO);
-                double defenseB = MaterialImpactProperties.getDefenseValue(stateB, level(p.slB), BlockPos.ZERO);
-                double ratioAB = defenseA / Math.max(0.01, defenseB);
-                
-                // Buff harder ship, punish softer ship
-                double bufferA = 1.0;
-                double bufferB = 1.0;
-                
-                if (ratioAB > 20.0) {
-                    bufferA = 0.0;
-                    bufferB = 1.0;
-                } else if (ratioAB < 0.05) {
-                    bufferA = 1.0;
-                    bufferB = 0.0;
-                } else {
-                    bufferA = 1.0 / Math.max(1.0, Math.pow(ratioAB, 0.8));
-                    bufferB = 1.0 / Math.max(1.0, Math.pow(1.0 / ratioAB, 0.8));
-                }
-
-                // Force Compression
-                double compressedForce = p.force;
-                if (p.force > 1000.0) {
-                    compressedForce = 1000.0 + Math.log10(p.force / 1000.0) * 500.0;
-                }
-
                 double massA = Math.max(mass(p.slA), 1.0);
                 double massB = Math.max(mass(p.slB), 1.0);
                 double reducedMass = (massA * massB) / (massA + massB);
@@ -188,17 +162,13 @@ public final class ElasticPairReaction {
                 impulse = Math.min(impulse, reducedMass * TrueImpactConfig.PAIR_REACTION_MAX_VELOCITY_CHANGE.get());
 
                 if (impulse > 1.0E-6) {
-                    applyImpulse(sceneId, p.slA, p.local, p.normal, (impulse * bufferA) / massA);
-                    applyImpulse(sceneId, p.slB, p.local, p.normal, (-impulse * bufferB) / massB);
+                    applyImpulse(sceneId, p.slA, p.local, p.normal, impulse / massA);
+                    applyImpulse(sceneId, p.slB, p.local, p.normal, -impulse / massB);
                     
                     Vector3d rot = rotationPoint(p.slA);
                     if (rot != null) {
                         collectExplosion(explosions, level(p.slA), new Vector3d(p.local).add(rot), p.force, Math.max(massA, massB));
                     }
-                    
-                    // Internal damage with compressed force and immunity
-                    SubLevelFracture.tryFracture(p.slA, p.local, p.normal, compressedForce * bufferA);
-                    SubLevelFracture.tryFracture(p.slB, p.local, p.normal.mul(-1, -1, -1), compressedForce * bufferB);
                 }
             }
         }
@@ -220,43 +190,15 @@ public final class ElasticPairReaction {
         ServerLevel level = level(subLevel);
         if (level == null) return;
 
-        BlockPos.MutableBlockPos tmpPos = new BlockPos.MutableBlockPos();
-        BlockState shipBlock = localState(subLevel, localPoint, tmpPos);
-        BlockPos terrainPos = BlockPos.containing(globalPoint.x, globalPoint.y, globalPoint.z);
-        BlockState terrainBlock = level.getBlockState(terrainPos);
-
-        // Standardized Defense Dominance
-        double shipDefense = MaterialImpactProperties.getDefenseValue(shipBlock, level, BlockPos.ZERO);
-        double terrainDefense = MaterialImpactProperties.getDefenseValue(terrainBlock, level, terrainPos);
-        double defenseRatio = shipDefense / Math.max(0.01, terrainDefense);
-        
-        // 1. Class Immunity: If ship is exponentially tougher than terrain, it takes ZERO damage.
-        // This is the "Tank vs Cookie" logic.
-        double forceBuffer = 1.0;
-        if (defenseRatio > 20.0) {
-            forceBuffer = 0.0;
-        } else {
-            forceBuffer = 1.0 / Math.max(1.0, Math.pow(defenseRatio, 1.2));
-        }
-
-        // 2. Force Compression: Logarithmic scaling for extreme impulses.
-        // This prevents numeric explosion from destroying ships instantly.
-        double compressedForce = forceAmount;
-        if (forceAmount > 1000.0) {
-            compressedForce = 1000.0 + Math.log10(forceAmount / 1000.0) * 500.0;
-        }
-
-        SubLevelFracture.tryFracture(subLevel, localPoint, normal, compressedForce * forceBuffer);
+        SubLevelFracture.tryFracture(subLevel, localPoint, normal, forceAmount);
         
         if (TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.get()) {
             double mass = Math.min(TrueImpactConfig.TERRAIN_IMPACT_MAX_EFFECTIVE_MASS.get(), Math.pow(Math.max(mass(subLevel), 1.0), TrueImpactConfig.TERRAIN_IMPACT_MASS_EXPONENT.get()));
             double force = scaledForce(forceAmount, TrueImpactConfig.TERRAIN_IMPACT_FORCE_THRESHOLD.get(), TrueImpactConfig.TERRAIN_IMPACT_FORCE_EXPONENT.get());
+            double energy = force * mass * TrueImpactConfig.TERRAIN_IMPACT_DAMAGE_SCALE.get() * TrueImpactConfig.DAMAGE_SCALE.get();
             
-            // Energy Boost: If ship is harder, terrain destruction is even more violent.
-            double energyBoost = Math.max(1.0, Math.min(50.0, defenseRatio * 0.5));
-            double energy = force * mass * TrueImpactConfig.TERRAIN_IMPACT_DAMAGE_SCALE.get() * TrueImpactConfig.DAMAGE_SCALE.get() * energyBoost;
-            
-            damageTerrain(level, terrainPos, normal, energy);
+            BlockPos center = BlockPos.containing(globalPoint.x, globalPoint.y, globalPoint.z);
+            damageTerrain(level, center, normal, energy);
             damageEntities(level, new Vec3(globalPoint.x, globalPoint.y, globalPoint.z), energy);
             collectExplosion(explosions, level, globalPoint, forceAmount, mass(subLevel));
         }
