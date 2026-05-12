@@ -174,10 +174,9 @@ public class TrueImpactPhysicsSolver {
                     && yieldRatio >= TrueImpactConfig.PROPAGATION_YIELD_THRESHOLD.get()) {
                 // Catastrophic
                 level.destroyBlock(pos, false);
-                // TODO: Re-implement crack propagation logic if needed
-                // if (TrueImpactConfig.ENABLE_CRACK_PROPAGATION.get()) {
-                //     CrackPropagationUtils.propagateCracks(level, pos, state.getBlock(), kineticEnergy * TrueImpactConfig.PROPAGATION_ENERGY_SCALE.get());
-                // }
+                if (TrueImpactConfig.ENABLE_CRACK_PROPAGATION.get()) {
+                    CrackPropagationUtils.propagateCracks(level, pos, state.getBlock(), kineticEnergy * TrueImpactConfig.PROPAGATION_ENERGY_SCALE.get());
+                }
                 return new BlockSubLevelCollisionCallback.CollisionResult(new org.joml.Vector3d(), true);
             } else if (canBreakWorldBlocks
                     && impactVelocity >= elasticBreakVelocity
