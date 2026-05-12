@@ -245,10 +245,8 @@ public final class SubLevelFracture {
                 continue;
             }
             double hardness = Math.max(0.05, destroySpeed);
-            double blast = Math.max(0.0, snapshot.blastResistance(pos));
             double baseResistance = (TrueImpactConfig.BASE_STRENGTH.get()
-                    + hardness * TrueImpactConfig.HARDNESS_STRENGTH_FACTOR.get()
-                    + blast * TrueImpactConfig.BLAST_STRENGTH_FACTOR.get());
+                    + hardness * TrueImpactConfig.HARDNESS_STRENGTH_FACTOR.get());
             double connectionStrength = structure.connectionStrength();
             double materialStrength = Math.max(MaterialImpactProperties.displayStrength(state, baseResistance) * connectionStrength, 1.0);
             double materialToughness = Math.max(
@@ -483,10 +481,8 @@ public final class SubLevelFracture {
                         materials.put(key, new BlockMaterial(state.getDestroySpeed(level, pos), state.getBlock().getExplosionResistance()));
                         if (!state.isAir() && state.getDestroySpeed(level, pos) >= 0.0f) {
                             double hardness = Math.max(0.05, state.getDestroySpeed(level, pos));
-                            double blast = Math.max(0.0, state.getBlock().getExplosionResistance());
                             double baseThreshold = TrueImpactConfig.BASE_STRENGTH.get()
-                                    + hardness * TrueImpactConfig.HARDNESS_STRENGTH_FACTOR.get()
-                                    + blast * TrueImpactConfig.BLAST_STRENGTH_FACTOR.get();
+                                    + hardness * TrueImpactConfig.HARDNESS_STRENGTH_FACTOR.get();
                             double breakThreshold = Math.max(
                                     Math.max(
                                             MaterialImpactProperties.displayStrength(state, baseThreshold),

@@ -34,7 +34,6 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.DoubleValue MAX_EFFECTIVE_MASS;
     public static final ModConfigSpec.DoubleValue SOFT_BLOCK_STRENGTH_MULTIPLIER;
     public static final ModConfigSpec.DoubleValue HARDNESS_STRENGTH_FACTOR;
-    public static final ModConfigSpec.DoubleValue BLAST_STRENGTH_FACTOR;
     public static final ModConfigSpec.DoubleValue BASE_STRENGTH;
     public static final ModConfigSpec.DoubleValue CRACK_YIELD_THRESHOLD;
     public static final ModConfigSpec.DoubleValue BREAK_YIELD_THRESHOLD;
@@ -131,9 +130,8 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.DoubleValue DEFAULT_MATERIAL_STRENGTH_MULTIPLIER;
     public static final ModConfigSpec.DoubleValue DEFAULT_MATERIAL_TOUGHNESS_MULTIPLIER;
     public static final ModConfigSpec.DoubleValue DEFAULT_MATERIAL_BRITTLENESS;
-    public static final ModConfigSpec.DoubleValue NETHERITE_STRENGTH_MULTIPLIER;
-    public static final ModConfigSpec.DoubleValue NETHERITE_TOUGHNESS_MULTIPLIER;
-    public static final ModConfigSpec.DoubleValue NETHERITE_BRITTLENESS;
+    public static final ModConfigSpec.DoubleValue BLAST_TOUGHNESS_FACTOR;
+    public static final ModConfigSpec.DoubleValue BLAST_BRITTLENESS_DECAY;
     public static final ModConfigSpec.BooleanValue ENABLE_GOGGLES_BLOCK_TOOLTIP;
     public static final ModConfigSpec.BooleanValue ENABLE_CUMULATIVE_BLOCK_DAMAGE;
     public static final ModConfigSpec.DoubleValue CUMULATIVE_BLOCK_DAMAGE_SCALE;
@@ -209,7 +207,6 @@ public final class TrueImpactConfig {
         SOFT_BLOCK_STRENGTH_MULTIPLIER = BUILDER.comment("Extra strength multiplier for soft blocks like dirt/grass. 1.0 keeps soil softer than wood and stone.")
                 .defineInRange("softBlockStrengthMultiplier", 1.0, 1.0, 1000.0);
         HARDNESS_STRENGTH_FACTOR = BUILDER.defineInRange("hardnessStrengthFactor", 20.0, 0.0, 1000.0);
-        BLAST_STRENGTH_FACTOR = BUILDER.defineInRange("blastStrengthFactor", 18.0, 0.0, 1000.0);
         BASE_STRENGTH = BUILDER.comment("Flat base strength. Keep this low enough that material hardness still matters.")
                 .defineInRange("baseStrength", 12.0, 0.0, 1000.0);
         CRACK_YIELD_THRESHOLD = BUILDER.defineInRange("crackYieldThreshold", 1.15, 0.0, 1000.0);
@@ -410,12 +407,10 @@ public final class TrueImpactConfig {
                 .defineInRange("defaultMaterialToughnessMultiplier", 1.0, 0.0, 1000000.0);
         DEFAULT_MATERIAL_BRITTLENESS = BUILDER.comment("Default brittleness multiplier. Lower means impact over-stress accumulates damage more slowly.")
                 .defineInRange("defaultMaterialBrittleness", 1.0, 0.0, 1000000.0);
-        NETHERITE_STRENGTH_MULTIPLIER = BUILDER.comment("Netherite block strength multiplier. High strength means larger force is needed before meaningful damage.")
-                .defineInRange("netheriteStrengthMultiplier", 14.0, 0.0, 1000000.0);
-        NETHERITE_TOUGHNESS_MULTIPLIER = BUILDER.comment("Netherite block toughness multiplier. High toughness means repeated over-stress is needed before breaking.")
-                .defineInRange("netheriteToughnessMultiplier", 48.0, 0.0, 1000000.0);
-        NETHERITE_BRITTLENESS = BUILDER.comment("Netherite brittleness multiplier. Lower means it absorbs impact without quickly turning that impact into cracks.")
-                .defineInRange("netheriteBrittleness", 0.018, 0.0, 1000000.0);
+        BLAST_TOUGHNESS_FACTOR = BUILDER.comment("How much a block's vanilla explosion resistance contributes to its physical toughness (impact absorption).")
+                .defineInRange("blastToughnessFactor", 0.5, 0.0, 1000.0);
+        BLAST_BRITTLENESS_DECAY = BUILDER.comment("Scale for how much explosion resistance reduces a material's brittleness. High blast resistance makes materials more 'ductile'.")
+                .defineInRange("blastBrittlenessDecay", 0.01, 0.0, 1.0);
         BUILDER.pop();
 
         BUILDER.push("client");

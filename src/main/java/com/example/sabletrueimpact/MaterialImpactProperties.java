@@ -133,24 +133,26 @@ public final class MaterialImpactProperties {
             return custom;
         }
 
-        if (state.is(Blocks.NETHERITE_BLOCK)) {
-            return new Properties(
-                    TrueImpactConfig.NETHERITE_STRENGTH_MULTIPLIER.get(),
-                    TrueImpactConfig.NETHERITE_TOUGHNESS_MULTIPLIER.get(),
-                    TrueImpactConfig.NETHERITE_BRITTLENESS.get(),
-                    -1, -1, -1, true
-            );
-        }
-        if (state.is(Blocks.ANCIENT_DEBRIS)) {
-            return new Properties(5.0, 10.0, 0.15, -1, -1, -1, true);
-        }
-        if (state.is(Blocks.OBSIDIAN) || state.is(Blocks.CRYING_OBSIDIAN) || state.is(Blocks.RESPAWN_ANCHOR)) {
-            return new Properties(6.0, 8.0, 0.25, -1, -1, -1, true);
-        }
+        double blast = state.getBlock().getExplosionResistance();
+
+        // Universal Scaling Algorithm:
+        // 1. Strength Multiplier: Base multiplier from config.
+        double strengthMult = TrueImpactConfig.DEFAULT_MATERIAL_STRENGTH_MULTIPLIER.get();
+
+        // 2. Toughness Multiplier: Scales with Blast Resistance.
+        // High blast resistance (Netherite, Obsidian) significantly increases the energy needed to break the block.
+        double toughnessMult = TrueImpactConfig.DEFAULT_MATERIAL_TOUGHNESS_MULTIPLIER.get()
+                * (1.0 + blast * TrueImpactConfig.BLAST_TOUGHNESS_FACTOR.get());
+
+        // 3. Brittleness: Inversely proportional to Blast Resistance.
+        // High blast resistance materials are more 'ductile' and resist chain-fracture.
+        double brittleness = TrueImpactConfig.DEFAULT_MATERIAL_BRITTLENESS.get()
+                / (1.0 + blast * TrueImpactConfig.BLAST_BRITTLENESS_DECAY.get());
+
         return new Properties(
-                TrueImpactConfig.DEFAULT_MATERIAL_STRENGTH_MULTIPLIER.get(),
-                TrueImpactConfig.DEFAULT_MATERIAL_TOUGHNESS_MULTIPLIER.get(),
-                TrueImpactConfig.DEFAULT_MATERIAL_BRITTLENESS.get(),
+                strengthMult,
+                toughnessMult,
+                brittleness,
                 -1, -1, -1, true
         );
     }

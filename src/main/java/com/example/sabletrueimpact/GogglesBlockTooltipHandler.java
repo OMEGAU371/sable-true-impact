@@ -37,8 +37,7 @@ public final class GogglesBlockTooltipHandler {
         double hardness = Math.max(0.05, state.getDestroySpeed(player.level(), BlockPos.ZERO));
         double blast = Math.max(0.0, state.getBlock().getExplosionResistance());
         double baseStrength = TrueImpactConfig.BASE_STRENGTH.get()
-                + hardness * TrueImpactConfig.HARDNESS_STRENGTH_FACTOR.get()
-                + blast * TrueImpactConfig.BLAST_STRENGTH_FACTOR.get();
+                + hardness * TrueImpactConfig.HARDNESS_STRENGTH_FACTOR.get();
 
         double mass = safeMass(player, state);
         double friction = safeFriction(state);

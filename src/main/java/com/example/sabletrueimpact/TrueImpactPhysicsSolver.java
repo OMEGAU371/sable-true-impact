@@ -78,7 +78,6 @@ public class TrueImpactPhysicsSolver {
                 supportMultiplier = Math.min(1.0, supportMultiplier);
             }
             double structuralIntegrity = ((hardness * TrueImpactConfig.HARDNESS_STRENGTH_FACTOR.get())
-                    + (blastResistance * TrueImpactConfig.BLAST_STRENGTH_FACTOR.get())
                     + TrueImpactConfig.BASE_STRENGTH.get()) * supportMultiplier;
             if (hardness < 1.0f) {
                 structuralIntegrity *= TrueImpactConfig.SOFT_BLOCK_STRENGTH_MULTIPLIER.get();

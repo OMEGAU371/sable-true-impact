@@ -251,7 +251,6 @@ public final class ElasticPairReaction {
                 if (state.isAir() || state.getDestroySpeed(level, pos) < 0 || state.is(Blocks.BEDROCK)) continue;
 
                 double strength = (state.getDestroySpeed(level, pos) * TrueImpactConfig.HARDNESS_STRENGTH_FACTOR.get())
-                        + (state.getBlock().getExplosionResistance() * TrueImpactConfig.BLAST_STRENGTH_FACTOR.get())
                         + TrueImpactConfig.BASE_STRENGTH.get();
                 if (state.getDestroySpeed(level, pos) < 1.0f) strength *= TrueImpactConfig.SOFT_BLOCK_STRENGTH_MULTIPLIER.get();
                 

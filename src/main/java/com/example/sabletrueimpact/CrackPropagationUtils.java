@@ -42,7 +42,6 @@ public class CrackPropagationUtils {
                 if (hardness < 0.0f) continue; // Unbreakable
                 
                 double structuralIntegrity = (hardness * (TrueImpactConfig.HARDNESS_STRENGTH_FACTOR.get() + 2.0))
-                        + (blastResist * (TrueImpactConfig.BLAST_STRENGTH_FACTOR.get() + 0.5))
                         + (TrueImpactConfig.BASE_STRENGTH.get() + 4.0);
                 if (hardness < 1.0f) {
                     structuralIntegrity *= TrueImpactConfig.SOFT_BLOCK_STRENGTH_MULTIPLIER.get();
