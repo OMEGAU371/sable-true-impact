@@ -190,18 +190,71 @@ public final class ElasticPairReaction {
         ServerLevel level = level(subLevel);
         if (level == null) return;
 
-        SubLevelFracture.tryFracture(subLevel, localPoint, normal, forceAmount);
+        // Material-aware scaling: determine damage split between structure and terrain
+        BlockPos.MutableBlockPos selfPos = new BlockPos.MutableBlockPos();
+        BlockState selfState = findNearestNonAirSubLevelState(subLevel, localPoint, selfPos);
+        BlockPos targetPos = BlockPos.containing(globalPoint.x, globalPoint.y, globalPoint.z);
+        BlockState targetState = level.getBlockState(targetPos);
+
+        double selfFractureScale = ImpactDamageAllocator.damageScaleForSelf(level, selfPos, selfState, targetPos, targetState);
+        double terrainDamageScale = ImpactDamageAllocator.damageScaleForTarget(level, targetPos, targetState, selfPos, selfState);
+
+        SubLevelFracture.tryFracture(subLevel, localPoint, normal, forceAmount, selfFractureScale);
         
         if (TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.get()) {
             double mass = Math.min(TrueImpactConfig.TERRAIN_IMPACT_MAX_EFFECTIVE_MASS.get(), Math.pow(Math.max(mass(subLevel), 1.0), TrueImpactConfig.TERRAIN_IMPACT_MASS_EXPONENT.get()));
             double force = scaledForce(forceAmount, TrueImpactConfig.TERRAIN_IMPACT_FORCE_THRESHOLD.get(), TrueImpactConfig.TERRAIN_IMPACT_FORCE_EXPONENT.get());
-            double energy = force * mass * TrueImpactConfig.TERRAIN_IMPACT_DAMAGE_SCALE.get() * TrueImpactConfig.DAMAGE_SCALE.get();
             
-            BlockPos center = BlockPos.containing(globalPoint.x, globalPoint.y, globalPoint.z);
-            damageTerrain(level, center, normal, energy);
+            // Scaled energy for terrain damage
+            double energy = force * mass * TrueImpactConfig.TERRAIN_IMPACT_DAMAGE_SCALE.get() * TrueImpactConfig.DAMAGE_SCALE.get() * terrainDamageScale;
+            
+            damageTerrain(level, targetPos, normal, energy);
             damageEntities(level, new Vec3(globalPoint.x, globalPoint.y, globalPoint.z), energy);
             collectExplosion(explosions, level, globalPoint, forceAmount, mass(subLevel));
         }
+    }
+
+    private static BlockState findNearestNonAirSubLevelState(Object subLevel, Vector3d localPoint, BlockPos.MutableBlockPos outPos) {
+        ServerLevel level = level(subLevel);
+        Vector3d rotationPoint = rotationPoint(subLevel);
+        if (level == null || rotationPoint == null) return Blocks.AIR.defaultBlockState();
+        
+        Vector3d worldPoint = new Vector3d(localPoint).add(rotationPoint);
+        BlockPos center = BlockPos.containing(worldPoint.x, worldPoint.y, worldPoint.z);
+        
+        BlockState direct = level.getBlockState(center);
+        if (!direct.isAir()) {
+            outPos.set(center);
+            return direct;
+        }
+        
+        BlockPos nearestPos = null;
+        double minDistSq = Double.MAX_VALUE;
+        BlockState nearestState = Blocks.AIR.defaultBlockState();
+        
+        for (int x = -1; x <= 1; x++) {
+            for (int y = -1; y <= 1; y++) {
+                for (int z = -1; z <= 1; z++) {
+                    BlockPos p = center.offset(x, y, z);
+                    BlockState s = level.getBlockState(p);
+                    if (!s.isAir()) {
+                        double d = p.distToCenterSqr(worldPoint.x, worldPoint.y, worldPoint.z);
+                        if (d < minDistSq) {
+                            minDistSq = d;
+                            nearestPos = p;
+                            nearestState = s;
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (nearestPos != null) {
+            outPos.set(nearestPos);
+            return nearestState;
+        }
+        
+        return Blocks.AIR.defaultBlockState();
     }
 
     private static boolean isForgivenStepContact(Vector3d terrainPoint, Vector3d normal) {

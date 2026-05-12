@@ -43,6 +43,10 @@ public final class SubLevelFracture {
     }
 
     public static void tryFracture(Object subLevel, Vector3d localPoint, Vector3d normal, double forceAmount) {
+        tryFracture(subLevel, localPoint, normal, forceAmount, 1.0);
+    }
+
+    public static void tryFracture(Object subLevel, Vector3d localPoint, Vector3d normal, double forceAmount, double externalDamageScale) {
         if (!TrueImpactConfig.ENABLE_TRUE_IMPACT.get()
                 || !TrueImpactConfig.ENABLE_SUBLEVEL_FRACTURE.get()
                 || !TrueImpactConfig.ENABLE_PHYSICAL_DESTRUCTION.get()
@@ -82,7 +86,8 @@ public final class SubLevelFracture {
         double fracturePower = (scaledForce - TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_THRESHOLD.get())
                 * TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_SCALE.get()
                 * structureMultiplier(subLevel, localPoint)
-                * TrueImpactConfig.GLOBAL_STRENGTH_SCALE.get();
+                * TrueImpactConfig.GLOBAL_STRENGTH_SCALE.get()
+                * externalDamageScale;
         if (fracturePower <= 0.0) {
             return;
         }

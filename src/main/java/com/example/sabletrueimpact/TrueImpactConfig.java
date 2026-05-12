@@ -13,6 +13,14 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.DoubleValue GLOBAL_FRICTION_SCALE;
     public static final ModConfigSpec.DoubleValue GLOBAL_RESTITUTION_SCALE;
     public static final ModConfigSpec.DoubleValue GLOBAL_MASS_SCALE;
+    public static final ModConfigSpec.BooleanValue ENABLE_DEBUG_IMPACT_LOGGING;
+
+    public static final ModConfigSpec.BooleanValue ENABLE_MATERIAL_MATCHUP_DAMAGE;
+    public static final ModConfigSpec.DoubleValue MATERIAL_MATCHUP_EXPONENT;
+    public static final ModConfigSpec.DoubleValue MIN_SELF_DAMAGE_SCALE;
+    public static final ModConfigSpec.DoubleValue MAX_SELF_DAMAGE_SCALE;
+    public static final ModConfigSpec.DoubleValue MIN_TARGET_DAMAGE_SCALE;
+    public static final ModConfigSpec.DoubleValue MAX_TARGET_DAMAGE_SCALE;
 
     public static final ModConfigSpec.BooleanValue ENABLE_SOIL_COMPACTION;
     public static final ModConfigSpec.DoubleValue SOIL_COMPACTION_MIN_VELOCITY;
@@ -169,6 +177,23 @@ public final class TrueImpactConfig {
                 .defineInRange("globalRestitutionScale", 1.0, 0.0, 2.0);
         GLOBAL_MASS_SCALE = BUILDER.comment("Global multiplier for all block mass values.")
                 .defineInRange("globalMassScale", 1.0, 0.0, 100.0);
+        ENABLE_DEBUG_IMPACT_LOGGING = BUILDER.comment("If true, logs detailed material-matchup damage split calculations to the server console.")
+                .define("enableDebugImpactLogging", false);
+
+        BUILDER.push("materialMatchup");
+        ENABLE_MATERIAL_MATCHUP_DAMAGE = BUILDER.comment("If true, damage split between colliding materials is determined by their relative impact resistance.")
+                .define("enableMaterialMatchupDamage", true);
+        MATERIAL_MATCHUP_EXPONENT = BUILDER.comment("Controls the severity of the damage split. 1.0 is linear; higher values make strong materials much more resistant to weak materials.")
+                .defineInRange("materialMatchupExponent", 0.85, 0.0, 4.0);
+        MIN_SELF_DAMAGE_SCALE = BUILDER.comment("The minimum possible damage multiplier for a strong material hitting a weak material.")
+                .defineInRange("minSelfDamageScale", 0.02, 0.0, 1.0);
+        MAX_SELF_DAMAGE_SCALE = BUILDER.comment("The maximum possible damage multiplier for a weak material hitting a strong material.")
+                .defineInRange("maxSelfDamageScale", 3.0, 1.0, 100.0);
+        MIN_TARGET_DAMAGE_SCALE = BUILDER.comment("The minimum possible damage multiplier applied to a target hit by a much weaker structure.")
+                .defineInRange("minTargetDamageScale", 0.25, 0.0, 1.0);
+        MAX_TARGET_DAMAGE_SCALE = BUILDER.comment("The maximum possible damage multiplier applied to a weak target hit by a much stronger structure.")
+                .defineInRange("maxTargetDamageScale", 6.0, 1.0, 100.0);
+        BUILDER.pop();
         
         HARDNESS_STRENGTH_FACTOR = BUILDER.comment("Strength added per 1.0 of vanilla block hardness. Hardness mainly resists the start of damage (Yield Point).")
                 .defineInRange("hardnessStrengthFactor", 2.0, 0.0, 1000.0);
