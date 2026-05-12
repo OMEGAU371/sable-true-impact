@@ -205,6 +205,9 @@ public final class ElasticPairReaction {
         double selfFractureScale = ImpactDamageAllocator.damageScaleForSelf(level, selfPos, selfState, targetPos, targetState);
         double terrainDamageScale = ImpactDamageAllocator.damageScaleForTarget(level, targetPos, targetState, selfPos, selfState);
 
+        ImpactDamageContextCache.put(level, selfPos, selfFractureScale);
+        ImpactDamageContextCache.put(level, targetPos, terrainDamageScale);
+
         SubLevelFracture.tryFracture(subLevel, localPoint, normal, forceAmount, selfFractureScale);
         
         if (TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.get()) {

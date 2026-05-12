@@ -143,10 +143,17 @@ public class TrueImpactPhysicsSolver {
                     * TrueImpactConfig.DAMAGE_SCALE.get()
                     * TrueImpactConfig.GLOBAL_STRENGTH_SCALE.get();
             
+            // Apply material matchup scale from cache
+            double matchupScale = ImpactDamageContextCache.get(level, pos, 1.0);
+            double scaledKineticEnergy = kineticEnergy * matchupScale;
+
             double materialStrength = Math.max(MaterialImpactProperties.displayStrength(state, structuralIntegrity), 1.0);
             double materialToughness = Math.max(MaterialImpactProperties.displayToughness(state, structuralIntegrity), materialStrength);
-            double overStress = Math.max(0.0, kineticEnergy - materialStrength);
-            double yieldRatio = kineticEnergy / materialStrength;
+            
+            double crackResistance = Math.sqrt(materialStrength * materialToughness);
+            double crackRatio = scaledKineticEnergy / Math.max(crackResistance, 1.0);
+            double yieldRatio = scaledKineticEnergy / materialStrength;
+
             double elasticBreakVelocity = TrueImpactConfig.MIN_BREAK_VELOCITY.get()
                     * (1.0 + restitution * TrueImpactConfig.RESTITUTION_BREAK_VELOCITY_MULTIPLIER.get());
             double elasticPropagationVelocity = TrueImpactConfig.MIN_PROPAGATION_VELOCITY.get()
@@ -182,7 +189,7 @@ public class TrueImpactPhysicsSolver {
                 // Catastrophic
                 level.destroyBlock(pos, false);
                 if (TrueImpactConfig.ENABLE_CRACK_PROPAGATION.get()) {
-                    CrackPropagationUtils.propagateCracks(level, pos, state.getBlock(), kineticEnergy * TrueImpactConfig.PROPAGATION_ENERGY_SCALE.get());
+                    CrackPropagationUtils.propagateCracks(level, pos, state.getBlock(), scaledKineticEnergy * TrueImpactConfig.PROPAGATION_ENERGY_SCALE.get());
                 }
                 return new BlockSubLevelCollisionCallback.CollisionResult(new org.joml.Vector3d(), true);
             } else if (canBreakWorldBlocks
@@ -209,19 +216,16 @@ public class TrueImpactPhysicsSolver {
                         reactionMotion(pos, hitPos, impactVelocity, yieldRatio, restitution), false);
             } else if (TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.get()
                     && TrueImpactConfig.ENABLE_CRACKS.get()
-                    && yieldRatio > TrueImpactConfig.CRACK_YIELD_THRESHOLD.get()) {
+                    && crackRatio > TrueImpactConfig.CRACK_YIELD_THRESHOLD.get()) {
                 // Cracks
-                int crackProgress = (int) Math.min(5, ((yieldRatio - TrueImpactConfig.CRACK_YIELD_THRESHOLD.get()) / 1.25) * 6);
-                boolean broke = BlockDamageAccumulator.apply(
+                double crackOverStress = Math.max(0.0, scaledKineticEnergy - crackResistance);
+                BlockDamageAccumulator.apply(
                         level,
                         pos,
-                        MaterialImpactProperties.fatigueDamage(state, overStress),
+                        MaterialImpactProperties.fatigueDamage(state, crackOverStress),
                         materialToughness * TrueImpactConfig.BREAK_YIELD_THRESHOLD.get(),
                         system.hashCode() + pos.hashCode()
                 );
-                if (!broke) {
-                    level.destroyBlockProgress(system.hashCode() + pos.hashCode(), pos, crackProgress);
-                }
             }
 
             return BlockSubLevelCollisionCallback.CollisionResult.NONE;
