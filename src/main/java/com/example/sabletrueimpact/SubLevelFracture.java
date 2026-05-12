@@ -8,7 +8,6 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import org.joml.Vector3d;
 
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -24,14 +23,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public final class SubLevelFracture {
-    private static final Method GET_LEVEL = findMethod("dev.ryanhcode.sable.sublevel.ServerSubLevel", "getLevel");
-    private static final Method GET_HEAT_MAP_MANAGER = findMethod("dev.ryanhcode.sable.sublevel.ServerSubLevel", "getHeatMapManager");
-    private static final Method GET_MASS_TRACKER = findMethod("dev.ryanhcode.sable.sublevel.ServerSubLevel", "getMassTracker");
-    private static final Method GET_MASS = findMethod("dev.ryanhcode.sable.api.physics.mass.MassData", "getMass");
-    private static final Method GET_CENTER_OF_MASS = findMethod("dev.ryanhcode.sable.api.physics.mass.MassData", "getCenterOfMass");
-    private static final Method GET_ON_SOLID_REMOVED = findMethod("dev.ryanhcode.sable.sublevel.plot.heat.SubLevelHeatMapManager", "onSolidRemoved", BlockPos.class);
-    private static final Method LOGICAL_POSE = findMethod("dev.ryanhcode.sable.sublevel.SubLevel", "logicalPose");
-    private static final Method ROTATION_POINT = findMethod("dev.ryanhcode.sable.companion.math.Pose3d", "rotationPoint");
     private static final Map<Integer, List<Offset>> OFFSET_CACHE = new ConcurrentHashMap<>();
     private static final ExecutorService FRACTURE_EXECUTOR = Executors.newSingleThreadExecutor(new FractureThreadFactory());
     private static final ConcurrentLinkedQueue<PendingFracture> COMPLETED_FRACTURES = new ConcurrentLinkedQueue<>();
@@ -52,13 +43,11 @@ public final class SubLevelFracture {
         }
         long startedAt = TrueImpactPerformance.start();
 
-        ServerLevel level = level(subLevel);
+        ServerLevel level = SableReflector.getLevel(subLevel);
         if (level == null) {
             return;
         }
 
-        // Convert local-space contact point → world-space before touching block world.
-        // Without this, ships near the origin would destroy blocks at (0,0,0).
         Vector3d worldPoint = toWorldPoint(subLevel, localPoint);
         if (worldPoint == null
                 || !Double.isFinite(worldPoint.x)
@@ -94,7 +83,7 @@ public final class SubLevelFracture {
         }
 
         FractureSnapshot snapshot = FractureSnapshot.capture(level, center, radiusForSnapshot());
-        Object heatMapManager = heatMapManager(subLevel);
+        Object heatMapManager = SableReflector.getHeatMapManager(subLevel);
         if (TrueImpactConfig.ENABLE_ASYNC_FRACTURE_ANALYSIS.get()) {
             submitAsync(level, snapshot, center, planeNormal, fracturePower, heatMapManager, startedAt);
             return;
@@ -201,7 +190,7 @@ public final class SubLevelFracture {
                     candidate.pos().hashCode() * 23
             );
             if (brokeFromFatigue) {
-                notifyRemoved(heatMapManager, candidate.pos());
+                SableReflector.onSolidRemoved(heatMapManager, candidate.pos());
                 removed++;
                 continue;
             }
@@ -209,7 +198,7 @@ public final class SubLevelFracture {
                 continue;
             }
             level.destroyBlock(candidate.pos(), true);
-            notifyRemoved(heatMapManager, candidate.pos());
+            SableReflector.onSolidRemoved(heatMapManager, candidate.pos());
             removed++;
         }
         return removed;
@@ -322,13 +311,12 @@ public final class SubLevelFracture {
     }
 
     private static double structureMultiplier(Object subLevel, Vector3d localPoint) {
-        Object massTracker = massTracker(subLevel);
-        double mass = mass(massTracker);
+        double mass = SableReflector.getMass(subLevel);
         double massReference = Math.max(1.0, TrueImpactConfig.SUBLEVEL_FRACTURE_MASS_REFERENCE.get());
         double massRatio = Math.max(0.0, mass / massReference);
         double massBonus = 1.0 + Math.log1p(massRatio) * TrueImpactConfig.SUBLEVEL_FRACTURE_MASS_BONUS_SCALE.get();
 
-        Vector3d centerOfMass = centerOfMass(massTracker);
+        Vector3d centerOfMass = SableReflector.getCenterOfMass(subLevel);
         if (centerOfMass == null) {
             return massBonus;
         }
@@ -339,92 +327,10 @@ public final class SubLevelFracture {
         return massBonus * imbalanceBonus;
     }
 
-    private static Object massTracker(Object subLevel) {
-        try {
-            return GET_MASS_TRACKER.invoke(subLevel);
-        } catch (ReflectiveOperationException | RuntimeException e) {
-            return null;
-        }
-    }
-
-    private static double mass(Object massTracker) {
-        if (massTracker == null) {
-            return 1.0;
-        }
-        try {
-            return Math.max(1.0, ((Number) GET_MASS.invoke(massTracker)).doubleValue());
-        } catch (ReflectiveOperationException | RuntimeException e) {
-            return 1.0;
-        }
-    }
-
-    private static Vector3d centerOfMass(Object massTracker) {
-        if (massTracker == null) {
-            return null;
-        }
-        try {
-            Object center = GET_CENTER_OF_MASS.invoke(massTracker);
-            if (center == null) {
-                return null;
-            }
-            Method x = center.getClass().getMethod("x");
-            Method y = center.getClass().getMethod("y");
-            Method z = center.getClass().getMethod("z");
-            return new Vector3d(((Number) x.invoke(center)).doubleValue(), ((Number) y.invoke(center)).doubleValue(), ((Number) z.invoke(center)).doubleValue());
-        } catch (ReflectiveOperationException | RuntimeException e) {
-            return null;
-        }
-    }
-
-    private static ServerLevel level(Object subLevel) {
-        try {
-            Object level = GET_LEVEL.invoke(subLevel);
-            return level instanceof ServerLevel serverLevel ? serverLevel : null;
-        } catch (ReflectiveOperationException | RuntimeException e) {
-            return null;
-        }
-    }
-
-    private static Object heatMapManager(Object subLevel) {
-        try {
-            return GET_HEAT_MAP_MANAGER.invoke(subLevel);
-        } catch (ReflectiveOperationException | RuntimeException e) {
-            return null;
-        }
-    }
-
-    private static void notifyRemoved(Object heatMapManager, BlockPos pos) {
-        if (heatMapManager == null) {
-            return;
-        }
-        try {
-            GET_ON_SOLID_REMOVED.invoke(heatMapManager, pos);
-        } catch (ReflectiveOperationException | RuntimeException ignored) {
-        }
-    }
-
-    private static Method findMethod(String className, String methodName, Class<?>... parameterTypes) {
-        try {
-            Method method = Class.forName(className).getMethod(methodName, parameterTypes);
-            method.setAccessible(true);
-            return method;
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("Missing Sable method " + className + "#" + methodName, e);
-        }
-    }
-
-    /** Resolves a Rapier local-space point to Minecraft world-space by adding the sub-level's rotation point. */
     static Vector3d toWorldPoint(Object subLevel, Vector3d localPoint) {
-        try {
-            Object pose = LOGICAL_POSE.invoke(subLevel);
-            Object rp = ROTATION_POINT.invoke(pose);
-            double rx = ((Number) rp.getClass().getMethod("x").invoke(rp)).doubleValue();
-            double ry = ((Number) rp.getClass().getMethod("y").invoke(rp)).doubleValue();
-            double rz = ((Number) rp.getClass().getMethod("z").invoke(rp)).doubleValue();
-            return new Vector3d(localPoint.x + rx, localPoint.y + ry, localPoint.z + rz);
-        } catch (ReflectiveOperationException | RuntimeException e) {
-            return null;
-        }
+        Vector3d rp = SableReflector.getRotationPoint(subLevel);
+        if (rp == null) return null;
+        return new Vector3d(localPoint.x + rp.x, localPoint.y + rp.y, localPoint.z + rp.z);
     }
 
     private record Candidate(BlockPos pos, double score, double fatigueDamage, double breakThreshold) {
@@ -466,11 +372,18 @@ public final class SubLevelFracture {
         }
 
         private static FractureSnapshot capture(ServerLevel level, BlockPos center, int radius) {
-            Map<Long, BlockState> states = new HashMap<>();
-            Map<Long, BlockMaterial> materials = new HashMap<>();
-            Map<Long, Double> damageRatios = new HashMap<>();
+            int capacity = (radius * 2 + 1) * (radius * 2 + 1) * (radius * 2 + 1);
+            Map<Long, BlockState> states = new HashMap<>(capacity);
+            Map<Long, BlockMaterial> materials = new HashMap<>(capacity);
+            Map<Long, Double> damageRatios = new HashMap<>(capacity / 4);
             Set<Long> glueEntities = new HashSet<>();
             BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+            
+            double baseStrength = TrueImpactConfig.BASE_STRENGTH.get();
+            double hardnessFactor = TrueImpactConfig.HARDNESS_STRENGTH_FACTOR.get();
+            double blastFactor = TrueImpactConfig.BLAST_STRENGTH_FACTOR.get();
+            double yieldThreshold = TrueImpactConfig.BREAK_YIELD_THRESHOLD.get();
+
             for (int x = -radius; x <= radius; x++) {
                 for (int y = -radius; y <= radius; y++) {
                     for (int z = -radius; z <= radius; z++) {
@@ -478,20 +391,15 @@ public final class SubLevelFracture {
                         long key = pos.asLong();
                         BlockState state = level.getBlockState(pos);
                         states.put(key, state);
-                        materials.put(key, new BlockMaterial(state.getDestroySpeed(level, pos), state.getBlock().getExplosionResistance()));
-                        if (!state.isAir() && state.getDestroySpeed(level, pos) >= 0.0f) {
-                            double hardness = Math.max(0.05, state.getDestroySpeed(level, pos));
-                            double blast = Math.max(0.0, state.getBlock().getExplosionResistance());
-                            double baseThreshold = TrueImpactConfig.BASE_STRENGTH.get()
-                                    + hardness * TrueImpactConfig.HARDNESS_STRENGTH_FACTOR.get()
-                                    + blast * TrueImpactConfig.BLAST_STRENGTH_FACTOR.get();
-                            double breakThreshold = Math.max(
-                                    Math.max(
-                                            MaterialImpactProperties.displayStrength(state, baseThreshold),
-                                            MaterialImpactProperties.displayToughness(state, baseThreshold)
-                                    ),
-                                    1.0);
-                            damageRatios.put(key, BlockDamageAccumulator.damageRatio(level, pos, breakThreshold));
+                        
+                        float hardness = state.getDestroySpeed(level, pos);
+                        float blast = state.getBlock().getExplosionResistance();
+                        materials.put(key, new BlockMaterial(hardness, blast));
+                        
+                        if (!state.isAir() && hardness >= 0.0f) {
+                            double strength = baseStrength + Math.max(0.05, hardness) * hardnessFactor + Math.max(0.0, blast) * blastFactor;
+                            double breakThreshold = Math.max(Math.max(MaterialImpactProperties.displayStrength(state, strength), MaterialImpactProperties.displayToughness(state, strength)), 1.0);
+                            damageRatios.put(key, BlockDamageAccumulator.damageRatio(level, pos, breakThreshold * yieldThreshold));
                         }
                         if (StructuralStrengthAnalyzer.hasGlueEntity(level, pos)) {
                             glueEntities.add(key);

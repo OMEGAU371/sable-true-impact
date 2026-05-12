@@ -24,24 +24,6 @@ import java.util.PriorityQueue;
 import java.util.Set;
 
 public final class ElasticPairReaction {
-    private static final Field RUNTIME_ID_FIELD = findField("dev.ryanhcode.sable.sublevel.ServerSubLevel", "runtimeId");
-    private static final Method GET_LEVEL_METHOD = findMethod("dev.ryanhcode.sable.sublevel.ServerSubLevel", "getLevel");
-    private static final Method GET_MASS_TRACKER_METHOD = findMethod("dev.ryanhcode.sable.sublevel.ServerSubLevel", "getMassTracker");
-    private static final Method GET_MASS_METHOD = findMethod("dev.ryanhcode.sable.api.physics.mass.MassData", "getMass");
-    private static final Method GET_CENTER_OF_MASS_METHOD = findMethod("dev.ryanhcode.sable.api.physics.mass.MassData", "getCenterOfMass");
-    private static final Method LOGICAL_POSE_METHOD = findMethod("dev.ryanhcode.sable.sublevel.SubLevel", "logicalPose");
-    private static final Method ROTATION_POINT_METHOD = findMethod("dev.ryanhcode.sable.companion.math.Pose3d", "rotationPoint");
-    private static final Method WAKE_UP_METHOD;
-
-    static {
-        Method m = null;
-        try {
-            m = Class.forName("dev.ryanhcode.sable.sublevel.ServerSubLevel").getMethod("wakeUp");
-            m.setAccessible(true);
-        } catch (Exception ignored) {}
-        WAKE_UP_METHOD = m;
-    }
-
     private ElasticPairReaction() {}
 
     public static void apply(int sceneId, Int2ObjectMap<?> activeSubLevels, double[] collisions) {
@@ -52,6 +34,7 @@ public final class ElasticPairReaction {
 
         java.util.Map<Integer, CollisionCluster> clusters = new java.util.HashMap<>();
         List<ExplosionCandidate> explosionCandidates = new ArrayList<>();
+        java.util.Map<Object, SubLevelCache> subLevelCaches = new java.util.IdentityHashMap<>();
 
         for (int i = 0; i < collisions.length / 15; i++) {
             int start = i * 15;
@@ -64,10 +47,10 @@ public final class ElasticPairReaction {
             Object mainSl = slA != null ? slA : slB;
             if (mainSl == null) continue;
             
-            Integer runtimeId = runtimeId(mainSl);
-            if (runtimeId == null) continue;
+            int runtimeId = SableReflector.getRuntimeId(mainSl);
+            if (runtimeId == -1) continue;
 
-            clusters.computeIfAbsent(runtimeId, k -> new CollisionCluster(sceneId, mainSl, slA == null || slB == null))
+            clusters.computeIfAbsent(runtimeId, k -> new CollisionCluster(sceneId, mainSl, slA == null || slB == null, subLevelCaches))
                     .addPoint(collisions, start, slA, slB);
         }
 
@@ -78,19 +61,37 @@ public final class ElasticPairReaction {
         processExplosions(explosionCandidates);
     }
 
+    private static class SubLevelCache {
+        final ServerLevel level;
+        final Vector3d rotationPoint;
+        final double mass;
+
+        SubLevelCache(Object subLevel) {
+            this.level = SableReflector.getLevel(subLevel);
+            this.rotationPoint = SableReflector.getRotationPoint(subLevel);
+            this.mass = SableReflector.getMass(subLevel);
+        }
+    }
+
     private static class CollisionCluster {
         private final int sceneId;
         private final Object subLevel;
         private final boolean isTerrain;
+        private final java.util.Map<Object, SubLevelCache> subLevelCaches;
         private double totalForce = 0;
         private final List<PointData> points = new ArrayList<>();
         private final Vector3d min = new Vector3d(Double.MAX_VALUE, Double.MAX_VALUE, Double.MAX_VALUE);
         private final Vector3d max = new Vector3d(-Double.MAX_VALUE, -Double.MAX_VALUE, -Double.MAX_VALUE);
 
-        public CollisionCluster(int sceneId, Object subLevel, boolean isTerrain) {
+        public CollisionCluster(int sceneId, Object subLevel, boolean isTerrain, java.util.Map<Object, SubLevelCache> subLevelCaches) {
             this.sceneId = sceneId;
             this.subLevel = subLevel;
             this.isTerrain = isTerrain;
+            this.subLevelCaches = subLevelCaches;
+        }
+
+        private SubLevelCache getCache(Object sl) {
+            return subLevelCaches.computeIfAbsent(sl, SubLevelCache::new);
         }
 
         public void addPoint(double[] collisions, int start, Object slA, Object slB) {
@@ -128,9 +129,12 @@ public final class ElasticPairReaction {
         }
 
         private void processTerrainImpact(boolean isFlat, List<ExplosionCandidate> explosions) {
-            ServerLevel level = level(subLevel);
-            Vector3d rotation = rotationPoint(subLevel);
-            if (level == null || rotation == null) return;
+            SubLevelCache cache = getCache(subLevel);
+            if (cache.level == null || cache.rotationPoint == null) return;
+
+            double threshold = TrueImpactConfig.TERRAIN_IMPACT_FORCE_THRESHOLD.get();
+            if (!isFlat && totalForce < threshold) return;
+            if (isFlat && totalForce < threshold * 0.5) return;
 
             points.sort((a, b) -> Double.compare(b.force, a.force));
             
@@ -139,11 +143,11 @@ public final class ElasticPairReaction {
                 double distributedForce = totalForce / limit;
                 for (int i = 0; i < limit; i++) {
                     PointData p = points.get(i);
-                    applyTerrainImpact(subLevel, p.local, p.normal, distributedForce * 1.5, explosions);
+                    applyTerrainImpact(subLevel, cache, p.local, p.normal, distributedForce * 1.5, explosions);
                 }
             } else {
                 PointData lead = points.get(0);
-                applyTerrainImpact(subLevel, lead.local, lead.normal, totalForce, explosions);
+                applyTerrainImpact(subLevel, cache, lead.local, lead.normal, totalForce, explosions);
             }
         }
 
@@ -152,15 +156,18 @@ public final class ElasticPairReaction {
             for (PointData p : points) {
                 if (p.slA == null || p.slB == null) continue;
                 
-                BlockState stateA = localState(p.slA, p.local, tmpPos);
-                BlockState stateB = localState(p.slB, p.local, tmpPos);
+                SubLevelCache cacheA = getCache(p.slA);
+                SubLevelCache cacheB = getCache(p.slB);
+
+                BlockState stateA = localState(cacheA, p.local, tmpPos);
+                BlockState stateB = localState(cacheB, p.local, tmpPos);
                 double res = Math.max(PhysicsBlockPropertyHelper.getRestitution(stateA), PhysicsBlockPropertyHelper.getRestitution(stateB));
                 
                 double threshold = TrueImpactConfig.PAIR_REACTION_FORCE_THRESHOLD.get();
                 if (p.force < threshold) continue;
 
-                double massA = Math.max(mass(p.slA), 1.0);
-                double massB = Math.max(mass(p.slB), 1.0);
+                double massA = Math.max(cacheA.mass, 1.0);
+                double massB = Math.max(cacheB.mass, 1.0);
                 double reducedMass = (massA * massB) / (massA + massB);
                 double softening = Math.min(1.0, (p.force - threshold) / Math.max(threshold, 100.0));
                 double cappedForce = Math.min(p.force, TrueImpactConfig.PAIR_REACTION_MAX_IMPULSE.get());
@@ -168,42 +175,40 @@ public final class ElasticPairReaction {
                 impulse = Math.min(impulse, reducedMass * TrueImpactConfig.PAIR_REACTION_MAX_VELOCITY_CHANGE.get());
 
                 if (impulse > 1.0E-6) {
-                    applyImpulse(sceneId, p.slA, p.slB, p.local, p.normal, impulse / massA, -impulse / massB);
+                    applyImpulse(sceneId, p.slA, cacheA, p.local, p.normal, impulse / massA);
+                    applyImpulse(sceneId, p.slB, cacheB, p.local, p.normal, -impulse / massB);
                     
-                    Vector3d rot = rotationPoint(p.slA);
-                    if (rot != null) {
-                        collectExplosion(explosions, level(p.slA), new Vector3d(p.local).add(rot), p.force, Math.max(massA, massB));
+                    if (cacheA.rotationPoint != null) {
+                        collectExplosion(explosions, cacheA.level, new Vector3d(p.local).add(cacheA.rotationPoint), p.force, Math.max(massA, massB));
                     }
                 }
             }
         }
+
+        private record PointData(Vector3d local, Vector3d normal, double force, Object slA, Object slB) {}
     }
 
-    private static void applyTerrainImpact(Object subLevel, Vector3d localPoint, Vector3d normal, double forceAmount, List<ExplosionCandidate> explosions) {
+    private static void applyTerrainImpact(Object subLevel, SubLevelCache cache, Vector3d localPoint, Vector3d normal, double forceAmount, List<ExplosionCandidate> explosions) {
         if (!TrueImpactConfig.ENABLE_TERRAIN_IMPACT_DAMAGE.get() || (TrueImpactConfig.ELASTIC_BLOCKS_BREAK_BLOCKS.get() == false && isElasticSubLevel(subLevel))) {
             return;
         }
         
-        Vector3d rotationPoint = rotationPoint(subLevel);
-        if (rotationPoint == null) return;
-        Vector3d globalPoint = new Vector3d(localPoint).add(rotationPoint);
+        if (cache.rotationPoint == null || cache.level == null) return;
+        Vector3d globalPoint = new Vector3d(localPoint).add(cache.rotationPoint);
 
         if (isForgivenStepContact(globalPoint, normal)) return;
-
-        ServerLevel level = level(subLevel);
-        if (level == null) return;
 
         SubLevelFracture.tryFracture(subLevel, localPoint, normal, forceAmount);
         
         if (TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.get()) {
-            double mass = Math.min(TrueImpactConfig.TERRAIN_IMPACT_MAX_EFFECTIVE_MASS.get(), Math.pow(Math.max(mass(subLevel), 1.0), TrueImpactConfig.TERRAIN_IMPACT_MASS_EXPONENT.get()));
+            double mass = Math.min(TrueImpactConfig.TERRAIN_IMPACT_MAX_EFFECTIVE_MASS.get(), Math.pow(Math.max(cache.mass, 1.0), TrueImpactConfig.TERRAIN_IMPACT_MASS_EXPONENT.get()));
             double force = scaledForce(forceAmount, TrueImpactConfig.TERRAIN_IMPACT_FORCE_THRESHOLD.get(), TrueImpactConfig.TERRAIN_IMPACT_FORCE_EXPONENT.get());
             double energy = force * mass * TrueImpactConfig.TERRAIN_IMPACT_DAMAGE_SCALE.get() * TrueImpactConfig.DAMAGE_SCALE.get();
             
             BlockPos center = BlockPos.containing(globalPoint.x, globalPoint.y, globalPoint.z);
-            damageTerrain(level, center, normal, energy);
-            damageEntities(level, new Vec3(globalPoint.x, globalPoint.y, globalPoint.z), energy);
-            collectExplosion(explosions, level, globalPoint, forceAmount, mass(subLevel));
+            damageTerrain(cache.level, center, normal, energy);
+            damageEntities(cache.level, new Vec3(globalPoint.x, globalPoint.y, globalPoint.z), energy);
+            collectExplosion(explosions, cache.level, globalPoint, forceAmount, cache.mass);
         }
     }
 
@@ -237,50 +242,49 @@ public final class ElasticPairReaction {
     }
 
     private static void damageTerrain(ServerLevel level, BlockPos center, Vector3d normal, double energy) {
-        PriorityQueue<TerrainNode> queue = new PriorityQueue<>(Comparator.comparingDouble(TerrainNode::cost));
-        Set<BlockPos> visited = new HashSet<>();
-        Vector3d direction = new Vector3d(normal).normalize();
-        if (direction.lengthSquared() < 0.1) direction.set(0, -1, 0);
+        level.getServer().execute(() -> {
+            PriorityQueue<TerrainNode> queue = new PriorityQueue<>(Comparator.comparingDouble(TerrainNode::cost));
+            Set<BlockPos> visited = new HashSet<>();
+            Vector3d direction = new Vector3d(normal).normalize();
+            if (direction.lengthSquared() < 0.1) direction.set(0, -1, 0);
 
-        queue.add(new TerrainNode(center.immutable(), energy, 0.0));
-        visited.add(center.immutable());
-        int broken = 0;
+            queue.add(new TerrainNode(center.immutable(), energy, 0.0));
+            visited.add(center.immutable());
+            int broken = 0;
 
-        TrueImpactConfig.QualityMode qm = TrueImpactConfig.PERFORMANCE_QUALITY_MODE.get();
-        int maxBlocks = qm.maxTerrainBlocks;
-        
-        while (!queue.isEmpty() && broken < maxBlocks) {
-            TerrainNode node = queue.poll();
-            BlockPos pos = node.pos();
-            BlockState state = level.getBlockState(pos);
-            if (state.isAir() || state.getDestroySpeed(level, pos) < 0 || state.is(Blocks.BEDROCK)) continue;
+            while (!queue.isEmpty() && broken < TrueImpactConfig.TERRAIN_IMPACT_MAX_BLOCKS.get()) {
+                TerrainNode node = queue.poll();
+                BlockPos pos = node.pos();
+                BlockState state = level.getBlockState(pos);
+                if (state.isAir() || state.getDestroySpeed(level, pos) < 0 || state.is(Blocks.BEDROCK)) continue;
 
-            double strength = (state.getDestroySpeed(level, pos) * TrueImpactConfig.HARDNESS_STRENGTH_FACTOR.get())
-                    + (state.getBlock().getExplosionResistance() * TrueImpactConfig.BLAST_STRENGTH_FACTOR.get())
-                    + TrueImpactConfig.BASE_STRENGTH.get();
-            if (state.getDestroySpeed(level, pos) < 1.0f) strength *= TrueImpactConfig.SOFT_BLOCK_STRENGTH_MULTIPLIER.get();
-            
-            double materialThreshold = Math.max(MaterialImpactProperties.breakThreshold(state, strength), 1.0);
-            double yield = node.energy() / materialThreshold;
+                double strength = (state.getDestroySpeed(level, pos) * TrueImpactConfig.HARDNESS_STRENGTH_FACTOR.get())
+                        + (state.getBlock().getExplosionResistance() * TrueImpactConfig.BLAST_STRENGTH_FACTOR.get())
+                        + TrueImpactConfig.BASE_STRENGTH.get();
+                if (state.getDestroySpeed(level, pos) < 1.0f) strength *= TrueImpactConfig.SOFT_BLOCK_STRENGTH_MULTIPLIER.get();
+                
+                double materialThreshold = Math.max(MaterialImpactProperties.breakThreshold(state, strength), 1.0);
+                double yield = node.energy() / materialThreshold;
 
-            if (yield >= TrueImpactConfig.TERRAIN_IMPACT_BREAK_YIELD.get()) {
-                level.destroyBlock(pos, true);
-                broken++;
-                double remaining = (node.energy() - materialThreshold) * 0.55;
-                if (remaining > materialThreshold * 0.2) {
-                    for (Direction dir : Direction.values()) {
-                        BlockPos next = pos.relative(dir).immutable();
-                        if (visited.add(next)) {
-                            double bias = 1.0 + Math.max(0.0, new Vector3d(dir.getStepX(), dir.getStepY(), dir.getStepZ()).dot(direction)) * 0.8;
-                            queue.add(new TerrainNode(next, remaining * bias, node.cost() + 1.0 / bias));
+                if (yield >= TrueImpactConfig.TERRAIN_IMPACT_BREAK_YIELD.get()) {
+                    level.destroyBlock(pos, true);
+                    broken++;
+                    double remaining = (node.energy() - materialThreshold) * 0.55;
+                    if (remaining > materialThreshold * 0.2) {
+                        for (Direction dir : Direction.values()) {
+                            BlockPos next = pos.relative(dir).immutable();
+                            if (visited.add(next)) {
+                                double bias = 1.0 + Math.max(0.0, new Vector3d(dir.getStepX(), dir.getStepY(), dir.getStepZ()).dot(direction)) * 0.8;
+                                queue.add(new TerrainNode(next, remaining * bias, node.cost() + 1.0 / bias));
+                            }
                         }
                     }
+                } else if (TrueImpactConfig.ENABLE_CRACKS.get() && yield > TrueImpactConfig.CRACK_YIELD_THRESHOLD.get()) {
+                    BlockDamageAccumulator.apply(level, pos, MaterialImpactProperties.fatigueDamage(state, node.energy() - materialThreshold), 
+                        materialThreshold * TrueImpactConfig.TERRAIN_IMPACT_BREAK_YIELD.get(), pos.hashCode());
                 }
-            } else if (TrueImpactConfig.ENABLE_CRACKS.get() && yield > TrueImpactConfig.CRACK_YIELD_THRESHOLD.get()) {
-                BlockDamageAccumulator.apply(level, pos, MaterialImpactProperties.fatigueDamage(state, node.energy() - materialThreshold), 
-                    materialThreshold * TrueImpactConfig.TERRAIN_IMPACT_BREAK_YIELD.get(), pos.hashCode());
             }
-        }
+        });
     }
 
     private static void collectExplosion(List<ExplosionCandidate> list, ServerLevel level, Vector3d point, double force, double mass) {
@@ -309,14 +313,12 @@ public final class ElasticPairReaction {
     }
 
     private static boolean isElasticSubLevel(Object subLevel) {
-        ServerLevel level = level(subLevel);
+        ServerLevel level = SableReflector.getLevel(subLevel);
         if (level == null) return false;
         try {
-            Method getPlot = subLevel.getClass().getMethod("getPlot");
-            Object plot = getPlot.invoke(subLevel);
-            Object box = plot.getClass().getMethod("getBoundingBox").invoke(plot);
-            int minX = (int) number(box, "minX"); int minY = (int) number(box, "minY"); int minZ = (int) number(box, "minZ");
-            int maxX = (int) number(box, "maxX"); int maxY = (int) number(box, "maxY"); int maxZ = (int) number(box, "maxZ");
+            Object bounds = SableReflector.plotBounds(subLevel);
+            int minX = (int) SableReflector.getMinX(bounds); int minY = (int) SableReflector.getMinY(bounds); int minZ = (int) SableReflector.getMinZ(bounds);
+            int maxX = (int) SableReflector.getMaxX(bounds); int maxY = (int) SableReflector.getMaxY(bounds); int maxZ = (int) SableReflector.getMaxZ(bounds);
             BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
             int limit = TrueImpactConfig.ELASTIC_SUBLEVEL_SCAN_LIMIT.get();
             for (int x = minX; x <= maxX && limit-- > 0; x++)
@@ -327,85 +329,22 @@ public final class ElasticPairReaction {
         return false;
     }
 
-    private static void applyImpulse(int sceneId, Object slA, Object slB, Vector3d localPoint, Vector3d normal, double impulseA, double impulseB) {
-        if (slA == null || slB == null) return;
-        if (slA instanceof net.minecraft.world.entity.Entity eA && eA.isRemoved()) return;
-        if (slB instanceof net.minecraft.world.entity.Entity eB && eB.isRemoved()) return;
-        
-        if (WAKE_UP_METHOD != null) {
-            try {
-                WAKE_UP_METHOD.invoke(slA);
-                WAKE_UP_METHOD.invoke(slB);
-            } catch (Exception ignored) {}
-        }
-
-        applySingleImpulse(sceneId, slA, localPoint, normal, impulseA);
-        applySingleImpulse(sceneId, slB, localPoint, normal, impulseB);
-    }
-
-    private static void applySingleImpulse(int sceneId, Object subLevel, Vector3d localPoint, Vector3d normal, double impulse) {
-        if (!Double.isFinite(impulse) || Math.abs(impulse) <= 1e-6) return;
-        if (!Double.isFinite(localPoint.x) || !Double.isFinite(localPoint.y) || !Double.isFinite(localPoint.z)) return;
-        if (!Double.isFinite(normal.x) || !Double.isFinite(normal.y) || !Double.isFinite(normal.z)) return;
-
-        Vector3d com = centerOfMass(subLevel);
-        Integer rid = runtimeId(subLevel);
-        if (normal.lengthSquared() < 1e-8 || com == null || rid == null) return;
-
+    private static void applyImpulse(int sceneId, Object subLevel, SubLevelCache cache, Vector3d localPoint, Vector3d normal, double impulse) {
+        Vector3d com = SableReflector.getCenterOfMass(subLevel);
+        int rid = SableReflector.getRuntimeId(subLevel);
+        if (normal.lengthSquared() < 1e-8 || com == null || rid == -1) return;
         Vector3d localNormal = new Vector3d(normal).normalize().mul(impulse);
-        if (!Double.isFinite(localNormal.x) || !Double.isFinite(localNormal.y) || !Double.isFinite(localNormal.z)) return;
-        
         Rapier3D.applyForce(sceneId, rid, localPoint.x - com.x, localPoint.y - com.y, localPoint.z - com.z, localNormal.x, localNormal.y, localNormal.z, true);
     }
 
-    private static double mass(Object subLevel) {
-        try { return ((Number) GET_MASS_METHOD.invoke(GET_MASS_TRACKER_METHOD.invoke(subLevel))).doubleValue(); } catch (Exception e) { return 1.0; }
-    }
-
-    private static Vector3d centerOfMass(Object subLevel) {
-        try {
-            Object center = GET_CENTER_OF_MASS_METHOD.invoke(GET_MASS_TRACKER_METHOD.invoke(subLevel));
-            return new Vector3d((double)center.getClass().getMethod("x").invoke(center), (double)center.getClass().getMethod("y").invoke(center), (double)center.getClass().getMethod("z").invoke(center));
-        } catch (Exception e) { return null; }
-    }
-
-    private static Vector3d rotationPoint(Object subLevel) {
-        try {
-            Object rp = ROTATION_POINT_METHOD.invoke(LOGICAL_POSE_METHOD.invoke(subLevel));
-            return new Vector3d((double)rp.getClass().getMethod("x").invoke(rp), (double)rp.getClass().getMethod("y").invoke(rp), (double)rp.getClass().getMethod("z").invoke(rp));
-        } catch (Exception e) { return null; }
-    }
-
-    private static ServerLevel level(Object subLevel) {
-        try { return (ServerLevel) GET_LEVEL_METHOD.invoke(subLevel); } catch (Exception e) { return null; }
-    }
-
-    private static Integer runtimeId(Object subLevel) {
-        if (subLevel instanceof net.minecraft.world.entity.Entity e && e.isRemoved()) return null;
-        try { return ((Number) RUNTIME_ID_FIELD.get(subLevel)).intValue(); } catch (Exception e) { return null; }
-    }
-
-    private static double number(Object target, String methodName) throws Exception {
-        return ((Number) target.getClass().getMethod(methodName).invoke(target)).doubleValue();
-    }
-
-    private static Field findField(String cl, String f) {
-        try { Field field = Class.forName(cl).getDeclaredField(f); field.setAccessible(true); return field; } catch (Exception e) { return null; }
-    }
-
-    private static Method findMethod(String cl, String m) {
-        try { Method method = Class.forName(cl).getMethod(m); method.setAccessible(true); return method; } catch (Exception e) { return null; }
-    }
-
-    private static BlockState localState(Object subLevel, Vector3d localPoint, BlockPos.MutableBlockPos blockPos) {
-        ServerLevel level = level(subLevel);
-        Vector3d rotationPoint = rotationPoint(subLevel);
-        if (level == null || rotationPoint == null) return Blocks.AIR.defaultBlockState();
-        blockPos.set(localPoint.x + rotationPoint.x, localPoint.y + rotationPoint.y, localPoint.z + rotationPoint.z);
-        return level.getBlockState(blockPos);
+    private static BlockState localState(SubLevelCache cache, Vector3d localPoint, BlockPos.MutableBlockPos blockPos) {
+        if (cache.level == null || cache.rotationPoint == null) return Blocks.AIR.defaultBlockState();
+        blockPos.set(localPoint.x + cache.rotationPoint.x, localPoint.y + cache.rotationPoint.y, localPoint.z + cache.rotationPoint.z);
+        return cache.level.getBlockState(blockPos);
     }
 
     private record PointData(Vector3d local, Vector3d normal, double force, Object slA, Object slB) {}
     private record ExplosionCandidate(ServerLevel level, Vector3d point, float radius, double force) {}
     private record TerrainNode(BlockPos pos, double energy, double cost) {}
+
 }

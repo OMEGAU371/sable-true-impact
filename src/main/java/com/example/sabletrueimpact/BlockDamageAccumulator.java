@@ -19,7 +19,6 @@ public final class BlockDamageAccumulator {
     public static boolean apply(ServerLevel level, BlockPos pos, double damage, double breakThreshold, int crackId) {
         if (!TrueImpactConfig.ENABLE_TRUE_IMPACT.get()
                 || !TrueImpactConfig.ENABLE_CUMULATIVE_BLOCK_DAMAGE.get()
-                || !TrueImpactConfig.PERFORMANCE_QUALITY_MODE.get().enableCracks
                 || damage <= 0.0
                 || breakThreshold <= 0.0) {
             return false;

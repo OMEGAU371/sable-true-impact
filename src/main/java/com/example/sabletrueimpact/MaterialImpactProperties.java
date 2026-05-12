@@ -2,8 +2,11 @@ package com.example.sabletrueimpact;
 
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import java.util.Map;
 
 public final class MaterialImpactProperties {
+    private static final Map<BlockState, Properties> CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+
     private MaterialImpactProperties() {
     }
 
@@ -29,7 +32,7 @@ public final class MaterialImpactProperties {
     }
 
     public static double breakThreshold(BlockState state, double baseStrength) {
-        return baseStrength * strengthMultiplier(state) * toughnessMultiplier(state) * TrueImpactConfig.GLOBAL_STRENGTH_SCALE.get();
+        return baseStrength * strengthMultiplier(state) * toughnessMultiplier(state);
     }
 
     public static double displayStrength(BlockState state, double baseStrength) {
@@ -45,6 +48,10 @@ public final class MaterialImpactProperties {
     }
 
     private static Properties properties(BlockState state) {
+        return CACHE.computeIfAbsent(state, MaterialImpactProperties::computeProperties);
+    }
+
+    private static Properties computeProperties(BlockState state) {
         if (state.is(Blocks.NETHERITE_BLOCK)) {
             return new Properties(
                     TrueImpactConfig.NETHERITE_STRENGTH_MULTIPLIER.get(),
