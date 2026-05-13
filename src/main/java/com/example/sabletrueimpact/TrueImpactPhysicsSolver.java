@@ -149,6 +149,7 @@ public class TrueImpactPhysicsSolver {
             double crackResistance = Math.sqrt(materialStrength * materialToughness);
             double crackRatio = scaledKineticEnergy / Math.max(crackResistance, 1.0);
             double yieldRatio = scaledKineticEnergy / materialStrength;
+            boolean protectedHardVsSoft = ImpactDamageAllocator.isProtectedHardMaterialNearSoftTarget(level, pos, state, 3);
 
             double elasticBreakVelocity = TrueImpactConfig.MIN_BREAK_VELOCITY.get()
                     * (1.0 + restitution * TrueImpactConfig.RESTITUTION_BREAK_VELOCITY_MULTIPLIER.get());
@@ -160,7 +161,7 @@ public class TrueImpactPhysicsSolver {
                     && TrueImpactConfig.PROTECT_NEARBY_SUBLEVEL_IMPACTS.get()
                     && ElasticSubLevelDetector.hasNearbySubLevel(level, pos);
 
-            if ((restitution >= TrueImpactConfig.BOUNCE_RESPONSE_THRESHOLD.get() || elasticImpactingSubLevel || protectedSubLevelImpact)
+            if ((protectedHardVsSoft || restitution >= TrueImpactConfig.BOUNCE_RESPONSE_THRESHOLD.get() || elasticImpactingSubLevel || protectedSubLevelImpact)
                     && !TrueImpactConfig.ELASTIC_BLOCKS_BREAK_BLOCKS.get()
                     && !fragile) {
                 return new BlockSubLevelCollisionCallback.CollisionResult(

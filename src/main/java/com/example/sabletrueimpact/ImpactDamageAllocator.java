@@ -88,6 +88,34 @@ public final class ImpactDamageAllocator {
         return finalScale;
     }
 
+    public static boolean isProtectedHardMaterialNearSoftTarget(ServerLevel level, BlockPos selfPos, BlockState selfState, int radius) {
+        MaterialStats self = materialStats(level, selfPos, selfState);
+        if (self.resistance() <= 1.0) {
+            return false;
+        }
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        for (int x = -radius; x <= radius; x++) {
+            for (int y = -radius; y <= radius; y++) {
+                for (int z = -radius; z <= radius; z++) {
+                    if (x == 0 && y == 0 && z == 0) {
+                        continue;
+                    }
+                    pos.set(selfPos.getX() + x, selfPos.getY() + y, selfPos.getZ() + z);
+                    BlockState targetState = level.getBlockState(pos);
+                    if (targetState.isAir() || targetState.getBlock() == selfState.getBlock()) {
+                        continue;
+                    }
+                    MaterialStats target = materialStats(level, pos, targetState);
+                    double ratio = target.resistance() / Math.max(self.resistance(), 1.0);
+                    if (ratio <= TrueImpactConfig.SELF_DAMAGE_IMMUNITY_RATIO.get()) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     private static MaterialStats materialStats(ServerLevel level, BlockPos pos, BlockState state) {
         if (state.isAir()) {
             return new MaterialStats(1.0, 1.0, 1.0);
