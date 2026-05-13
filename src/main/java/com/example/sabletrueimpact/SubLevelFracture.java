@@ -86,7 +86,7 @@ public final class SubLevelFracture {
         );
         double fracturePower = (scaledForce - TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_THRESHOLD.get())
                 * TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_SCALE.get()
-                * structureMultiplier(subLevel, plotPoint)
+                * structureMultiplier(subLevel, localPoint)
                 * TrueImpactConfig.GLOBAL_STRENGTH_SCALE.get()
                 * externalDamageScale;
         if (fracturePower <= 0.0) {
@@ -252,36 +252,23 @@ public final class SubLevelFracture {
             }
             double baseResistance = MaterialImpactProperties.baseStrength(destroySpeed, snapshot.blastResistance(pos));
             double connectionStrength = structure.connectionStrength();
-            double connectionMaterialScale = Math.pow(Math.max(connectionStrength, 1.0), 0.25);
-            double materialStrength = Math.max(MaterialImpactProperties.displayStrength(state, baseResistance) * connectionMaterialScale, 1.0);
+            double materialStrength = Math.max(MaterialImpactProperties.displayStrength(state, baseResistance) * connectionStrength, 1.0);
             double materialToughness = Math.max(
-                    MaterialImpactProperties.displayToughness(state, baseResistance) * connectionMaterialScale,
+                    MaterialImpactProperties.displayToughness(state, baseResistance) * connectionStrength,
                     materialStrength);
             double impactFocus = impactFocus(offset.distanceSquared());
             double rawStress = fracturePower * structure.seamWeakness() * impactFocus;
             double overStress = rawStress - materialStrength;
+            if (overStress <= 0.0) {
+                continue;
+            }
             double toughnessBonus = materialToughness / materialStrength;
+            double fatigueDamage = MaterialImpactProperties.fatigueDamage(state, overStress);
             double breakThreshold = Math.max(materialToughness, 1.0);
             double crackRatio = snapshot.damageRatio(pos);
             double crackBonus = 1.0 + crackRatio * TrueImpactConfig.SUBLEVEL_FRACTURE_CRACK_BONUS_SCALE.get();
             double spreadBonus = 1.0 + structure.weakPlaneSpread() * TrueImpactConfig.SUBLEVEL_FRACTURE_WEAK_PLANE_SPREAD.get();
-
-            double fatigueDamage;
-            double score;
-            if (overStress > 0.0) {
-                fatigueDamage = MaterialImpactProperties.fatigueDamage(state, overStress);
-                // Score scales inverse to toughness bonus so hard blocks resist sudden fracture,
-                // while still showing accumulated cracks after repeated near-limit hits.
-                score = (fatigueDamage * crackBonus * spreadBonus) / (breakThreshold * toughnessBonus);
-            } else {
-                double nearLimitRatio = rawStress / Math.max(materialStrength, 1.0);
-                if (nearLimitRatio < 0.18) {
-                    continue;
-                }
-                double fatigue = materialStrength * nearLimitRatio * nearLimitRatio * 0.75;
-                fatigueDamage = MaterialImpactProperties.fatigueDamage(state, fatigue);
-                score = 0.0;
-            }
+            double score = (fatigueDamage * crackBonus * spreadBonus) / (breakThreshold * toughnessBonus);
             result.add(new Candidate(pos.immutable(), score, fatigueDamage, breakThreshold));
         }
         return new CandidateScan(result, checked);
