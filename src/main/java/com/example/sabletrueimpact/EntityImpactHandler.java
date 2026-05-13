@@ -131,9 +131,15 @@ public final class EntityImpactHandler {
         }
         int candidates = 0;
         int hits = 0;
-        for (Entity entity : level.getEntities((Entity) null, contactBounds.inflate(TrueImpactConfig.CREATE_CONTRAPTION_ANCHOR_DAMAGE_RADIUS.get()),
+        double contactMargin = Math.max(0.08, TrueImpactConfig.ENTITY_MOVING_IMPACT_CONTACT_MARGIN.get());
+        AABB contraptionContactBounds = contactBounds.inflate(contactMargin);
+        for (Entity entity : level.getEntities((Entity) null, contraptionContactBounds,
                 EntityImpactHandler::isCreateContraptionEntity)) {
             candidates++;
+            AABB entityBounds = entity.getBoundingBox();
+            if (!contraptionContactBounds.intersects(entityBounds)) {
+                continue;
+            }
             Vec3 entityVelocity = entity.getDeltaMovement();
             Vector3d relativeVelocity = new Vector3d(
                     subLevelVelocity.x - entityVelocity.x,
@@ -144,6 +150,10 @@ public final class EntityImpactHandler {
             if (relativeSpeed < TrueImpactConfig.ENTITY_MOVING_IMPACT_MIN_RELATIVE_SPEED.get()) {
                 continue;
             }
+            double closingSpeed = closingSpeed(entityBounds, contactBounds, relativeVelocity);
+            if (closingSpeed < TrueImpactConfig.ENTITY_MOVING_IMPACT_MIN_CLOSING_SPEED.get()) {
+                continue;
+            }
 
             EntityHitKey key = new EntityHitKey(entity.getUUID(), System.identityHashCode(subLevel));
             long now = level.getGameTime();
@@ -151,8 +161,9 @@ public final class EntityImpactHandler {
                 continue;
             }
 
-            Vec3 point = entity.getBoundingBox().getCenter();
-            double impactEnergy = relativeSpeed * relativeSpeed
+            Vec3 point = closestPoint(entityBounds.getCenter(), contactBounds);
+            double impactSpeed = Math.min(relativeSpeed, Math.max(closingSpeed, relativeSpeed * 0.35));
+            double impactEnergy = impactSpeed * impactSpeed
                     * mass
                     * TrueImpactConfig.ENTITY_MOVING_IMPACT_DAMAGE_SCALE.get()
                     * 24.0;
@@ -161,6 +172,14 @@ public final class EntityImpactHandler {
             hits++;
         }
         return new AnchorScanResult(candidates, hits);
+    }
+
+    private static Vec3 closestPoint(Vec3 point, AABB bounds) {
+        return new Vec3(
+                clamp(point.x, bounds.minX, bounds.maxX),
+                clamp(point.y, bounds.minY, bounds.maxY),
+                clamp(point.z, bounds.minZ, bounds.maxZ)
+        );
     }
 
     private static boolean isCreateContraptionEntity(Entity entity) {
