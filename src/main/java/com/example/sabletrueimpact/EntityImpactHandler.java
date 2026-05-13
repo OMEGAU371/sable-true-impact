@@ -97,7 +97,9 @@ public final class EntityImpactHandler {
                     velocity.z - entityVelocity.z
             );
             double relativeSpeed = relativeVelocity.length();
-            if (relativeSpeed < TrueImpactConfig.ENTITY_MOVING_IMPACT_MIN_RELATIVE_SPEED.get()) {
+            double minSpeed = Math.max(TrueImpactConfig.ENTITY_MOVING_IMPACT_MIN_RELATIVE_SPEED.get(),
+                    TrueImpactConfig.CREATE_CONTRAPTION_MIN_IMPACT_SPEED.get());
+            if (relativeSpeed < minSpeed) {
                 continue;
             }
             double closingSpeed = closingSpeed(entity.getBoundingBox(), bounds, relativeVelocity);
@@ -163,11 +165,27 @@ public final class EntityImpactHandler {
 
             Vec3 point = closestPoint(entityBounds.getCenter(), contactBounds);
             double impactSpeed = Math.min(relativeSpeed, Math.max(closingSpeed, relativeSpeed * 0.35));
-            double impactEnergy = impactSpeed * impactSpeed
+            double impactLoad = impactSpeed * impactSpeed
                     * mass
                     * TrueImpactConfig.ENTITY_MOVING_IMPACT_DAMAGE_SCALE.get()
                     * 24.0;
-            CreateContraptionAnchorDamage.apply(level, new Vector3d(point.x, point.y, point.z), impactEnergy);
+            CreateContraptionLoadAnalyzer.Result load = CreateContraptionLoadAnalyzer.analyze(level, entity);
+            double overload = Math.max(0.0, impactLoad - load.capacity());
+            if (TrueImpactConfig.CREATE_CONTRAPTION_DEBUG_LOGGING.get()) {
+                org.apache.logging.log4j.LogManager.getLogger().info(
+                        "[TrueImpact] Contraption impact id={} speed={} load={} capacity={} blocks={} fallback={} overload={}",
+                        BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()),
+                        String.format(java.util.Locale.ROOT, "%.2f", impactSpeed),
+                        String.format(java.util.Locale.ROOT, "%.2f", impactLoad),
+                        String.format(java.util.Locale.ROOT, "%.2f", load.capacity()),
+                        load.blocks(),
+                        load.fallback(),
+                        String.format(java.util.Locale.ROOT, "%.2f", overload));
+            }
+            if (overload <= 0.0) {
+                continue;
+            }
+            CreateContraptionAnchorDamage.apply(level, new Vector3d(point.x, point.y, point.z), overload);
             LAST_HIT_TICK.put(key, now);
             hits++;
         }
@@ -184,9 +202,13 @@ public final class EntityImpactHandler {
 
     private static boolean isCreateContraptionEntity(Entity entity) {
         ResourceLocation id = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
-        return id != null
-                && "create".equals(id.getNamespace())
-                && id.getPath().toLowerCase(java.util.Locale.ROOT).contains("contraption");
+        if (id == null) {
+            return false;
+        }
+        String namespace = id.getNamespace().toLowerCase(java.util.Locale.ROOT);
+        String path = id.getPath().toLowerCase(java.util.Locale.ROOT);
+        return ("create".equals(namespace) || "aeronautics".equals(namespace) || "simulated".equals(namespace) || "offroad".equals(namespace))
+                && (path.contains("contraption") || path.contains("airship") || path.contains("aircraft") || path.contains("vehicle"));
     }
 
     private static boolean isStandingOnSubLevel(AABB entityBounds, AABB subLevelBounds, Vector3d subLevelVelocity) {

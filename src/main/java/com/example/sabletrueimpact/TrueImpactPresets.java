@@ -1,23 +1,20 @@
 package com.example.sabletrueimpact;
 
-import java.util.Locale;
-
 public final class TrueImpactPresets {
     private TrueImpactPresets() {
     }
 
     public static void apply() {
-        String mode = normalized(TrueImpactConfig.PRESET_MODE.get());
-        if (!"auto".equals(mode)) {
+        if (TrueImpactConfig.PRESET_MODE.get() != TrueImpactConfig.PresetMode.auto) {
             return;
         }
-        applyDestruction(normalized(TrueImpactConfig.DESTRUCTION_PRESET.get()));
-        applyPerformance(normalized(TrueImpactConfig.PERFORMANCE_PRESET.get()));
+        applyDestruction(TrueImpactConfig.DESTRUCTION_PRESET.get());
+        applyPerformance(TrueImpactConfig.PERFORMANCE_PRESET.get());
     }
 
-    private static void applyDestruction(String preset) {
+    private static void applyDestruction(TrueImpactConfig.DestructionPreset preset) {
         switch (preset) {
-            case "off" -> {
+            case off -> {
                 TrueImpactConfig.ENABLE_CRACKS.set(false);
                 TrueImpactConfig.ENABLE_CUMULATIVE_BLOCK_DAMAGE.set(false);
                 TrueImpactConfig.ENABLE_BLOCK_BREAKING.set(false);
@@ -33,7 +30,7 @@ public final class TrueImpactPresets {
                 TrueImpactConfig.ENABLE_MATERIAL_MATCHUP_DAMAGE.set(false);
                 TrueImpactConfig.ENABLE_PAIR_REACTION.set(false);
             }
-            case "low" -> {
+            case low -> {
                 detailToggles(true, true, false, false, true, true);
                 TrueImpactConfig.DAMAGE_SCALE.set(0.034);
                 TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_SCALE.set(0.04);
@@ -41,7 +38,7 @@ public final class TrueImpactPresets {
                 TrueImpactConfig.EXPLOSION_IMPACT_FORCE_SCALE.set(130.0);
                 TrueImpactConfig.CUMULATIVE_BLOCK_DAMAGE_SCALE.set(0.45);
             }
-            case "high" -> {
+            case high -> {
                 detailToggles(true, true, true, true, true, true);
                 TrueImpactConfig.DAMAGE_SCALE.set(0.048);
                 TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_SCALE.set(0.09);
@@ -49,7 +46,7 @@ public final class TrueImpactPresets {
                 TrueImpactConfig.EXPLOSION_IMPACT_FORCE_SCALE.set(285.0);
                 TrueImpactConfig.CUMULATIVE_BLOCK_DAMAGE_SCALE.set(0.8);
             }
-            case "cinematic" -> {
+            case cinematic -> {
                 detailToggles(true, true, true, true, true, true);
                 TrueImpactConfig.DAMAGE_SCALE.set(0.06);
                 TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_SCALE.set(0.12);
@@ -87,14 +84,14 @@ public final class TrueImpactPresets {
         TrueImpactConfig.ENABLE_PAIR_REACTION.set(false);
     }
 
-    private static void applyPerformance(String preset) {
+    private static void applyPerformance(TrueImpactConfig.PerformancePreset preset) {
         switch (preset) {
-            case "potato" -> budgets(2, 24, 12, 4, 1, 1, false, 6, 4, 2, 512, 6, 64, 12, 4);
-            case "very_low" -> budgets(3, 48, 24, 6, 1, 2, false, 10, 8, 2, 1024, 12, 96, 16, 6);
-            case "low" -> budgets(4, 96, 48, 8, 2, 2, false, 18, 16, 3, 2048, 24, 128, 24, 8);
-            case "high" -> budgets(8, 768, 160, 32, 8, 1, true, 80, 64, 8, 8192, 96, 384, 64, 24);
-            case "very_high" -> budgets(12, 1200, 256, 48, 12, 1, true, 128, 96, 12, 12000, 128, 512, 96, 32);
-            case "destructive" -> budgets(24, 2400, 512, 96, 24, 1, true, 256, 160, 24, 20000, 192, 768, 160, 48);
+            case potato -> budgets(2, 24, 12, 4, 1, 1, false, 6, 4, 2, 512, 6, 64, 12, 4);
+            case very_low -> budgets(3, 48, 24, 6, 1, 2, false, 10, 8, 2, 1024, 12, 96, 16, 6);
+            case low -> budgets(4, 96, 48, 8, 2, 2, false, 18, 16, 3, 2048, 24, 128, 24, 8);
+            case high -> budgets(8, 768, 160, 32, 8, 1, true, 80, 64, 8, 8192, 96, 384, 64, 24);
+            case very_high -> budgets(12, 1200, 256, 48, 12, 1, true, 128, 96, 12, 12000, 128, 512, 96, 32);
+            case destructive -> budgets(24, 2400, 512, 96, 24, 1, true, 256, 160, 24, 20000, 192, 768, 160, 48);
             default -> budgets(6, 384, 96, 18, 4, 2, false, 48, 32, 4, 4096, 48, 256, 32, 18);
         }
     }
@@ -121,7 +118,4 @@ public final class TrueImpactPresets {
         TrueImpactConfig.IMPACT_EXPLOSION_MAX_PER_BATCH.set(impactExplosionBatch);
     }
 
-    private static String normalized(String value) {
-        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT).replace('-', '_');
-    }
 }

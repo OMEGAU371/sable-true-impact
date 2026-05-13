@@ -6,9 +6,9 @@ public final class TrueImpactConfig {
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
 
     public static final ModConfigSpec.BooleanValue ENABLE_TRUE_IMPACT;
-    public static final ModConfigSpec.ConfigValue<String> PRESET_MODE;
-    public static final ModConfigSpec.ConfigValue<String> PERFORMANCE_PRESET;
-    public static final ModConfigSpec.ConfigValue<String> DESTRUCTION_PRESET;
+    public static final ModConfigSpec.EnumValue<PresetMode> PRESET_MODE;
+    public static final ModConfigSpec.EnumValue<PerformancePreset> PERFORMANCE_PRESET;
+    public static final ModConfigSpec.EnumValue<DestructionPreset> DESTRUCTION_PRESET;
     public static final ModConfigSpec.DoubleValue GLOBAL_STRENGTH_SCALE;
     public static final ModConfigSpec.DoubleValue GLOBAL_BLOCK_STRENGTH_SCALE;
     public static final ModConfigSpec.DoubleValue GLOBAL_BLOCK_TOUGHNESS_SCALE;
@@ -163,6 +163,10 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.BooleanValue ENABLE_CREATE_CONTRAPTION_ANCHOR_DAMAGE;
     public static final ModConfigSpec.DoubleValue CREATE_CONTRAPTION_ANCHOR_DAMAGE_SCALE;
     public static final ModConfigSpec.IntValue CREATE_CONTRAPTION_ANCHOR_DAMAGE_RADIUS;
+    public static final ModConfigSpec.DoubleValue CREATE_CONTRAPTION_LOAD_CAPACITY_SCALE;
+    public static final ModConfigSpec.DoubleValue CREATE_CONTRAPTION_MIN_IMPACT_SPEED;
+    public static final ModConfigSpec.IntValue CREATE_CONTRAPTION_MAX_BLOCKS_SCANNED;
+    public static final ModConfigSpec.BooleanValue CREATE_CONTRAPTION_DEBUG_LOGGING;
     
     public static final ModConfigSpec.ConfigValue<java.util.List<? extends String>> CUSTOM_BLOCK_PROPERTIES;
     public static final ModConfigSpec.BooleanValue ENABLE_PHYSICAL_DESTRUCTION;
@@ -175,12 +179,12 @@ public final class TrueImpactConfig {
         BUILDER.push("general");
         ENABLE_TRUE_IMPACT = BUILDER.comment("Master switch for all Sable True Impact behavior.")
                 .define("enableTrueImpact", true);
-        PRESET_MODE = BUILDER.comment("Preset mode. 'auto' applies performancePreset and destructionPreset to the main tuning values at config load. 'custom' leaves every advanced value untouched.")
-                .define("presetMode", "auto");
-        PERFORMANCE_PRESET = BUILDER.comment("Performance budget preset: potato, very_low, low, medium, high, very_high, destructive. This has priority over destructionPreset when both affect cost.")
-                .define("performancePreset", "medium");
-        DESTRUCTION_PRESET = BUILDER.comment("Destruction detail preset: off, low, medium, high, cinematic. Higher values enable more detailed cracks, fracture, explosions, and material response.")
-                .define("destructionPreset", "medium");
+        PRESET_MODE = BUILDER.comment("Preset mode. AUTO applies performancePreset and destructionPreset to the main tuning values at config load. CUSTOM leaves every advanced value untouched.")
+                .defineEnum("presetMode", PresetMode.auto);
+        PERFORMANCE_PRESET = BUILDER.comment("Performance budget preset. This has priority over destructionPreset when both affect cost.")
+                .defineEnum("performancePreset", PerformancePreset.medium);
+        DESTRUCTION_PRESET = BUILDER.comment("Destruction detail preset. Higher values enable more detailed cracks, fracture, explosions, and material response.")
+                .defineEnum("destructionPreset", DestructionPreset.medium);
         GLOBAL_STRENGTH_SCALE = BUILDER.comment("Global multiplier for impact damage and fracture power.")
                 .defineInRange("globalStrengthScale", 1.0, 0.0, 1000.0);
         GLOBAL_BLOCK_STRENGTH_SCALE = BUILDER.comment("Global multiplier for block strength (how much force is needed to start damage).")
@@ -520,11 +524,42 @@ public final class TrueImpactConfig {
                 .defineInRange("createContraptionAnchorDamageScale", 1.0, 0.0, 1000.0);
         CREATE_CONTRAPTION_ANCHOR_DAMAGE_RADIUS = BUILDER.comment("Radius around an impact point to search for Create contraption anchors that should receive transferred impact load.")
                 .defineInRange("createContraptionAnchorDamageRadius", 4, 0, 16);
+        CREATE_CONTRAPTION_LOAD_CAPACITY_SCALE = BUILDER.comment("Scales computed Create contraption load capacity. Higher values make moving contraptions absorb more impact before their anchor is damaged.")
+                .defineInRange("createContraptionLoadCapacityScale", 1.0, 0.0, 1000000.0);
+        CREATE_CONTRAPTION_MIN_IMPACT_SPEED = BUILDER.comment("Minimum relative closing speed before Create contraption anchor load transfer is considered.")
+                .defineInRange("createContraptionMinImpactSpeed", 4.0, 0.0, 1000.0);
+        CREATE_CONTRAPTION_MAX_BLOCKS_SCANNED = BUILDER.comment("Maximum moving contraption blocks inspected while estimating load capacity. Lower values improve performance on huge contraptions.")
+                .defineInRange("createContraptionMaxBlocksScanned", 512, 16, 100000);
+        CREATE_CONTRAPTION_DEBUG_LOGGING = BUILDER.comment("If true, logs Create contraption load capacity and overload calculations.")
+                .define("createContraptionDebugLogging", false);
         BUILDER.pop();
 
         SPEC = BUILDER.build();
     }
 
     private TrueImpactConfig() {
+    }
+
+    public enum PresetMode {
+        auto,
+        custom
+    }
+
+    public enum PerformancePreset {
+        potato,
+        very_low,
+        low,
+        medium,
+        high,
+        very_high,
+        destructive
+    }
+
+    public enum DestructionPreset {
+        off,
+        low,
+        medium,
+        high,
+        cinematic
     }
 }
