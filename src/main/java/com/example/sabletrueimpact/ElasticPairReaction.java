@@ -216,6 +216,7 @@ public final class ElasticPairReaction {
             double energy = force * mass * TrueImpactConfig.TERRAIN_IMPACT_DAMAGE_SCALE.get() * TrueImpactConfig.DAMAGE_SCALE.get() * terrainDamageScale;
             
             damageTerrain(level, targetPos, normal, energy);
+            CreateContraptionAnchorDamage.apply(level, globalPoint, energy);
             damageEntities(level, new Vec3(globalPoint.x, globalPoint.y, globalPoint.z), energy);
             collectExplosion(explosions, level, globalPoint, forceAmount, mass(subLevel));
         }

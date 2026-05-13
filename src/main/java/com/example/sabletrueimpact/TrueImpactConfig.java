@@ -6,6 +6,9 @@ public final class TrueImpactConfig {
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
 
     public static final ModConfigSpec.BooleanValue ENABLE_TRUE_IMPACT;
+    public static final ModConfigSpec.ConfigValue<String> PRESET_MODE;
+    public static final ModConfigSpec.ConfigValue<String> PERFORMANCE_PRESET;
+    public static final ModConfigSpec.ConfigValue<String> DESTRUCTION_PRESET;
     public static final ModConfigSpec.DoubleValue GLOBAL_STRENGTH_SCALE;
     public static final ModConfigSpec.DoubleValue GLOBAL_BLOCK_STRENGTH_SCALE;
     public static final ModConfigSpec.DoubleValue GLOBAL_BLOCK_TOUGHNESS_SCALE;
@@ -173,6 +176,12 @@ public final class TrueImpactConfig {
         BUILDER.push("general");
         ENABLE_TRUE_IMPACT = BUILDER.comment("Master switch for all Sable True Impact behavior.")
                 .define("enableTrueImpact", true);
+        PRESET_MODE = BUILDER.comment("Preset mode. 'auto' applies performancePreset and destructionPreset to the main tuning values at config load. 'custom' leaves every advanced value untouched.")
+                .define("presetMode", "auto");
+        PERFORMANCE_PRESET = BUILDER.comment("Performance budget preset: potato, very_low, low, medium, high, very_high, destructive. This has priority over destructionPreset when both affect cost.")
+                .define("performancePreset", "medium");
+        DESTRUCTION_PRESET = BUILDER.comment("Destruction detail preset: off, low, medium, high, cinematic. Higher values enable more detailed cracks, fracture, explosions, and material response.")
+                .define("destructionPreset", "medium");
         GLOBAL_STRENGTH_SCALE = BUILDER.comment("Global multiplier for impact damage and fracture power.")
                 .defineInRange("globalStrengthScale", 1.0, 0.0, 1000.0);
         GLOBAL_BLOCK_STRENGTH_SCALE = BUILDER.comment("Global multiplier for block strength (how much force is needed to start damage).")
@@ -511,12 +520,12 @@ public final class TrueImpactConfig {
         BUILDER.pop();
 
         BUILDER.push("createContraptionAnchors");
-        ENABLE_CREATE_CONTRAPTION_ANCHOR_DAMAGE = BUILDER.comment("Reserved compatibility switch: future versions will route normal Create contraption impact load to bearings/anchor blocks instead of letting indestructible contraption fronts absorb everything.")
-                .define("enableCreateContraptionAnchorDamage", false);
-        CREATE_CONTRAPTION_ANCHOR_DAMAGE_SCALE = BUILDER.comment("Reserved damage scale for future Create contraption anchor load transfer.")
+        ENABLE_CREATE_CONTRAPTION_ANCHOR_DAMAGE = BUILDER.comment("If true, impacts near Create contraption anchors transfer part of the load to bearings, pistons, pulleys, car assemblers, and nearby support blocks.")
+                .define("enableCreateContraptionAnchorDamage", true);
+        CREATE_CONTRAPTION_ANCHOR_DAMAGE_SCALE = BUILDER.comment("Damage scale for Create contraption anchor load transfer.")
                 .defineInRange("createContraptionAnchorDamageScale", 1.0, 0.0, 1000.0);
-        CREATE_CONTRAPTION_ANCHOR_DAMAGE_RADIUS = BUILDER.comment("Reserved radius around a Create contraption anchor that receives transferred impact damage.")
-                .defineInRange("createContraptionAnchorDamageRadius", 1, 0, 16);
+        CREATE_CONTRAPTION_ANCHOR_DAMAGE_RADIUS = BUILDER.comment("Radius around an impact point to search for Create contraption anchors that should receive transferred impact load.")
+                .defineInRange("createContraptionAnchorDamageRadius", 4, 0, 16);
         BUILDER.pop();
 
         SPEC = BUILDER.build();
