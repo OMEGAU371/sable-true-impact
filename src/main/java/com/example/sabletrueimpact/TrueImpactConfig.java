@@ -150,7 +150,6 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.BooleanValue ENABLE_MATERIAL_TOUGHNESS;
     public static final ModConfigSpec.DoubleValue BLAST_TOUGHNESS_FACTOR;
     public static final ModConfigSpec.DoubleValue BLAST_BRITTLENESS_DECAY;
-    public static final ModConfigSpec.BooleanValue ENABLE_GOGGLES_BLOCK_TOOLTIP;
     public static final ModConfigSpec.BooleanValue ENABLE_CUMULATIVE_BLOCK_DAMAGE;
     public static final ModConfigSpec.DoubleValue CUMULATIVE_BLOCK_DAMAGE_SCALE;
     public static final ModConfigSpec.IntValue CUMULATIVE_BLOCK_DAMAGE_DECAY_TICKS;
@@ -476,11 +475,6 @@ public final class TrueImpactConfig {
                 .define("enableMaterialToughness", true);
         BLAST_BRITTLENESS_DECAY = BUILDER.comment("Scale for how much explosion resistance reduces a material's brittleness. High blast resistance makes materials more 'ductile'.")
                 .defineInRange("blastBrittlenessDecay", 0.01, 0.0, 1.0);
-        BUILDER.pop();
-
-        BUILDER.push("client");
-        ENABLE_GOGGLES_BLOCK_TOOLTIP = BUILDER.comment("Client-side helper: when wearing Create: Aeronautics aviator goggles, block item tooltips show Sable and True Impact material data.")
-                .define("enableGogglesBlockTooltip", true);
         BUILDER.pop();
 
         BUILDER.push("cumulativeDamage");

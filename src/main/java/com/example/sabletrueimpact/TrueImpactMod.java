@@ -15,6 +15,9 @@ public class TrueImpactMod {
 
     public TrueImpactMod(IEventBus modEventBus, ModContainer modContainer) {
         modContainer.registerConfig(ModConfig.Type.SERVER, TrueImpactConfig.SPEC);
+        if (FMLEnvironment.dist == Dist.CLIENT) {
+            modContainer.registerConfig(ModConfig.Type.CLIENT, TrueImpactClientConfig.SPEC);
+        }
 
         modEventBus.addListener(this::onConfigLoad);
         modEventBus.addListener(this::onConfigReload);

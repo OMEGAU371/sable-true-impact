@@ -24,7 +24,7 @@ public final class GogglesBlockTooltipHandler {
 
     @SubscribeEvent
     public static void onItemTooltip(ItemTooltipEvent event) {
-        if (!TrueImpactConfig.ENABLE_TRUE_IMPACT.get() || !TrueImpactConfig.ENABLE_GOGGLES_BLOCK_TOOLTIP.get()) {
+        if (!TrueImpactConfig.ENABLE_TRUE_IMPACT.get() || !TrueImpactClientConfig.ENABLE_GOGGLES_BLOCK_TOOLTIP.get()) {
             return;
         }
         Player player = event.getEntity();
