@@ -447,8 +447,8 @@ public final class TrueImpactConfig {
                 .defineInRange("explosionImpactRaySamples", 48, 6, 512);
         EXPLOSION_IMPACT_RAY_STEP = BUILDER.comment("Distance advanced per shockwave ray sample step. Lower is more precise but costs more CPU.")
                 .defineInRange("explosionImpactRayStep", 0.75, 0.1, 4.0);
-        ENABLE_EXPLOSION_IMPULSE = BUILDER.comment("If true, shockwave hits push Sable physical structures away from the explosion center.")
-                .define("enableExplosionImpulse", true);
+        ENABLE_EXPLOSION_IMPULSE = BUILDER.comment("If true, shockwave hits push Sable physical structures away from the explosion center. Disabled by default because direct Rapier force injection can panic sleeping islands.")
+                .define("enableExplosionImpulse", false);
         EXPLOSION_IMPULSE_SCALE = BUILDER.comment("Converts shockwave pressure into outward impulse. Raise for more dramatic flying debris.")
                 .defineInRange("explosionImpulseScale", 0.018, 0.0, 1000.0);
         EXPLOSION_MAX_IMPULSE = BUILDER.comment("Caps outward impulse from one explosion hit per Sable physical structure.")

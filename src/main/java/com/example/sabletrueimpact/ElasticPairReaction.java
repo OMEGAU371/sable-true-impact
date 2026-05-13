@@ -118,7 +118,9 @@ public final class ElasticPairReaction {
             Vector3d rotation = rotationPoint(subLevel);
             if (level == null || rotation == null) return;
 
-            double threshold = TrueImpactConfig.TERRAIN_IMPACT_FORCE_THRESHOLD.get();
+            double terrainThreshold = TrueImpactConfig.TERRAIN_IMPACT_FORCE_THRESHOLD.get();
+            double fractureThreshold = TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_THRESHOLD.get();
+            double threshold = Math.min(terrainThreshold, fractureThreshold);
             if (!isFlat && totalForce < threshold) return;
             if (isFlat && totalForce < threshold * 0.5) return;
 
@@ -194,7 +196,11 @@ public final class ElasticPairReaction {
     }
 
     private static void applyTerrainImpact(Object subLevel, Vector3d localPoint, Vector3d normal, double forceAmount, List<ExplosionCandidate> explosions) {
-        if (!TrueImpactConfig.ENABLE_TERRAIN_IMPACT_DAMAGE.get() || (TrueImpactConfig.ELASTIC_BLOCKS_BREAK_BLOCKS.get() == false && isElasticSubLevel(subLevel))) {
+        boolean canDamageTerrain = TrueImpactConfig.ENABLE_TERRAIN_IMPACT_DAMAGE.get();
+        boolean canFractureSelf = TrueImpactConfig.ENABLE_SUBLEVEL_FRACTURE.get()
+                && TrueImpactConfig.ENABLE_PHYSICAL_DESTRUCTION.get();
+        if ((!canDamageTerrain && !canFractureSelf)
+                || (TrueImpactConfig.ELASTIC_BLOCKS_BREAK_BLOCKS.get() == false && isElasticSubLevel(subLevel))) {
             return;
         }
         
@@ -225,7 +231,13 @@ public final class ElasticPairReaction {
         ImpactDamageContextCache.putArea(level, BlockPos.containing(globalPoint.x, globalPoint.y, globalPoint.z), 2, selfFractureScale);
         ImpactDamageContextCache.put(level, targetPos, terrainDamageScale);
 
-        if (TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.get()) {
+        if (canFractureSelf) {
+            SubLevelFracture.tryFracture(subLevel, localPoint, normal, forceAmount, selfFractureScale);
+        }
+
+        if (canDamageTerrain
+                && TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.get()
+                && forceAmount >= TrueImpactConfig.TERRAIN_IMPACT_FORCE_THRESHOLD.get()) {
             double mass = Math.min(TrueImpactConfig.TERRAIN_IMPACT_MAX_EFFECTIVE_MASS.get(), Math.pow(Math.max(mass(subLevel), 1.0), TrueImpactConfig.TERRAIN_IMPACT_MASS_EXPONENT.get()));
             double force = scaledForce(forceAmount, TrueImpactConfig.TERRAIN_IMPACT_FORCE_THRESHOLD.get(), TrueImpactConfig.TERRAIN_IMPACT_FORCE_EXPONENT.get());
             

@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 
 public final class ExplosionImpactHandler {
+    private static final boolean ALLOW_UNSAFE_RAPIER_EXPLOSION_FORCES = false;
     private static final Method GET_CONTAINER = findMethod("dev.ryanhcode.sable.api.sublevel.SubLevelContainer", "getContainer", Level.class);
     private static final Method GET_ALL_SUBLEVELS = findMethod("dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer", "getAllSubLevels");
     private static final Method BOUNDING_BOX = findMethod("dev.ryanhcode.sable.sublevel.SubLevel", "boundingBox");
@@ -198,7 +199,9 @@ public final class ExplosionImpactHandler {
     }
 
     private static void applyExplosionImpulse(ServerLevel level, Object subLevel, Vector3d normal, double force) {
-        if (!TrueImpactConfig.ENABLE_EXPLOSION_IMPULSE.get() || normal.lengthSquared() < 1.0E-8) {
+        if (!ALLOW_UNSAFE_RAPIER_EXPLOSION_FORCES
+                || !TrueImpactConfig.ENABLE_EXPLOSION_IMPULSE.get()
+                || normal.lengthSquared() < 1.0E-8) {
             return;
         }
         Integer runtimeId = runtimeId(subLevel);
