@@ -63,8 +63,8 @@ public final class SubLevelFracture {
             return;
         }
 
-        // Convert local-space contact point → world-space before touching block world.
-        // Without this, ships near the origin would destroy blocks at (0,0,0).
+        // Collision points are in Sable sub-level plot space. Scanning world-space here misses
+        // the physical structure's own blocks and makes internal fracture look impossible.
         if (!Double.isFinite(localPoint.x)
                 || !Double.isFinite(localPoint.y)
                 || !Double.isFinite(localPoint.z)) {
@@ -250,7 +250,7 @@ public final class SubLevelFracture {
             }
             double baseResistance = MaterialImpactProperties.baseStrength(destroySpeed, snapshot.blastResistance(pos));
             double connectionStrength = structure.connectionStrength();
-            double connectionMaterialScale = Math.sqrt(Math.max(connectionStrength, 1.0));
+            double connectionMaterialScale = Math.pow(Math.max(connectionStrength, 1.0), 0.25);
             double materialStrength = Math.max(MaterialImpactProperties.displayStrength(state, baseResistance) * connectionMaterialScale, 1.0);
             double materialToughness = Math.max(
                     MaterialImpactProperties.displayToughness(state, baseResistance) * connectionMaterialScale,
@@ -273,10 +273,10 @@ public final class SubLevelFracture {
                 score = (fatigueDamage * crackBonus * spreadBonus) / (breakThreshold * toughnessBonus);
             } else {
                 double nearLimitRatio = rawStress / Math.max(materialStrength, 1.0);
-                if (nearLimitRatio < 0.28) {
+                if (nearLimitRatio < 0.18) {
                     continue;
                 }
-                double fatigue = materialStrength * nearLimitRatio * nearLimitRatio * 0.42;
+                double fatigue = materialStrength * nearLimitRatio * nearLimitRatio * 0.75;
                 fatigueDamage = MaterialImpactProperties.fatigueDamage(state, fatigue);
                 score = 0.0;
             }

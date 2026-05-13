@@ -333,9 +333,9 @@ public final class TrueImpactConfig {
                 .defineInRange("terrainStepContactForgiveness", 0.22, 0.0, 1.0);
         TERRAIN_STEP_SIDE_NORMAL_THRESHOLD = BUILDER.comment("Contacts with vertical normal component below this are considered side contacts for step forgiveness.")
                 .defineInRange("terrainStepSideNormalThreshold", 0.35, 0.0, 1.0);
-        TERRAIN_IMPACT_BREAK_YIELD = BUILDER.defineInRange("terrainImpactBreakYield", 8.5, 0.0, 1000.0);
+        TERRAIN_IMPACT_BREAK_YIELD = BUILDER.defineInRange("terrainImpactBreakYield", 13.0, 0.0, 1000.0);
         TERRAIN_IMPACT_MAX_BLOCKS = BUILDER.comment("Maximum terrain blocks broken by one terrain impact collision.")
-                .defineInRange("terrainImpactMaxBlocks", 4, 0, 10000);
+                .defineInRange("terrainImpactMaxBlocks", 1, 0, 10000);
         BUILDER.pop();
 
         BUILDER.push("entityImpact");
@@ -375,9 +375,9 @@ public final class TrueImpactConfig {
         ENABLE_SUBLEVEL_FRACTURE = BUILDER.comment("Experimental: very strong impacts can cut weak internal connections so Sable's native splitter creates new sublevels.")
                 .define("enableSubLevelFracture", true);
         SUBLEVEL_FRACTURE_FORCE_THRESHOLD = BUILDER.comment("Minimum collision force before internal sublevel fracture is considered. Raise this if vehicles split too easily.")
-                .defineInRange("subLevelFractureForceThreshold", 620.0, 0.0, 1000000000.0);
+                .defineInRange("subLevelFractureForceThreshold", 360.0, 0.0, 1000000000.0);
         SUBLEVEL_FRACTURE_FORCE_SCALE = BUILDER.comment("Scales raw collision force into fracture damage.")
-                .defineInRange("subLevelFractureForceScale", 0.068, 0.0, 1000.0);
+                .defineInRange("subLevelFractureForceScale", 0.115, 0.0, 1000.0);
         SUBLEVEL_FRACTURE_FORCE_EXPONENT = BUILDER.comment("Exponent applied to collision force above the fracture threshold. 1.0 keeps current linear behavior; higher values make high-speed/high-force crashes split structures much more aggressively.")
                 .defineInRange("subLevelFractureForceExponent", 1.0, 0.0, 8.0);
         SUBLEVEL_FRACTURE_RADIUS = BUILDER.comment("Maximum radius around the impact point scanned for weak connections.")
@@ -421,7 +421,7 @@ public final class TrueImpactConfig {
         SUBLEVEL_FRACTURE_CRACK_BONUS_SCALE = BUILDER.comment("How much existing cumulative crack damage increases fracture chance.")
                 .defineInRange("subLevelFractureCrackBonusScale", 3.0, 0.0, 1000.0);
         SUBLEVEL_FRACTURE_FATIGUE_SCALE = BUILDER.comment("How much near-miss fracture force is stored as cumulative block damage/cracks.")
-                .defineInRange("subLevelFractureFatigueScale", 0.22, 0.0, 1000.0);
+                .defineInRange("subLevelFractureFatigueScale", 0.42, 0.0, 1000.0);
         SUBLEVEL_FRACTURE_INTERLOCK_STRENGTH = BUILDER.comment("Strength multiplier from checkerboard/interlocked mixed-material neighbors.")
                 .defineInRange("subLevelFractureInterlockStrength", 1.8, 0.0, 1000.0);
         SUBLEVEL_FRACTURE_BEAM_STRENGTH = BUILDER.comment("Strength multiplier from beam/girder/frame/support blocks near a candidate fracture.")

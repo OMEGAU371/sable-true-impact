@@ -33,37 +33,54 @@ public final class TrueImpactPresets {
             case low -> {
                 detailToggles(true, true, false, false, true, true);
                 TrueImpactConfig.DAMAGE_SCALE.set(0.034);
-                TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_SCALE.set(0.04);
+                TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_THRESHOLD.set(520.0);
+                TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_SCALE.set(0.07);
                 TrueImpactConfig.SUBLEVEL_FRACTURE_CHANCE_SCALE.set(0.65);
+                TrueImpactConfig.SUBLEVEL_FRACTURE_FATIGUE_SCALE.set(0.28);
                 TrueImpactConfig.EXPLOSION_IMPACT_FORCE_SCALE.set(130.0);
                 TrueImpactConfig.CUMULATIVE_BLOCK_DAMAGE_SCALE.set(0.45);
+                terrainStability(15.0, 1);
             }
             case high -> {
                 detailToggles(true, true, true, true, true, true);
                 TrueImpactConfig.DAMAGE_SCALE.set(0.048);
-                TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_SCALE.set(0.09);
+                TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_THRESHOLD.set(280.0);
+                TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_SCALE.set(0.145);
                 TrueImpactConfig.SUBLEVEL_FRACTURE_CHANCE_SCALE.set(1.6);
+                TrueImpactConfig.SUBLEVEL_FRACTURE_FATIGUE_SCALE.set(0.58);
                 TrueImpactConfig.EXPLOSION_IMPACT_FORCE_SCALE.set(285.0);
                 TrueImpactConfig.CUMULATIVE_BLOCK_DAMAGE_SCALE.set(0.8);
+                terrainStability(11.0, 2);
             }
             case cinematic -> {
                 detailToggles(true, true, true, true, true, true);
                 TrueImpactConfig.DAMAGE_SCALE.set(0.06);
-                TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_SCALE.set(0.12);
+                TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_THRESHOLD.set(220.0);
+                TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_SCALE.set(0.19);
                 TrueImpactConfig.SUBLEVEL_FRACTURE_CHANCE_SCALE.set(2.2);
+                TrueImpactConfig.SUBLEVEL_FRACTURE_FATIGUE_SCALE.set(0.75);
                 TrueImpactConfig.EXPLOSION_IMPACT_FORCE_SCALE.set(380.0);
                 TrueImpactConfig.EXPLOSION_IMPACT_CONFINEMENT_SCALE.set(6.5);
                 TrueImpactConfig.CUMULATIVE_BLOCK_DAMAGE_SCALE.set(1.0);
+                terrainStability(9.0, 3);
             }
             default -> {
                 detailToggles(true, true, true, true, true, true);
                 TrueImpactConfig.DAMAGE_SCALE.set(0.042);
-                TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_SCALE.set(0.068);
+                TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_THRESHOLD.set(360.0);
+                TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_SCALE.set(0.115);
                 TrueImpactConfig.SUBLEVEL_FRACTURE_CHANCE_SCALE.set(1.25);
+                TrueImpactConfig.SUBLEVEL_FRACTURE_FATIGUE_SCALE.set(0.42);
                 TrueImpactConfig.EXPLOSION_IMPACT_FORCE_SCALE.set(225.0);
                 TrueImpactConfig.CUMULATIVE_BLOCK_DAMAGE_SCALE.set(0.65);
+                terrainStability(13.0, 1);
             }
         }
+    }
+
+    private static void terrainStability(double breakYield, int maxBlocks) {
+        TrueImpactConfig.TERRAIN_IMPACT_BREAK_YIELD.set(breakYield);
+        TrueImpactConfig.TERRAIN_IMPACT_MAX_BLOCKS.set(maxBlocks);
     }
 
     private static void detailToggles(boolean cracks, boolean blockBreaking, boolean propagation,
