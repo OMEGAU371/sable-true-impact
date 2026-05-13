@@ -191,7 +191,7 @@ public final class TrueImpactConfig {
         TOUGHNESS_MATCHUP_EXPONENT = BUILDER.comment("Extra damage split from toughness ratio. Higher values make tough materials chip less and brittle materials crack more.")
                 .defineInRange("toughnessMatchupExponent", 0.45, 0.0, 4.0);
         SELF_DAMAGE_IMMUNITY_RATIO = BUILDER.comment("If target impact resistance is below this fraction of the moving material's resistance, the moving material takes no fracture damage.")
-                .defineInRange("selfDamageImmunityRatio", 0.05, 0.0, 1.0);
+                .defineInRange("selfDamageImmunityRatio", 0.25, 0.0, 1.0);
         MIN_SELF_DAMAGE_SCALE = BUILDER.comment("The minimum possible damage multiplier for a strong material hitting a weak material.")
                 .defineInRange("minSelfDamageScale", 0.0, 0.0, 1.0);
         MAX_SELF_DAMAGE_SCALE = BUILDER.comment("The maximum possible damage multiplier for a weak material hitting a strong material.")

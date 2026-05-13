@@ -206,6 +206,7 @@ public final class ElasticPairReaction {
         double terrainDamageScale = ImpactDamageAllocator.damageScaleForTarget(level, targetPos, targetState, selfPos, selfState);
 
         ImpactDamageContextCache.put(level, selfPos, selfFractureScale);
+        ImpactDamageContextCache.putArea(level, BlockPos.containing(globalPoint.x, globalPoint.y, globalPoint.z), 2, selfFractureScale);
         ImpactDamageContextCache.put(level, targetPos, terrainDamageScale);
 
         SubLevelFracture.tryFracture(subLevel, localPoint, normal, forceAmount, selfFractureScale);

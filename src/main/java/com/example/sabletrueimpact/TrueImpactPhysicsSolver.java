@@ -140,7 +140,7 @@ public class TrueImpactPhysicsSolver {
                     * TrueImpactConfig.GLOBAL_STRENGTH_SCALE.get();
             
             // Apply material matchup scale from cache
-            double matchupScale = ImpactDamageContextCache.get(level, pos, 1.0);
+            double matchupScale = ImpactDamageContextCache.getNearby(level, pos, 2, 1.0);
             double scaledKineticEnergy = kineticEnergy * matchupScale;
 
             double materialStrength = Math.max(MaterialImpactProperties.displayStrength(state, structuralIntegrity), 1.0);

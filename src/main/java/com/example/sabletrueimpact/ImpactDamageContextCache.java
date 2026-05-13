@@ -21,6 +21,16 @@ public final class ImpactDamageContextCache {
         }
     }
 
+    public static void putArea(ServerLevel level, BlockPos center, int radius, double scale) {
+        for (int x = -radius; x <= radius; x++) {
+            for (int y = -radius; y <= radius; y++) {
+                for (int z = -radius; z <= radius; z++) {
+                    put(level, center.offset(x, y, z), scale);
+                }
+            }
+        }
+    }
+
     public static double get(ServerLevel level, BlockPos pos, double defaultScale) {
         String dimension = level.dimension().location().toString();
         CachedScale cached = CACHE.get(new ContextKey(dimension, pos));
@@ -33,6 +43,21 @@ public final class ImpactDamageContextCache {
         }
         
         return cached.scale;
+    }
+
+    public static double getNearby(ServerLevel level, BlockPos pos, int radius, double defaultScale) {
+        double scale = get(level, pos, defaultScale);
+        for (int x = -radius; x <= radius; x++) {
+            for (int y = -radius; y <= radius; y++) {
+                for (int z = -radius; z <= radius; z++) {
+                    if (x == 0 && y == 0 && z == 0) {
+                        continue;
+                    }
+                    scale = Math.min(scale, get(level, pos.offset(x, y, z), defaultScale));
+                }
+            }
+        }
+        return scale;
     }
 
     private static void cleanup(long currentTick) {
