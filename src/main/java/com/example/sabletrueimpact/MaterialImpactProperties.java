@@ -2,7 +2,9 @@ package com.example.sabletrueimpact;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -15,14 +17,18 @@ import java.util.Optional;
 
 public final class MaterialImpactProperties {
     private static final Map<Block, Properties> CUSTOM_OVERRIDES = new HashMap<>();
+    private static final Map<TagKey<Block>, Properties> CUSTOM_TAG_OVERRIDES = new HashMap<>();
     private static final Map<Block, Boolean> DESTRUCTIBLE_OVERRIDES = new HashMap<>();
+    private static final Map<TagKey<Block>, Boolean> DESTRUCTIBLE_TAG_OVERRIDES = new HashMap<>();
 
     private MaterialImpactProperties() {
     }
 
     public static void reload() {
         CUSTOM_OVERRIDES.clear();
+        CUSTOM_TAG_OVERRIDES.clear();
         DESTRUCTIBLE_OVERRIDES.clear();
+        DESTRUCTIBLE_TAG_OVERRIDES.clear();
 
         List<? extends String> customProps = TrueImpactConfig.CUSTOM_BLOCK_PROPERTIES.get();
         for (String entry : customProps) {
@@ -30,9 +36,7 @@ public final class MaterialImpactProperties {
                 String[] parts = entry.split(",");
                 if (parts.length < 7) continue;
 
-                ResourceLocation id = ResourceLocation.parse(parts[0].trim());
-                Block block = BuiltInRegistries.BLOCK.get(id);
-                if (block == Blocks.AIR && !id.getPath().equals("air")) continue;
+                String target = parts[0].trim();
 
                 double strength = Double.parseDouble(parts[1].trim());
                 double toughness = Double.parseDouble(parts[2].trim());
@@ -41,7 +45,15 @@ public final class MaterialImpactProperties {
                 double mass = Double.parseDouble(parts[5].trim());
                 boolean destructible = Boolean.parseBoolean(parts[6].trim());
 
-                CUSTOM_OVERRIDES.put(block, new Properties(strength, toughness, 1.0, friction, elasticity, mass, destructible));
+                Properties properties = new Properties(strength, toughness, 1.0, friction, elasticity, mass, destructible, Source.BLOCK_OVERRIDE);
+                if (target.startsWith("tag:")) {
+                    CUSTOM_TAG_OVERRIDES.put(blockTag(target), properties.withSource(Source.TAG_OVERRIDE));
+                } else {
+                    ResourceLocation id = ResourceLocation.parse(target);
+                    Block block = BuiltInRegistries.BLOCK.get(id);
+                    if (block == Blocks.AIR && !id.getPath().equals("air")) continue;
+                    CUSTOM_OVERRIDES.put(block, properties);
+                }
             } catch (Exception ignored) {
             }
         }
@@ -56,7 +68,7 @@ public final class MaterialImpactProperties {
                 boolean destructible = Boolean.parseBoolean(parts[1].trim());
 
                 if (target.startsWith("tag:")) {
-                    // Tag support could be added here if needed, but for now we focus on block IDs
+                    DESTRUCTIBLE_TAG_OVERRIDES.put(blockTag(target), destructible);
                 } else {
                     ResourceLocation id = ResourceLocation.parse(target);
                     Block block = BuiltInRegistries.BLOCK.get(id);
@@ -91,19 +103,19 @@ public final class MaterialImpactProperties {
     }
 
     public static double getFriction(BlockState state, double original) {
-        Properties props = CUSTOM_OVERRIDES.get(state.getBlock());
+        Properties props = customProperties(state);
         double base = props != null ? props.friction() : original;
         return base * TrueImpactConfig.GLOBAL_FRICTION_SCALE.get();
     }
 
     public static double getRestitution(BlockState state, double original) {
-        Properties props = CUSTOM_OVERRIDES.get(state.getBlock());
+        Properties props = customProperties(state);
         double base = props != null ? props.elasticity() : original;
         return base * TrueImpactConfig.GLOBAL_RESTITUTION_SCALE.get();
     }
 
     public static double getMass(BlockState state, double original) {
-        Properties props = CUSTOM_OVERRIDES.get(state.getBlock());
+        Properties props = customProperties(state);
         double base = props != null ? props.mass() : original;
         return base * TrueImpactConfig.GLOBAL_MASS_SCALE.get();
     }
@@ -112,7 +124,12 @@ public final class MaterialImpactProperties {
         if (DESTRUCTIBLE_OVERRIDES.containsKey(state.getBlock())) {
             return DESTRUCTIBLE_OVERRIDES.get(state.getBlock());
         }
-        Properties props = CUSTOM_OVERRIDES.get(state.getBlock());
+        for (Map.Entry<TagKey<Block>, Boolean> entry : DESTRUCTIBLE_TAG_OVERRIDES.entrySet()) {
+            if (state.is(entry.getKey())) {
+                return entry.getValue();
+            }
+        }
+        Properties props = customProperties(state);
         return props != null ? props.destructible() : original;
     }
 
@@ -150,8 +167,33 @@ public final class MaterialImpactProperties {
         return damage * brittleness(state);
     }
 
-    private static Properties properties(BlockState state) {
+    public static String sourceLabel(BlockState state) {
+        return switch (properties(state).source()) {
+            case BLOCK_OVERRIDE -> "STI block override";
+            case TAG_OVERRIDE -> "STI tag override";
+            case DERIVED -> "Vanilla/Sable derived";
+        };
+    }
+
+    private static TagKey<Block> blockTag(String target) {
+        return TagKey.create(Registries.BLOCK, ResourceLocation.parse(target.substring("tag:".length())));
+    }
+
+    private static Properties customProperties(BlockState state) {
         Properties custom = CUSTOM_OVERRIDES.get(state.getBlock());
+        if (custom != null) {
+            return custom;
+        }
+        for (Map.Entry<TagKey<Block>, Properties> entry : CUSTOM_TAG_OVERRIDES.entrySet()) {
+            if (state.is(entry.getKey())) {
+                return entry.getValue();
+            }
+        }
+        return null;
+    }
+
+    private static Properties properties(BlockState state) {
+        Properties custom = customProperties(state);
         if (custom != null) {
             return custom;
         }
@@ -174,11 +216,20 @@ public final class MaterialImpactProperties {
                 strengthMult,
                 toughnessMult,
                 brittleness,
-                -1, -1, -1, true
+                -1, -1, -1, true, Source.DERIVED
         );
     }
 
     private record Properties(double strengthMultiplier, double toughnessMultiplier, double brittleness,
-                              double friction, double elasticity, double mass, boolean destructible) {
+                              double friction, double elasticity, double mass, boolean destructible, Source source) {
+        private Properties withSource(Source source) {
+            return new Properties(strengthMultiplier, toughnessMultiplier, brittleness, friction, elasticity, mass, destructible, source);
+        }
+    }
+
+    private enum Source {
+        DERIVED,
+        BLOCK_OVERRIDE,
+        TAG_OVERRIDE
     }
 }

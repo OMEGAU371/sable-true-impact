@@ -5,7 +5,7 @@
   "compatibilityLevel": "JAVA_21",
   "refmap": "sabletrueimpact.refmap.json",
   "mixins": [
-    "BlockMixin",
+    "RapierVoxelColliderBakeryMixin",
     "RapierPhysicsPipelineMixin",
     "SableCollisionMixin"
   ],

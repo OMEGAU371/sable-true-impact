@@ -30,9 +30,11 @@ public class TrueImpactMod {
 
     private void onConfigLoad(ModConfigEvent.Loading event) {
         MaterialImpactProperties.reload();
+        ImpactCallbackDecider.reload();
     }
 
     private void onConfigReload(ModConfigEvent.Reloading event) {
         MaterialImpactProperties.reload();
+        ImpactCallbackDecider.reload();
     }
 }

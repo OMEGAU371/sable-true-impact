@@ -154,6 +154,13 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.IntValue CUMULATIVE_BLOCK_DAMAGE_MAX_ENTRIES;
     public static final ModConfigSpec.IntValue PERFORMANCE_LOG_INTERVAL_TICKS;
     public static final ModConfigSpec.BooleanValue ENABLE_PERFORMANCE_LOGGING;
+    public static final ModConfigSpec.BooleanValue ENABLE_UNIVERSAL_IMPACT_CALLBACK;
+    public static final ModConfigSpec.ConfigValue<String> IMPACT_CALLBACK_MODE;
+    public static final ModConfigSpec.ConfigValue<java.util.List<? extends String>> IMPACT_CALLBACK_BLOCKS;
+    public static final ModConfigSpec.ConfigValue<java.util.List<? extends String>> IMPACT_CALLBACK_BLOCK_BLACKLIST;
+    public static final ModConfigSpec.BooleanValue ENABLE_CREATE_CONTRAPTION_ANCHOR_DAMAGE;
+    public static final ModConfigSpec.DoubleValue CREATE_CONTRAPTION_ANCHOR_DAMAGE_SCALE;
+    public static final ModConfigSpec.IntValue CREATE_CONTRAPTION_ANCHOR_DAMAGE_RADIUS;
     
     public static final ModConfigSpec.ConfigValue<java.util.List<? extends String>> CUSTOM_BLOCK_PROPERTIES;
     public static final ModConfigSpec.BooleanValue ENABLE_PHYSICAL_DESTRUCTION;
@@ -485,6 +492,14 @@ public final class TrueImpactConfig {
         BUILDER.pop();
 
         BUILDER.push("customization");
+        ENABLE_UNIVERSAL_IMPACT_CALLBACK = BUILDER.comment("If true, Sable True Impact attaches its collision callback while Sable builds voxel collider data. This avoids making every Block implement Sable's callback interface.")
+                .define("enableUniversalImpactCallback", true);
+        IMPACT_CALLBACK_MODE = BUILDER.comment("Controls callback selection. 'blacklist' applies True Impact to all blocks except impactCallbackBlockBlacklist. 'whitelist' applies only to impactCallbackBlocks.")
+                .define("impactCallbackMode", "blacklist");
+        IMPACT_CALLBACK_BLOCKS = BUILDER.comment("Blocks that receive the True Impact callback when impactCallbackMode is 'whitelist'.")
+                .defineListAllowEmpty(java.util.List.of("impactCallbackBlocks"), java.util.ArrayList::new, o -> o instanceof String);
+        IMPACT_CALLBACK_BLOCK_BLACKLIST = BUILDER.comment("Blocks that never receive the universal True Impact callback. Sable's own callbacks are still preserved. Keep Create functional blocks here if another mod changes their interaction behavior.")
+                .defineListAllowEmpty(java.util.List.of("impactCallbackBlockBlacklist"), () -> java.util.List.of("create:blaze_burner"), o -> o instanceof String);
         CUSTOM_BLOCK_PROPERTIES = BUILDER.comment("List of custom block physical properties overrides. Format: 'modid:blockid,strength,toughness,friction,elasticity,mass,destructible'. Example: 'minecraft:obsidian,6.0,8.0,0.5,0.2,50.0,true'")
                 .defineListAllowEmpty(java.util.List.of("customBlockProperties"), java.util.ArrayList::new, o -> o instanceof String);
         ENABLE_PHYSICAL_DESTRUCTION = BUILDER.comment("Global toggle for internal physical structure destruction (SubLevel Fracture).")
@@ -493,6 +508,15 @@ public final class TrueImpactConfig {
                 .define("enableWorldDestruction", true);
         DESTRUCTIBLE_OVERRIDES = BUILDER.comment("Explicit list of block IDs or tags to mark as destructible (true) or indestructible (false). Format: 'modid:blockid,true' or 'tag:modid:tagname,false'. Overrides other settings.")
                 .defineListAllowEmpty(java.util.List.of("destructibleOverrides"), java.util.ArrayList::new, o -> o instanceof String);
+        BUILDER.pop();
+
+        BUILDER.push("createContraptionAnchors");
+        ENABLE_CREATE_CONTRAPTION_ANCHOR_DAMAGE = BUILDER.comment("Reserved compatibility switch: future versions will route normal Create contraption impact load to bearings/anchor blocks instead of letting indestructible contraption fronts absorb everything.")
+                .define("enableCreateContraptionAnchorDamage", false);
+        CREATE_CONTRAPTION_ANCHOR_DAMAGE_SCALE = BUILDER.comment("Reserved damage scale for future Create contraption anchor load transfer.")
+                .defineInRange("createContraptionAnchorDamageScale", 1.0, 0.0, 1000.0);
+        CREATE_CONTRAPTION_ANCHOR_DAMAGE_RADIUS = BUILDER.comment("Reserved radius around a Create contraption anchor that receives transferred impact damage.")
+                .defineInRange("createContraptionAnchorDamageRadius", 1, 0, 16);
         BUILDER.pop();
 
         SPEC = BUILDER.build();

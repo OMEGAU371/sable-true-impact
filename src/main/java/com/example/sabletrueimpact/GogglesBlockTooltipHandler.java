@@ -44,6 +44,9 @@ public final class GogglesBlockTooltipHandler {
         double brittleness = MaterialImpactProperties.brittleness(state);
 
         event.getToolTip().add(Component.literal("Sable True Impact").withStyle(ChatFormatting.DARK_AQUA));
+        event.getToolTip().add(Component.literal("  Source: ")
+                .withStyle(ChatFormatting.GRAY)
+                .append(Component.literal(MaterialImpactProperties.sourceLabel(state)).withStyle(ChatFormatting.DARK_AQUA)));
         event.getToolTip().add(line("Mass", "%.2f kpg", mass));
         event.getToolTip().add(line("Friction", "%.2f", friction));
         event.getToolTip().add(line("Restitution", "%.2f", restitution));
@@ -71,7 +74,8 @@ public final class GogglesBlockTooltipHandler {
 
     private static double safeMass(Player player, BlockState state) {
         try {
-            return Math.max(0.0, PhysicsBlockPropertyHelper.getMass(player.level(), BlockPos.ZERO, state));
+            double original = PhysicsBlockPropertyHelper.getMass(player.level(), BlockPos.ZERO, state);
+            return Math.max(0.0, MaterialImpactProperties.getMass(state, original));
         } catch (RuntimeException e) {
             return 0.0;
         }
@@ -79,7 +83,7 @@ public final class GogglesBlockTooltipHandler {
 
     private static double safeFriction(BlockState state) {
         try {
-            return PhysicsBlockPropertyHelper.getFriction(state);
+            return MaterialImpactProperties.getFriction(state, PhysicsBlockPropertyHelper.getFriction(state));
         } catch (RuntimeException e) {
             return 1.0;
         }
@@ -87,7 +91,7 @@ public final class GogglesBlockTooltipHandler {
 
     private static double safeRestitution(BlockState state) {
         try {
-            return PhysicsBlockPropertyHelper.getRestitution(state);
+            return MaterialImpactProperties.getRestitution(state, PhysicsBlockPropertyHelper.getRestitution(state));
         } catch (RuntimeException e) {
             return 0.0;
         }
