@@ -208,8 +208,6 @@ public final class ElasticPairReaction {
         ImpactDamageContextCache.putArea(level, BlockPos.containing(globalPoint.x, globalPoint.y, globalPoint.z), 2, selfFractureScale);
         ImpactDamageContextCache.put(level, targetPos, terrainDamageScale);
 
-        SubLevelFracture.tryFracture(subLevel, localPoint, normal, forceAmount, selfFractureScale);
-        
         if (TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.get()) {
             double mass = Math.min(TrueImpactConfig.TERRAIN_IMPACT_MAX_EFFECTIVE_MASS.get(), Math.pow(Math.max(mass(subLevel), 1.0), TrueImpactConfig.TERRAIN_IMPACT_MASS_EXPONENT.get()));
             double force = scaledForce(forceAmount, TrueImpactConfig.TERRAIN_IMPACT_FORCE_THRESHOLD.get(), TrueImpactConfig.TERRAIN_IMPACT_FORCE_EXPONENT.get());
