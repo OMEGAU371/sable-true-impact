@@ -51,13 +51,19 @@ build/libs/
 
 ## Configuration
 
-Server configuration is generated at:
+Server configuration is generated in the Minecraft instance config folder:
 
 ```text
-serverconfig/sabletrueimpact-server.toml
+config/sabletrueimpact-server.toml
 ```
 
 Existing worlds keep their old config values. Delete or edit the server config after updating if you want new defaults.
+
+Client-only configuration is generated at:
+
+```text
+config/sabletrueimpact-client.toml
+```
 
 Useful feature switches:
 
@@ -82,6 +88,21 @@ Useful feature switches:
 - `cumulativeDamage.enableCumulativeBlockDamage`: repeated crack-level hits accumulate until breakage.
 - `performance.enablePerformanceLogging`: periodic low-level counters for collision, fracture, and entity scan cost.
 - `performance.performanceLogIntervalTicks`: logging interval when performance logging is enabled.
+
+## Future Roadmap
+
+Low-level Sable physics work:
+
+- Investigate why Newton's cradle setups built with default Sable behavior do not transfer motion correctly.
+- Rework collision force handling so physical objects exchange force through contacts more consistently.
+- Improve force propagation through connected physical structures instead of treating every impact as a local block event.
+- Add a safer force application path for sleeping or paused Rapier islands before re-enabling pair reaction impulses by default.
+- Add explosion shockwave impulse transfer so blasts push Sable physical structures outward, not only crack or fracture them.
+
+Presentation and feedback:
+
+- Add configurable impact particles for cracks, heavy collisions, structure fracture, and explosion shockwaves.
+- Add configurable impact and fracture sound effects so large crashes are easier to read in gameplay.
 
 ## Safety
 
