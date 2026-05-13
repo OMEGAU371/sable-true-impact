@@ -22,11 +22,7 @@ public final class ImpactDamageAllocator {
         if (rawHardness < 0.0f) {
             return 1_000_000.0;
         }
-        double baseStrength = MaterialImpactProperties.baseStrength(level, pos, state);
-        double strength = Math.max(MaterialImpactProperties.displayStrength(state, baseStrength), 1.0);
-        double toughness = Math.max(MaterialImpactProperties.displayToughness(state, baseStrength), strength);
-        
-        return Math.sqrt(strength * toughness);
+        return materialStats(level, pos, state).resistance();
     }
 
     public static double damageScaleForSelf(ServerLevel level, BlockPos selfPos, BlockState selfState, BlockPos targetPos, BlockState targetState) {
@@ -34,8 +30,10 @@ public final class ImpactDamageAllocator {
             return 1.0;
         }
 
-        double selfResistance = impactResistance(level, selfPos, selfState);
-        double targetResistance = impactResistance(level, targetPos, targetState);
+        MaterialStats self = materialStats(level, selfPos, selfState);
+        MaterialStats target = materialStats(level, targetPos, targetState);
+        double selfResistance = self.resistance();
+        double targetResistance = target.resistance();
 
         double ratio = targetResistance / Math.max(selfResistance, 1.0);
         if (ratio <= TrueImpactConfig.SELF_DAMAGE_IMMUNITY_RATIO.get()) {
@@ -45,7 +43,9 @@ public final class ImpactDamageAllocator {
             return 0.0;
         }
 
-        double scale = Math.pow(ratio, TrueImpactConfig.MATERIAL_MATCHUP_EXPONENT.get());
+        double toughnessRatio = target.toughness() / Math.max(self.toughness(), 1.0);
+        double toughnessScale = Math.pow(Math.max(toughnessRatio, 0.001), TrueImpactConfig.TOUGHNESS_MATCHUP_EXPONENT.get());
+        double scale = Math.pow(ratio, TrueImpactConfig.MATERIAL_MATCHUP_EXPONENT.get()) * toughnessScale;
         
         double finalScale;
         // Soft-target protection: prevent heavy structures from breaking when hitting grass/crops
@@ -69,11 +69,15 @@ public final class ImpactDamageAllocator {
             return 1.0;
         }
 
-        double targetResistance = impactResistance(level, targetPos, targetState);
-        double selfResistance = impactResistance(level, selfPos, selfState);
+        MaterialStats target = materialStats(level, targetPos, targetState);
+        MaterialStats self = materialStats(level, selfPos, selfState);
+        double targetResistance = target.resistance();
+        double selfResistance = self.resistance();
 
         double ratio = selfResistance / Math.max(targetResistance, 1.0);
-        double scale = Math.pow(ratio, TrueImpactConfig.MATERIAL_MATCHUP_EXPONENT.get());
+        double toughnessRatio = self.toughness() / Math.max(target.toughness(), 1.0);
+        double toughnessScale = Math.pow(Math.max(toughnessRatio, 0.001), TrueImpactConfig.TOUGHNESS_MATCHUP_EXPONENT.get());
+        double scale = Math.pow(ratio, TrueImpactConfig.MATERIAL_MATCHUP_EXPONENT.get()) * toughnessScale;
         double finalScale = Math.max(TrueImpactConfig.MIN_TARGET_DAMAGE_SCALE.get(), 
                                     Math.min(scale, TrueImpactConfig.MAX_TARGET_DAMAGE_SCALE.get()));
 
@@ -82,6 +86,21 @@ public final class ImpactDamageAllocator {
         }
 
         return finalScale;
+    }
+
+    private static MaterialStats materialStats(ServerLevel level, BlockPos pos, BlockState state) {
+        if (state.isAir()) {
+            return new MaterialStats(1.0, 1.0, 1.0);
+        }
+        float rawHardness = state.getDestroySpeed(level, pos);
+        if (rawHardness < 0.0f) {
+            return new MaterialStats(1_000_000.0, 1_000_000.0, 1_000_000.0);
+        }
+        double baseStrength = MaterialImpactProperties.baseStrength(level, pos, state);
+        double strength = Math.max(MaterialImpactProperties.displayStrength(state, baseStrength), 1.0);
+        double toughness = Math.max(MaterialImpactProperties.displayToughness(state, baseStrength), strength);
+        double resistance = Math.sqrt(strength * toughness);
+        return new MaterialStats(strength, toughness, resistance);
     }
 
     private static void logMatchup(ServerLevel level, BlockPos selfPos, BlockState selfState, double selfRes, 
@@ -95,5 +114,8 @@ public final class ImpactDamageAllocator {
         LOGGER.info("  - Target: {} at {} (Res: {})", targetId, targetPos, String.format("%.2f", targetRes));
         if (selfScale >= 0) LOGGER.info("  - Self Fracture Scale: {}", String.format("%.4f", selfScale));
         if (targetScale >= 0) LOGGER.info("  - Terrain Damage Scale: {}", String.format("%.4f", targetScale));
+    }
+
+    private record MaterialStats(double strength, double toughness, double resistance) {
     }
 }

@@ -17,6 +17,7 @@ public final class TrueImpactConfig {
 
     public static final ModConfigSpec.BooleanValue ENABLE_MATERIAL_MATCHUP_DAMAGE;
     public static final ModConfigSpec.DoubleValue MATERIAL_MATCHUP_EXPONENT;
+    public static final ModConfigSpec.DoubleValue TOUGHNESS_MATCHUP_EXPONENT;
     public static final ModConfigSpec.DoubleValue SELF_DAMAGE_IMMUNITY_RATIO;
     public static final ModConfigSpec.DoubleValue MIN_SELF_DAMAGE_SCALE;
     public static final ModConfigSpec.DoubleValue MAX_SELF_DAMAGE_SCALE;
@@ -187,6 +188,8 @@ public final class TrueImpactConfig {
                 .define("enableMaterialMatchupDamage", true);
         MATERIAL_MATCHUP_EXPONENT = BUILDER.comment("Controls the severity of the damage split. 1.0 is linear; higher values make strong materials much more resistant to weak materials.")
                 .defineInRange("materialMatchupExponent", 0.85, 0.0, 4.0);
+        TOUGHNESS_MATCHUP_EXPONENT = BUILDER.comment("Extra damage split from toughness ratio. Higher values make tough materials chip less and brittle materials crack more.")
+                .defineInRange("toughnessMatchupExponent", 0.45, 0.0, 4.0);
         SELF_DAMAGE_IMMUNITY_RATIO = BUILDER.comment("If target impact resistance is below this fraction of the moving material's resistance, the moving material takes no fracture damage.")
                 .defineInRange("selfDamageImmunityRatio", 0.05, 0.0, 1.0);
         MIN_SELF_DAMAGE_SCALE = BUILDER.comment("The minimum possible damage multiplier for a strong material hitting a weak material.")
@@ -195,16 +198,16 @@ public final class TrueImpactConfig {
                 .defineInRange("maxSelfDamageScale", 3.0, 1.0, 100.0);
         MIN_TARGET_DAMAGE_SCALE = BUILDER.comment("The minimum possible damage multiplier applied to a target hit by a much weaker structure.")
                 .defineInRange("minTargetDamageScale", 0.25, 0.0, 1.0);
-        MAX_TARGET_DAMAGE_SCALE = BUILDER.comment("The maximum possible damage multiplier applied to a weak target hit by a much stronger structure.")
-                .defineInRange("maxTargetDamageScale", 6.0, 1.0, 100.0);
+        MAX_TARGET_DAMAGE_SCALE = BUILDER.comment("The maximum possible damage multiplier applied to a weak target hit by a much stronger/tougher structure.")
+                .defineInRange("maxTargetDamageScale", 8.0, 1.0, 100.0);
         BUILDER.pop();
         
         HARDNESS_STRENGTH_FACTOR = BUILDER.comment("Strength added per 1.0 of vanilla block hardness. Hardness mainly resists the start of damage (Yield Point).")
                 .defineInRange("hardnessStrengthFactor", 2.0, 0.0, 1000.0);
         BLAST_STRENGTH_FACTOR = BUILDER.comment("Strength added per 1.0 of vanilla explosion resistance. This keeps dense blast-proof materials from chipping before soft targets.")
-                .defineInRange("blastStrengthFactor", 4.0, 0.0, 1000.0);
+                .defineInRange("blastStrengthFactor", 5.5, 0.0, 1000.0);
         BLAST_TOUGHNESS_FACTOR = BUILDER.comment("How much a block's vanilla explosion resistance contributes to its physical toughness (impact absorption).")
-                .defineInRange("blastToughnessFactor", 0.5, 0.0, 1000.0);
+                .defineInRange("blastToughnessFactor", 0.65, 0.0, 1000.0);
         BUILDER.pop();
 
         ENABLE_SOIL_COMPACTION = BUILDER.comment("If true, light impacts on grass/podzol/mycelium compress the soil into dirt instead of breaking or ignoring the block. Heavy impacts still break the block normally.")
