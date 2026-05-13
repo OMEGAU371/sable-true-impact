@@ -24,6 +24,7 @@ public final class ElasticSubLevelDetector {
     private static String cacheDimension = "";
     private static final Map<ProbeKey, Boolean> NEARBY_ELASTIC_CACHE = new HashMap<>();
     private static final Map<ProbeKey, Boolean> NEARBY_SUBLEVEL_CACHE = new HashMap<>();
+    private static final Map<ProbeKey, Boolean> INSIDE_SUBLEVEL_CACHE = new HashMap<>();
     private static final Map<ProbeKey, Double> NEARBY_MASS_CACHE = new HashMap<>();
     private static final Map<Object, Boolean> ELASTIC_SUBLEVEL_CACHE = new IdentityHashMap<>();
     private static final Map<Class<?>, Method> PLOT_BOUNDING_BOX_METHODS = new HashMap<>();
@@ -86,6 +87,33 @@ public final class ElasticSubLevelDetector {
             result = false;
         }
         NEARBY_SUBLEVEL_CACHE.put(key, result);
+        return result;
+    }
+
+    public static boolean isInsideSubLevelPlot(ServerLevel level, BlockPos impactPos) {
+        resetCacheIfNeeded(level);
+        ProbeKey key = key(impactPos);
+        Boolean cached = INSIDE_SUBLEVEL_CACHE.get(key);
+        if (cached != null) {
+            return cached;
+        }
+
+        boolean result = false;
+        try {
+            Object container = GET_CONTAINER.invoke(null, level);
+            if (container != null) {
+                Iterable<?> subLevels = getAllSubLevels(container);
+                for (Object subLevel : subLevels) {
+                    if (plotContains(subLevel, impactPos)) {
+                        result = true;
+                        break;
+                    }
+                }
+            }
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            result = false;
+        }
+        INSIDE_SUBLEVEL_CACHE.put(key, result);
         return result;
     }
 
@@ -223,6 +251,7 @@ public final class ElasticSubLevelDetector {
         cacheDimension = dimension;
         NEARBY_ELASTIC_CACHE.clear();
         NEARBY_SUBLEVEL_CACHE.clear();
+        INSIDE_SUBLEVEL_CACHE.clear();
         NEARBY_MASS_CACHE.clear();
         ELASTIC_SUBLEVEL_CACHE.clear();
     }

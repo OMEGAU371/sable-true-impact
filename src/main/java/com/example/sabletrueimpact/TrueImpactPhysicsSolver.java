@@ -149,7 +149,7 @@ public class TrueImpactPhysicsSolver {
             double crackResistance = Math.sqrt(materialStrength * materialToughness);
             double crackRatio = scaledKineticEnergy / Math.max(crackResistance, 1.0);
             double yieldRatio = scaledKineticEnergy / materialStrength;
-            boolean protectedHardVsSoft = ImpactDamageAllocator.isProtectedHardMaterialNearSoftTarget(level, pos, state, 3);
+            boolean suppressCallbackDamage = ImpactResolver.shouldSuppressCallbackDamage(level, pos, state);
 
             double elasticBreakVelocity = TrueImpactConfig.MIN_BREAK_VELOCITY.get()
                     * (1.0 + restitution * TrueImpactConfig.RESTITUTION_BREAK_VELOCITY_MULTIPLIER.get());
@@ -161,7 +161,7 @@ public class TrueImpactPhysicsSolver {
                     && TrueImpactConfig.PROTECT_NEARBY_SUBLEVEL_IMPACTS.get()
                     && ElasticSubLevelDetector.hasNearbySubLevel(level, pos);
 
-            if ((protectedHardVsSoft || restitution >= TrueImpactConfig.BOUNCE_RESPONSE_THRESHOLD.get() || elasticImpactingSubLevel || protectedSubLevelImpact)
+            if ((suppressCallbackDamage || restitution >= TrueImpactConfig.BOUNCE_RESPONSE_THRESHOLD.get() || elasticImpactingSubLevel || protectedSubLevelImpact)
                     && !TrueImpactConfig.ELASTIC_BLOCKS_BREAK_BLOCKS.get()
                     && !fragile) {
                 return new BlockSubLevelCollisionCallback.CollisionResult(
@@ -178,6 +178,7 @@ public class TrueImpactPhysicsSolver {
             boolean canBreakWorldBlocks = TrueImpactConfig.ENABLE_BLOCK_BREAKING.get()
                     && TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.get()
                     && TrueImpactConfig.ENABLE_WORLD_DESTRUCTION.get()
+                    && !suppressCallbackDamage
                     && MaterialImpactProperties.isDestructible(state, true);
 
             if (canBreakWorldBlocks
@@ -213,6 +214,7 @@ public class TrueImpactPhysicsSolver {
                         reactionMotion(pos, hitPos, impactVelocity, yieldRatio, restitution), false);
             } else if (TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.get()
                     && TrueImpactConfig.ENABLE_CRACKS.get()
+                    && !suppressCallbackDamage
                     && crackRatio > TrueImpactConfig.CRACK_YIELD_THRESHOLD.get()) {
                 // Cracks
                 double crackOverStress = Math.max(0.0, scaledKineticEnergy - crackResistance);
