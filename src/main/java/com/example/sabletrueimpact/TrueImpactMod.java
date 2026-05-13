@@ -32,12 +32,18 @@ public class TrueImpactMod {
     }
 
     private void onConfigLoad(ModConfigEvent.Loading event) {
+        if (event.getConfig().getType() != ModConfig.Type.SERVER) {
+            return;
+        }
         TrueImpactPresets.apply();
         MaterialImpactProperties.reload();
         ImpactCallbackDecider.reload();
     }
 
     private void onConfigReload(ModConfigEvent.Reloading event) {
+        if (event.getConfig().getType() != ModConfig.Type.SERVER) {
+            return;
+        }
         TrueImpactPresets.apply();
         MaterialImpactProperties.reload();
         ImpactCallbackDecider.reload();
