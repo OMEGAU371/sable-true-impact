@@ -146,9 +146,10 @@ public final class MaterialImpactProperties {
     public static double baseStrength(double hardness, double blast) {
         hardness = Math.max(0.05, hardness);
         blast = Math.max(0.0, blast);
+        double blastResistance = Math.sqrt(blast);
         double base = TrueImpactConfig.BASE_STRENGTH.get()
                 + hardness * TrueImpactConfig.HARDNESS_STRENGTH_FACTOR.get()
-                + blast * TrueImpactConfig.BLAST_STRENGTH_FACTOR.get();
+                + blastResistance * TrueImpactConfig.BLAST_STRENGTH_FACTOR.get();
         if (hardness < 1.0) {
             base *= TrueImpactConfig.SOFT_BLOCK_STRENGTH_MULTIPLIER.get();
         }
@@ -206,7 +207,7 @@ public final class MaterialImpactProperties {
 
         // 2. Toughness Multiplier: Scales with Blast Resistance.
         double toughnessMult = TrueImpactConfig.GLOBAL_BLOCK_TOUGHNESS_SCALE.get()
-                * (1.0 + blast * TrueImpactConfig.BLAST_TOUGHNESS_FACTOR.get());
+                * (1.0 + Math.sqrt(Math.max(blast, 0.0)) * TrueImpactConfig.BLAST_TOUGHNESS_FACTOR.get());
 
         // 3. Brittleness: Inversely proportional to Blast Resistance.
         double brittleness = TrueImpactConfig.GLOBAL_BRITTLENESS_SCALE.get()

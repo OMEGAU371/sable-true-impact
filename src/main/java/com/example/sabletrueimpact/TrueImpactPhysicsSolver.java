@@ -204,12 +204,27 @@ public class TrueImpactPhysicsSolver {
                     && impactVelocity >= elasticBreakVelocity
                     && yieldRatio > TrueImpactConfig.BREAK_YIELD_THRESHOLD.get()
                     && impactVelocity * yieldRatio > elasticBreakVelocity * (TrueImpactConfig.BREAK_YIELD_THRESHOLD.get() + 1.5)) {
+                double overstress = Math.max(0.0, scaledKineticEnergy - materialStrength);
+                BlockDamageAccumulator.apply(
+                        level,
+                        pos,
+                        MaterialImpactProperties.fatigueDamage(state, overstress),
+                        materialToughness * TrueImpactConfig.BREAK_YIELD_THRESHOLD.get(),
+                        system.hashCode() + pos.hashCode()
+                );
                 return new BlockSubLevelCollisionCallback.CollisionResult(
                         reactionMotion(pos, hitPos, impactVelocity, yieldRatio, restitution), false);
             } else if (canBreakWorldBlocks
                     && impactVelocity >= elasticBreakVelocity
                     && yieldRatio > TrueImpactConfig.BREAK_YIELD_THRESHOLD.get()) {
-                // Gentle break
+                double overstress = Math.max(0.0, scaledKineticEnergy - materialStrength);
+                BlockDamageAccumulator.apply(
+                        level,
+                        pos,
+                        MaterialImpactProperties.fatigueDamage(state, overstress * 0.65),
+                        materialToughness * TrueImpactConfig.BREAK_YIELD_THRESHOLD.get(),
+                        system.hashCode() + pos.hashCode()
+                );
                 return new BlockSubLevelCollisionCallback.CollisionResult(
                         reactionMotion(pos, hitPos, impactVelocity, yieldRatio, restitution), false);
             } else if (TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.get()
