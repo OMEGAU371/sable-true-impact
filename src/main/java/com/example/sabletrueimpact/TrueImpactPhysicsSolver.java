@@ -175,10 +175,10 @@ public class TrueImpactPhysicsSolver {
                         reactionMotion(pos, hitPos, impactVelocity, Math.max(yieldRatio, 1.0), restitution), false);
             }
 
-            boolean canBreakWorldBlocks = TrueImpactConfig.ENABLE_BLOCK_BREAKING.get()
-                    && TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.get()
-                    && TrueImpactConfig.ENABLE_WORLD_DESTRUCTION.get()
-                    && MaterialImpactProperties.isDestructible(state, true);
+            // This callback can be invoked for either the terrain block or a block inside the moving sublevel.
+            // Direct block deletion here can therefore eat the moving structure itself when it brushes soft targets.
+            // Terrain damage is handled in ElasticPairReaction, where both sides of the collision are known.
+            boolean canBreakWorldBlocks = false;
 
             if (canBreakWorldBlocks
                     && impactVelocity >= elasticPropagationVelocity
@@ -211,7 +211,7 @@ public class TrueImpactPhysicsSolver {
                 // Gentle break
                 return new BlockSubLevelCollisionCallback.CollisionResult(
                         reactionMotion(pos, hitPos, impactVelocity, yieldRatio, restitution), false);
-            } else if (TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.get()
+            } else if (false
                     && TrueImpactConfig.ENABLE_CRACKS.get()
                     && crackRatio > TrueImpactConfig.CRACK_YIELD_THRESHOLD.get()) {
                 // Cracks
