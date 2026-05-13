@@ -199,6 +199,23 @@ public final class MaterialImpactProperties {
             return custom;
         }
 
+        if (state.is(Blocks.NETHERITE_BLOCK)) {
+            return new Properties(
+                    TrueImpactConfig.GLOBAL_BLOCK_STRENGTH_SCALE.get() * 3.2,
+                    TrueImpactConfig.GLOBAL_BLOCK_TOUGHNESS_SCALE.get() * 9.0,
+                    TrueImpactConfig.GLOBAL_BRITTLENESS_SCALE.get() * 0.05,
+                    -1, -1, -1, true, Source.DERIVED
+            );
+        }
+        if (state.is(Blocks.OBSIDIAN) || state.is(Blocks.CRYING_OBSIDIAN)) {
+            return new Properties(
+                    TrueImpactConfig.GLOBAL_BLOCK_STRENGTH_SCALE.get() * 1.8,
+                    TrueImpactConfig.GLOBAL_BLOCK_TOUGHNESS_SCALE.get() * 4.5,
+                    TrueImpactConfig.GLOBAL_BRITTLENESS_SCALE.get() * 0.18,
+                    -1, -1, -1, true, Source.DERIVED
+            );
+        }
+
         double blast = state.getBlock().getExplosionResistance();
 
         // Universal Scaling Algorithm:

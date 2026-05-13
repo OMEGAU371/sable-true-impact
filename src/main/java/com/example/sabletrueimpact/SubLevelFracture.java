@@ -250,9 +250,10 @@ public final class SubLevelFracture {
             }
             double baseResistance = MaterialImpactProperties.baseStrength(destroySpeed, snapshot.blastResistance(pos));
             double connectionStrength = structure.connectionStrength();
-            double materialStrength = Math.max(MaterialImpactProperties.displayStrength(state, baseResistance) * connectionStrength, 1.0);
+            double connectionMaterialScale = Math.sqrt(Math.max(connectionStrength, 1.0));
+            double materialStrength = Math.max(MaterialImpactProperties.displayStrength(state, baseResistance) * connectionMaterialScale, 1.0);
             double materialToughness = Math.max(
-                    MaterialImpactProperties.displayToughness(state, baseResistance) * connectionStrength,
+                    MaterialImpactProperties.displayToughness(state, baseResistance) * connectionMaterialScale,
                     materialStrength);
             double impactFocus = impactFocus(offset.distanceSquared());
             double rawStress = fracturePower * structure.seamWeakness() * impactFocus;
@@ -272,10 +273,10 @@ public final class SubLevelFracture {
                 score = (fatigueDamage * crackBonus * spreadBonus) / (breakThreshold * toughnessBonus);
             } else {
                 double nearLimitRatio = rawStress / Math.max(materialStrength, 1.0);
-                if (nearLimitRatio < 0.38) {
+                if (nearLimitRatio < 0.28) {
                     continue;
                 }
-                double fatigue = materialStrength * nearLimitRatio * nearLimitRatio * 0.22;
+                double fatigue = materialStrength * nearLimitRatio * nearLimitRatio * 0.42;
                 fatigueDamage = MaterialImpactProperties.fatigueDamage(state, fatigue);
                 score = 0.0;
             }
