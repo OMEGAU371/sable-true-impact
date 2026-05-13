@@ -198,7 +198,7 @@ public final class ElasticPairReaction {
         BlockState targetState = findSoftestNearbyTerrainState(level, globalPoint, selfState, targetPos);
 
         if (selfPos.equals(targetPos)) {
-            org.apache.logging.log4j.LogManager.getLogger().warn("[TrueImpact] Collision overlap: Self and Target position are identical at {}! Material matchup split may be incorrect.", selfPos);
+            return;
         }
 
         double selfFractureScale = ImpactDamageAllocator.damageScaleForSelf(level, selfPos, selfState, targetPos, targetState);
