@@ -78,7 +78,10 @@ public final class ExplosionImpactHandler {
                 if (force < TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_THRESHOLD.get()) {
                     continue;
                 }
-                Vector3d localPoint = new Vector3d(hit.point().x, hit.point().y, hit.point().z);
+                Vector3d localPoint = SubLevelFracture.toLocalPoint(subLevel, new Vector3d(hit.point().x, hit.point().y, hit.point().z));
+                if (localPoint == null) {
+                    continue;
+                }
                 Vector3d normal = new Vector3d(hit.direction());
                 if (normal.lengthSquared() < 1.0E-8) {
                     normal.set(0.0, 1.0, 0.0);

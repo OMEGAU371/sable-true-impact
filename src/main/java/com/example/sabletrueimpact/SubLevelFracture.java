@@ -65,11 +65,9 @@ public final class SubLevelFracture {
 
         // Convert local-space contact point → world-space before touching block world.
         // Without this, ships near the origin would destroy blocks at (0,0,0).
-        Vector3d worldPoint = toWorldPoint(subLevel, localPoint);
-        if (worldPoint == null
-                || !Double.isFinite(worldPoint.x)
-                || !Double.isFinite(worldPoint.y)
-                || !Double.isFinite(worldPoint.z)) {
+        if (!Double.isFinite(localPoint.x)
+                || !Double.isFinite(localPoint.y)
+                || !Double.isFinite(localPoint.z)) {
             return;
         }
 
@@ -78,7 +76,7 @@ public final class SubLevelFracture {
             return;
         }
 
-        BlockPos center = BlockPos.containing(worldPoint.x, worldPoint.y, worldPoint.z);
+        BlockPos center = BlockPos.containing(localPoint.x, localPoint.y, localPoint.z);
         double scaledForce = scaledForceAboveThreshold(
                 forceAmount,
                 TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_THRESHOLD.get(),
@@ -434,6 +432,19 @@ public final class SubLevelFracture {
             double ry = ((Number) rp.getClass().getMethod("y").invoke(rp)).doubleValue();
             double rz = ((Number) rp.getClass().getMethod("z").invoke(rp)).doubleValue();
             return new Vector3d(localPoint.x + rx, localPoint.y + ry, localPoint.z + rz);
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            return null;
+        }
+    }
+
+    static Vector3d toLocalPoint(Object subLevel, Vector3d worldPoint) {
+        try {
+            Object pose = LOGICAL_POSE.invoke(subLevel);
+            Object rp = ROTATION_POINT.invoke(pose);
+            double rx = ((Number) rp.getClass().getMethod("x").invoke(rp)).doubleValue();
+            double ry = ((Number) rp.getClass().getMethod("y").invoke(rp)).doubleValue();
+            double rz = ((Number) rp.getClass().getMethod("z").invoke(rp)).doubleValue();
+            return new Vector3d(worldPoint.x - rx, worldPoint.y - ry, worldPoint.z - rz);
         } catch (ReflectiveOperationException | RuntimeException e) {
             return null;
         }
