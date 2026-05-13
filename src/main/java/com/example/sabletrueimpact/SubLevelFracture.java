@@ -63,11 +63,13 @@ public final class SubLevelFracture {
             return;
         }
 
-        // Collision points are in Sable sub-level plot space. Scanning world-space here misses
-        // the physical structure's own blocks and makes internal fracture look impossible.
-        if (!Double.isFinite(localPoint.x)
-                || !Double.isFinite(localPoint.y)
-                || !Double.isFinite(localPoint.z)) {
+        // Rapier reports contact points relative to Sable's rotation point. The actual blocks
+        // stored in the sub-level plot live at contact + rotationPoint.
+        Vector3d plotPoint = toPlotPoint(subLevel, localPoint);
+        if (plotPoint == null
+                || !Double.isFinite(plotPoint.x)
+                || !Double.isFinite(plotPoint.y)
+                || !Double.isFinite(plotPoint.z)) {
             return;
         }
 
@@ -76,7 +78,7 @@ public final class SubLevelFracture {
             return;
         }
 
-        BlockPos center = BlockPos.containing(localPoint.x, localPoint.y, localPoint.z);
+        BlockPos center = BlockPos.containing(plotPoint.x, plotPoint.y, plotPoint.z);
         double scaledForce = scaledForceAboveThreshold(
                 forceAmount,
                 TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_THRESHOLD.get(),
@@ -84,7 +86,7 @@ public final class SubLevelFracture {
         );
         double fracturePower = (scaledForce - TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_THRESHOLD.get())
                 * TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_SCALE.get()
-                * structureMultiplier(subLevel, localPoint)
+                * structureMultiplier(subLevel, plotPoint)
                 * TrueImpactConfig.GLOBAL_STRENGTH_SCALE.get()
                 * externalDamageScale;
         if (fracturePower <= 0.0) {
@@ -424,7 +426,15 @@ public final class SubLevelFracture {
         }
     }
 
-    /** Resolves a Rapier local-space point to Minecraft world-space by adding the sub-level's rotation point. */
+    /**
+     * Resolves a Rapier contact point to the sub-level plot coordinates used for stored blocks.
+     * Sable's own collision callback path applies this same rotation-point offset.
+     */
+    static Vector3d toPlotPoint(Object subLevel, Vector3d localPoint) {
+        return toWorldPoint(subLevel, localPoint);
+    }
+
+    /** Resolves a Rapier contact point by adding the sub-level's rotation point. */
     static Vector3d toWorldPoint(Object subLevel, Vector3d localPoint) {
         try {
             Object pose = LOGICAL_POSE.invoke(subLevel);
