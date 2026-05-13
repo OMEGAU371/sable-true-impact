@@ -23,7 +23,6 @@ public class TrueImpactMod {
         modEventBus.addListener(this::onConfigReload);
 
         NeoForge.EVENT_BUS.register(ExplosionImpactHandler.class);
-        NeoForge.EVENT_BUS.register(EntityImpactHandler.class);
         NeoForge.EVENT_BUS.register(SubLevelFracture.class);
         NeoForge.EVENT_BUS.register(TrueImpactPerformance.class);
         if (FMLEnvironment.dist == Dist.CLIENT) {

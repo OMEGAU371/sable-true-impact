@@ -339,8 +339,8 @@ public final class TrueImpactConfig {
         BUILDER.pop();
 
         BUILDER.push("entityImpact");
-        ENABLE_ENTITY_IMPACT_DAMAGE = BUILDER.comment("Damages living entities near a Sable sublevel impact point.")
-                .define("enableEntityImpactDamage", true);
+        ENABLE_ENTITY_IMPACT_DAMAGE = BUILDER.comment("Deprecated: STI no longer applies custom entity impact damage. Keep false and let Sable/Aeronautics handle entity collision damage.")
+                .define("enableEntityImpactDamage", false);
         ENTITY_IMPACT_DAMAGE_SCALE = BUILDER.defineInRange("entityImpactDamageScale", 0.18, 0.0, 1000.0);
         ENTITY_IMPACT_MIN_DAMAGE = BUILDER.defineInRange("entityImpactMinDamage", 1.0, 0.0, 1000.0);
         ENTITY_IMPACT_MAX_DAMAGE = BUILDER.comment("Maximum damage per entity impact. Set to 0 for unlimited.")

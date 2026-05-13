@@ -79,7 +79,7 @@ public final class TrueImpactPresets {
         TrueImpactConfig.ENABLE_SUBLEVEL_FRACTURE.set(fracture);
         TrueImpactConfig.ENABLE_EXPLOSION_IMPACT_FRACTURE.set(explosions);
         TrueImpactConfig.ENABLE_EXPLOSION_IMPULSE.set(explosions);
-        TrueImpactConfig.ENABLE_ENTITY_IMPACT_DAMAGE.set(blockBreaking);
+        TrueImpactConfig.ENABLE_ENTITY_IMPACT_DAMAGE.set(false);
         TrueImpactConfig.ENABLE_MATERIAL_MATCHUP_DAMAGE.set(materialMatchup);
         TrueImpactConfig.ENABLE_PAIR_REACTION.set(false);
     }

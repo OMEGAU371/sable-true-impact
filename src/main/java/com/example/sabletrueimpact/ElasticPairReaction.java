@@ -6,12 +6,10 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3d;
 
 import java.lang.reflect.Field;
@@ -87,15 +85,13 @@ public final class ElasticPairReaction {
             double f = collisions[start + 2];
             totalForce += f;
             
-            Vector3d local = slA != null ? 
-                new Vector3d(collisions[start + 9], collisions[start + 10], collisions[start + 11]) :
-                new Vector3d(collisions[start + 12], collisions[start + 13], collisions[start + 14]);
-            
-            Vector3d normal = slA != null ?
-                new Vector3d(collisions[start + 3], collisions[start + 4], collisions[start + 5]) :
-                new Vector3d(collisions[start + 6], collisions[start + 7], collisions[start + 8]);
+            Vector3d localA = new Vector3d(collisions[start + 9], collisions[start + 10], collisions[start + 11]);
+            Vector3d localB = new Vector3d(collisions[start + 12], collisions[start + 13], collisions[start + 14]);
+            Vector3d normalA = new Vector3d(collisions[start + 3], collisions[start + 4], collisions[start + 5]);
+            Vector3d normalB = new Vector3d(collisions[start + 6], collisions[start + 7], collisions[start + 8]);
+            Vector3d local = slA != null ? localA : localB;
 
-            points.add(new PointData(local, normal, f, slA, slB));
+            points.add(new PointData(localA, localB, normalA, normalB, f, slA, slB));
             
             min.x = Math.min(min.x, local.x); min.y = Math.min(min.y, local.y); min.z = Math.min(min.z, local.z);
             max.x = Math.max(max.x, local.x); max.y = Math.max(max.y, local.y); max.z = Math.max(max.z, local.z);
@@ -112,8 +108,8 @@ public final class ElasticPairReaction {
 
             if (isTerrain) {
                 processTerrainImpact(isFlat, explosions);
-            } else if (TrueImpactConfig.ENABLE_PAIR_REACTION.get()) {
-                processPairReaction(explosions);
+            } else {
+                processPairCollision(explosions);
             }
         }
 
@@ -133,21 +129,34 @@ public final class ElasticPairReaction {
                 double distributedForce = totalForce / limit;
                 for (int i = 0; i < limit; i++) {
                     PointData p = points.get(i);
-                    applyTerrainImpact(subLevel, p.local, p.normal, distributedForce * 1.5, explosions);
+                    applyTerrainImpact(subLevel, p.localFor(subLevel), p.normalFor(subLevel), distributedForce * 1.5, explosions);
                 }
             } else {
                 PointData lead = points.get(0);
-                applyTerrainImpact(subLevel, lead.local, lead.normal, totalForce, explosions);
+                applyTerrainImpact(subLevel, lead.localFor(subLevel), lead.normalFor(subLevel), totalForce, explosions);
             }
         }
 
-        private void processPairReaction(List<ExplosionCandidate> explosions) {
-            BlockPos.MutableBlockPos tmpPos = new BlockPos.MutableBlockPos();
+        private void processPairCollision(List<ExplosionCandidate> explosions) {
             for (PointData p : points) {
                 if (p.slA == null || p.slB == null) continue;
-                
-                BlockState stateA = localState(p.slA, p.local, tmpPos);
-                BlockState stateB = localState(p.slB, p.local, tmpPos);
+
+                BlockPos.MutableBlockPos posA = new BlockPos.MutableBlockPos();
+                BlockPos.MutableBlockPos posB = new BlockPos.MutableBlockPos();
+                BlockState stateA = localState(p.slA, p.localA, posA);
+                BlockState stateB = localState(p.slB, p.localB, posB);
+                ServerLevel levelA = level(p.slA);
+                ServerLevel levelB = level(p.slB);
+
+                double scaleA = levelA == null ? 1.0 : ImpactDamageAllocator.damageScaleForSelf(levelA, posA, stateA, posB, stateB);
+                double scaleB = levelB == null ? 1.0 : ImpactDamageAllocator.damageScaleForSelf(levelB, posB, stateB, posA, stateA);
+                SubLevelFracture.tryFracture(p.slA, p.localA, p.normalA, p.force, scaleA);
+                SubLevelFracture.tryFracture(p.slB, p.localB, p.normalB, p.force, scaleB);
+
+                if (!TrueImpactConfig.ENABLE_PAIR_REACTION.get()) {
+                    continue;
+                }
+
                 double res = Math.max(PhysicsBlockPropertyHelper.getRestitution(stateA), PhysicsBlockPropertyHelper.getRestitution(stateB));
                 
                 double threshold = TrueImpactConfig.PAIR_REACTION_FORCE_THRESHOLD.get();
@@ -162,18 +171,26 @@ public final class ElasticPairReaction {
                 impulse = Math.min(impulse, reducedMass * TrueImpactConfig.PAIR_REACTION_MAX_VELOCITY_CHANGE.get());
 
                 if (impulse > 1.0E-6) {
-                    applyImpulse(sceneId, p.slA, p.local, p.normal, impulse / massA);
-                    applyImpulse(sceneId, p.slB, p.local, p.normal, -impulse / massB);
+                    applyImpulse(sceneId, p.slA, p.localA, p.normalA, impulse / massA);
+                    applyImpulse(sceneId, p.slB, p.localB, p.normalB, -impulse / massB);
                     
                     Vector3d rot = rotationPoint(p.slA);
                     if (rot != null) {
-                        collectExplosion(explosions, level(p.slA), new Vector3d(p.local).add(rot), p.force, Math.max(massA, massB));
+                        collectExplosion(explosions, level(p.slA), new Vector3d(p.localA).add(rot), p.force, Math.max(massA, massB));
                     }
                 }
             }
         }
 
-        private record PointData(Vector3d local, Vector3d normal, double force, Object slA, Object slB) {}
+        private record PointData(Vector3d localA, Vector3d localB, Vector3d normalA, Vector3d normalB, double force, Object slA, Object slB) {
+            private Vector3d localFor(Object subLevel) {
+                return subLevel == slA ? localA : localB;
+            }
+
+            private Vector3d normalFor(Object subLevel) {
+                return subLevel == slA ? normalA : normalB;
+            }
+        }
     }
 
     private static void applyTerrainImpact(Object subLevel, Vector3d localPoint, Vector3d normal, double forceAmount, List<ExplosionCandidate> explosions) {
@@ -217,7 +234,6 @@ public final class ElasticPairReaction {
             
             damageTerrain(level, targetPos, normal, energy);
             CreateContraptionAnchorDamage.apply(level, globalPoint, energy);
-            damageEntities(level, new Vec3(globalPoint.x, globalPoint.y, globalPoint.z), energy);
             collectExplosion(explosions, level, globalPoint, forceAmount, mass(subLevel));
         }
     }
@@ -355,23 +371,6 @@ public final class ElasticPairReaction {
         if (exponent == 1.0 || forceAmount <= 0.0) return forceAmount;
         double reference = Math.max(threshold, 1.0);
         return forceAmount * Math.pow(Math.max(forceAmount / reference, 0.0), exponent - 1.0);
-    }
-
-    private static void damageEntities(ServerLevel level, Vec3 impactPoint, double energy) {
-        if (!TrueImpactConfig.ENABLE_ENTITY_IMPACT_DAMAGE.get() || energy <= 0.0) return;
-        double radius = TrueImpactConfig.ENTITY_IMPACT_RADIUS.get();
-        AABB bounds = AABB.ofSize(impactPoint, radius * 2.0, radius * 2.0, radius * 2.0);
-        double baseDamage = Math.sqrt(energy) * TrueImpactConfig.ENTITY_IMPACT_DAMAGE_SCALE.get();
-        if (baseDamage < TrueImpactConfig.ENTITY_IMPACT_MIN_DAMAGE.get()) return;
-        
-        for (LivingEntity entity : level.getEntitiesOfClass(LivingEntity.class, bounds, e -> e.isAlive() && !e.isSpectator())) {
-            double distance = entity.position().distanceTo(impactPoint);
-            double falloff = Math.max(0.0, 1.0 - distance / Math.max(radius, 0.001));
-            float damage = (float) Math.min(TrueImpactConfig.ENTITY_IMPACT_MAX_DAMAGE.get() <= 0 ? 1000 : TrueImpactConfig.ENTITY_IMPACT_MAX_DAMAGE.get(), baseDamage * falloff);
-            if (damage >= TrueImpactConfig.ENTITY_IMPACT_MIN_DAMAGE.get()) {
-                entity.hurt(level.damageSources().cramming(), damage);
-            }
-        }
     }
 
     private static void damageTerrain(ServerLevel level, BlockPos center, Vector3d normal, double energy) {
