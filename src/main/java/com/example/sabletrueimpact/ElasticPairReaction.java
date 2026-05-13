@@ -190,13 +190,12 @@ public final class ElasticPairReaction {
         ServerLevel level = level(subLevel);
         if (level == null) return;
 
-        BlockPos.MutableBlockPos targetPos = new BlockPos.MutableBlockPos();
-        BlockState targetState = findNearestNonAirTerrainState(level, globalPoint, targetPos);
-
         // Material-aware scaling: determine damage split between structure and terrain.
         // The terrain position is excluded from self lookup so a moving block does not inherit the target's material.
         BlockPos.MutableBlockPos selfPos = new BlockPos.MutableBlockPos();
-        BlockState selfState = findNearestNonAirSubLevelState(subLevel, localPoint, targetPos, selfPos);
+        BlockState selfState = findNearestNonAirSubLevelState(subLevel, localPoint, null, selfPos);
+        BlockPos.MutableBlockPos targetPos = new BlockPos.MutableBlockPos();
+        BlockState targetState = findSoftestNearbyTerrainState(level, globalPoint, selfState, targetPos);
 
         if (selfPos.equals(targetPos)) {
             org.apache.logging.log4j.LogManager.getLogger().warn("[TrueImpact] Collision overlap: Self and Target position are identical at {}! Material matchup split may be incorrect.", selfPos);
@@ -260,6 +259,35 @@ public final class ElasticPairReaction {
 
         outPos.set(center);
         return Blocks.AIR.defaultBlockState();
+    }
+
+    private static BlockState findSoftestNearbyTerrainState(ServerLevel level, Vector3d worldPoint, BlockState selfState, BlockPos.MutableBlockPos outPos) {
+        BlockPos center = BlockPos.containing(worldPoint.x, worldPoint.y, worldPoint.z);
+        BlockState nearest = findNearestNonAirTerrainState(level, worldPoint, outPos);
+        double bestResistance = selfState.isAir() ? Double.MAX_VALUE : ImpactDamageAllocator.impactResistance(level, outPos, nearest);
+        BlockPos bestPos = outPos.immutable();
+
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        for (int x = -3; x <= 3; x++) {
+            for (int y = -3; y <= 3; y++) {
+                for (int z = -3; z <= 3; z++) {
+                    pos.set(center.getX() + x, center.getY() + y, center.getZ() + z);
+                    BlockState candidate = level.getBlockState(pos);
+                    if (candidate.isAir() || candidate.getBlock() == selfState.getBlock()) {
+                        continue;
+                    }
+                    double resistance = ImpactDamageAllocator.impactResistance(level, pos, candidate);
+                    if (resistance < bestResistance) {
+                        bestResistance = resistance;
+                        bestPos = pos.immutable();
+                        nearest = candidate;
+                    }
+                }
+            }
+        }
+
+        outPos.set(bestPos);
+        return nearest;
     }
 
     private static BlockState findNearestNonAirSubLevelState(Object subLevel, Vector3d localPoint, BlockPos excludedWorldPos, BlockPos.MutableBlockPos outPos) {
