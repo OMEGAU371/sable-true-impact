@@ -17,6 +17,7 @@ public final class TrueImpactConfig {
 
     public static final ModConfigSpec.BooleanValue ENABLE_MATERIAL_MATCHUP_DAMAGE;
     public static final ModConfigSpec.DoubleValue MATERIAL_MATCHUP_EXPONENT;
+    public static final ModConfigSpec.DoubleValue SELF_DAMAGE_IMMUNITY_RATIO;
     public static final ModConfigSpec.DoubleValue MIN_SELF_DAMAGE_SCALE;
     public static final ModConfigSpec.DoubleValue MAX_SELF_DAMAGE_SCALE;
     public static final ModConfigSpec.DoubleValue MIN_TARGET_DAMAGE_SCALE;
@@ -186,8 +187,10 @@ public final class TrueImpactConfig {
                 .define("enableMaterialMatchupDamage", true);
         MATERIAL_MATCHUP_EXPONENT = BUILDER.comment("Controls the severity of the damage split. 1.0 is linear; higher values make strong materials much more resistant to weak materials.")
                 .defineInRange("materialMatchupExponent", 0.85, 0.0, 4.0);
+        SELF_DAMAGE_IMMUNITY_RATIO = BUILDER.comment("If target impact resistance is below this fraction of the moving material's resistance, the moving material takes no fracture damage.")
+                .defineInRange("selfDamageImmunityRatio", 0.05, 0.0, 1.0);
         MIN_SELF_DAMAGE_SCALE = BUILDER.comment("The minimum possible damage multiplier for a strong material hitting a weak material.")
-                .defineInRange("minSelfDamageScale", 0.02, 0.0, 1.0);
+                .defineInRange("minSelfDamageScale", 0.0, 0.0, 1.0);
         MAX_SELF_DAMAGE_SCALE = BUILDER.comment("The maximum possible damage multiplier for a weak material hitting a strong material.")
                 .defineInRange("maxSelfDamageScale", 3.0, 1.0, 100.0);
         MIN_TARGET_DAMAGE_SCALE = BUILDER.comment("The minimum possible damage multiplier applied to a target hit by a much weaker structure.")

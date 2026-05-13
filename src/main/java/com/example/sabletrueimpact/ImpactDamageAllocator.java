@@ -38,6 +38,13 @@ public final class ImpactDamageAllocator {
         double targetResistance = impactResistance(level, targetPos, targetState);
 
         double ratio = targetResistance / Math.max(selfResistance, 1.0);
+        if (ratio <= TrueImpactConfig.SELF_DAMAGE_IMMUNITY_RATIO.get()) {
+            if (TrueImpactConfig.ENABLE_DEBUG_IMPACT_LOGGING.get()) {
+                logMatchup(level, selfPos, selfState, selfResistance, targetPos, targetState, targetResistance, 0.0, -1.0);
+            }
+            return 0.0;
+        }
+
         double scale = Math.pow(ratio, TrueImpactConfig.MATERIAL_MATCHUP_EXPONENT.get());
         
         double finalScale;

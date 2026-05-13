@@ -51,6 +51,7 @@ public final class SubLevelFracture {
                 || !TrueImpactConfig.ENABLE_SUBLEVEL_FRACTURE.get()
                 || !TrueImpactConfig.ENABLE_PHYSICAL_DESTRUCTION.get()
                 || subLevel == null
+                || externalDamageScale <= 0.0
                 || forceAmount < TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_THRESHOLD.get()
                 || TrueImpactConfig.SUBLEVEL_FRACTURE_MAX_BLOCKS.get() <= 0) {
             return;
