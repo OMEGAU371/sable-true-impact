@@ -259,20 +259,28 @@ public final class SubLevelFracture {
             double impactFocus = impactFocus(offset.distanceSquared());
             double rawStress = fracturePower * structure.seamWeakness() * impactFocus;
             double overStress = rawStress - materialStrength;
-            if (overStress <= 0.0) {
-                continue;
-            }
-            
-            // Re-check against toughness for actual breakage
             double toughnessBonus = materialToughness / materialStrength;
-            double fatigueDamage = MaterialImpactProperties.fatigueDamage(state, overStress);
             double breakThreshold = Math.max(materialToughness, 1.0);
             double crackRatio = snapshot.damageRatio(pos);
             double crackBonus = 1.0 + crackRatio * TrueImpactConfig.SUBLEVEL_FRACTURE_CRACK_BONUS_SCALE.get();
             double spreadBonus = 1.0 + structure.weakPlaneSpread() * TrueImpactConfig.SUBLEVEL_FRACTURE_WEAK_PLANE_SPREAD.get();
-            
-            // Score now scales inverse to the square of toughness bonus to make Netherite truly god-like
-            double score = (fatigueDamage * crackBonus * spreadBonus) / (breakThreshold * toughnessBonus);
+
+            double fatigueDamage;
+            double score;
+            if (overStress > 0.0) {
+                fatigueDamage = MaterialImpactProperties.fatigueDamage(state, overStress);
+                // Score scales inverse to toughness bonus so hard blocks resist sudden fracture,
+                // while still showing accumulated cracks after repeated near-limit hits.
+                score = (fatigueDamage * crackBonus * spreadBonus) / (breakThreshold * toughnessBonus);
+            } else {
+                double nearLimitRatio = rawStress / Math.max(materialStrength, 1.0);
+                if (nearLimitRatio < 0.38) {
+                    continue;
+                }
+                double fatigue = materialStrength * nearLimitRatio * nearLimitRatio * 0.22;
+                fatigueDamage = MaterialImpactProperties.fatigueDamage(state, fatigue);
+                score = 0.0;
+            }
             result.add(new Candidate(pos.immutable(), score, fatigueDamage, breakThreshold));
         }
         return new CandidateScan(result, checked);
