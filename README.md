@@ -4,6 +4,8 @@ Sable True Impact is an experimental NeoForge add-on for Sable that adds impact 
 
 It is designed for Minecraft 1.21.1, NeoForge, and Sable 1.2.2+.
 
+<img width="2672" height="1024" alt="STICOVER" src="https://github.com/user-attachments/assets/376ba13a-21dc-4269-ab4d-f42429b6c977" />
+
 ## Features
 
 - Impact-based terrain damage using collision force, material hardness, blast resistance, mass, and support.
