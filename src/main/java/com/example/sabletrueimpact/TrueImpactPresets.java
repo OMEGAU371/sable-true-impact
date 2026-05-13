@@ -31,6 +31,7 @@ public final class TrueImpactPresets {
                 TrueImpactConfig.ENABLE_EXPLOSION_IMPULSE.set(false);
                 TrueImpactConfig.ENABLE_ENTITY_IMPACT_DAMAGE.set(false);
                 TrueImpactConfig.ENABLE_MATERIAL_MATCHUP_DAMAGE.set(false);
+                TrueImpactConfig.ENABLE_PAIR_REACTION.set(false);
             }
             case "low" -> {
                 detailToggles(true, true, false, false, true, true);
@@ -83,6 +84,7 @@ public final class TrueImpactPresets {
         TrueImpactConfig.ENABLE_EXPLOSION_IMPULSE.set(explosions);
         TrueImpactConfig.ENABLE_ENTITY_IMPACT_DAMAGE.set(blockBreaking);
         TrueImpactConfig.ENABLE_MATERIAL_MATCHUP_DAMAGE.set(materialMatchup);
+        TrueImpactConfig.ENABLE_PAIR_REACTION.set(false);
     }
 
     private static void applyPerformance(String preset) {

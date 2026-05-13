@@ -301,8 +301,8 @@ public final class TrueImpactConfig {
         BUILDER.pop();
 
         BUILDER.push("pairReaction");
-        ENABLE_PAIR_REACTION = BUILDER.comment("Experimental: apply equal-ish counter impulses when two Sable physical sublevels collide and either side is elastic.")
-                .define("enablePairReaction", true);
+        ENABLE_PAIR_REACTION = BUILDER.comment("Experimental: apply equal-ish counter impulses when two Sable physical sublevels collide and either side is elastic. Disabled by default because direct Rapier force injection can destabilize sleeping islands during save/pause.")
+                .define("enablePairReaction", false);
         PAIR_REACTION_SCALE = BUILDER.comment("Scales pair collision counter-impulses. Lower if elastic structures launch too hard.")
                 .defineInRange("pairReactionScale", 0.025, 0.0, 10.0);
         PAIR_REACTION_MAX_IMPULSE = BUILDER.comment("Caps raw collision force used by pair reaction.")
