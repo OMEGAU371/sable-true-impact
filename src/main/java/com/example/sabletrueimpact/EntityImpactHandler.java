@@ -1,6 +1,9 @@
 package com.example.sabletrueimpact;
 
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -79,6 +82,9 @@ public final class EntityImpactHandler {
         AABB contactBounds = bounds.inflate(TrueImpactConfig.ENTITY_MOVING_IMPACT_CONTACT_MARGIN.get());
         int candidates = 0;
         int hits = 0;
+        AnchorScanResult anchorResult = damageCreateContraptionAnchorsNearSubLevel(level, subLevel, contactBounds, velocity, mass);
+        candidates += anchorResult.candidates();
+        hits += anchorResult.hits();
         for (LivingEntity entity : level.getEntitiesOfClass(LivingEntity.class, contactBounds, entity -> entity.isAlive() && !entity.isSpectator())) {
             candidates++;
             if (isStandingOnSubLevel(entity.getBoundingBox(), bounds, velocity)) {
@@ -116,6 +122,52 @@ public final class EntityImpactHandler {
             }
         }
         return new EntityScanResult(candidates, hits);
+    }
+
+    private static AnchorScanResult damageCreateContraptionAnchorsNearSubLevel(ServerLevel level, Object subLevel, AABB contactBounds,
+                                                                               Vector3d subLevelVelocity, double mass) {
+        if (!TrueImpactConfig.ENABLE_CREATE_CONTRAPTION_ANCHOR_DAMAGE.get()) {
+            return AnchorScanResult.EMPTY;
+        }
+        int candidates = 0;
+        int hits = 0;
+        for (Entity entity : level.getEntities((Entity) null, contactBounds.inflate(TrueImpactConfig.CREATE_CONTRAPTION_ANCHOR_DAMAGE_RADIUS.get()),
+                EntityImpactHandler::isCreateContraptionEntity)) {
+            candidates++;
+            Vec3 entityVelocity = entity.getDeltaMovement();
+            Vector3d relativeVelocity = new Vector3d(
+                    subLevelVelocity.x - entityVelocity.x,
+                    subLevelVelocity.y - entityVelocity.y,
+                    subLevelVelocity.z - entityVelocity.z
+            );
+            double relativeSpeed = relativeVelocity.length();
+            if (relativeSpeed < TrueImpactConfig.ENTITY_MOVING_IMPACT_MIN_RELATIVE_SPEED.get()) {
+                continue;
+            }
+
+            EntityHitKey key = new EntityHitKey(entity.getUUID(), System.identityHashCode(subLevel));
+            long now = level.getGameTime();
+            if (LAST_HIT_TICK.getOrDefault(key, Long.MIN_VALUE) + TrueImpactConfig.ENTITY_IMPACT_COOLDOWN_TICKS.get() > now) {
+                continue;
+            }
+
+            Vec3 point = entity.getBoundingBox().getCenter();
+            double impactEnergy = relativeSpeed * relativeSpeed
+                    * mass
+                    * TrueImpactConfig.ENTITY_MOVING_IMPACT_DAMAGE_SCALE.get()
+                    * 24.0;
+            CreateContraptionAnchorDamage.apply(level, new Vector3d(point.x, point.y, point.z), impactEnergy);
+            LAST_HIT_TICK.put(key, now);
+            hits++;
+        }
+        return new AnchorScanResult(candidates, hits);
+    }
+
+    private static boolean isCreateContraptionEntity(Entity entity) {
+        ResourceLocation id = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
+        return id != null
+                && "create".equals(id.getNamespace())
+                && id.getPath().toLowerCase(java.util.Locale.ROOT).contains("contraption");
     }
 
     private static boolean isStandingOnSubLevel(AABB entityBounds, AABB subLevelBounds, Vector3d subLevelVelocity) {
@@ -211,5 +263,9 @@ public final class EntityImpactHandler {
 
     private record EntityScanResult(int candidates, int hits) {
         private static final EntityScanResult EMPTY = new EntityScanResult(0, 0);
+    }
+
+    private record AnchorScanResult(int candidates, int hits) {
+        private static final AnchorScanResult EMPTY = new AnchorScanResult(0, 0);
     }
 }
