@@ -38,14 +38,9 @@ public class CrackPropagationUtils {
                 if (state.isAir()) continue;
 
                 float hardness = state.getDestroySpeed(level, pos);
-                float blastResist = state.getBlock().getExplosionResistance();
                 if (hardness < 0.0f) continue; // Unbreakable
                 
-                double structuralIntegrity = (hardness * (TrueImpactConfig.HARDNESS_STRENGTH_FACTOR.get() + 2.0))
-                        + (TrueImpactConfig.BASE_STRENGTH.get() + 4.0);
-                if (hardness < 1.0f) {
-                    structuralIntegrity *= TrueImpactConfig.SOFT_BLOCK_STRENGTH_MULTIPLIER.get();
-                }
+                double structuralIntegrity = MaterialImpactProperties.baseStrength(level, pos, state) + 4.0;
                 double yieldRatio = energy / structuralIntegrity;
                 
                 if (yieldRatio > TrueImpactConfig.PROPAGATION_CRACK_YIELD_THRESHOLD.get()) {

@@ -77,11 +77,7 @@ public class TrueImpactPhysicsSolver {
                 // Soil and other soft materials should not become stronger than timber just because they are surrounded.
                 supportMultiplier = Math.min(1.0, supportMultiplier);
             }
-            double structuralIntegrity = ((hardness * TrueImpactConfig.HARDNESS_STRENGTH_FACTOR.get())
-                    + TrueImpactConfig.BASE_STRENGTH.get()) * supportMultiplier;
-            if (hardness < 1.0f) {
-                structuralIntegrity *= TrueImpactConfig.SOFT_BLOCK_STRENGTH_MULTIPLIER.get();
-            }
+            double structuralIntegrity = MaterialImpactProperties.baseStrength(level, pos, state) * supportMultiplier;
 
             // 2. Fetch Mass and Velocity Vector via Reflection
             double mass = TrueImpactConfig.FALLBACK_IMPACT_MASS.get();

@@ -49,6 +49,7 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.DoubleValue MAX_EFFECTIVE_MASS;
     public static final ModConfigSpec.DoubleValue SOFT_BLOCK_STRENGTH_MULTIPLIER;
     public static final ModConfigSpec.DoubleValue HARDNESS_STRENGTH_FACTOR;
+    public static final ModConfigSpec.DoubleValue BLAST_STRENGTH_FACTOR;
     public static final ModConfigSpec.DoubleValue BASE_STRENGTH;
     public static final ModConfigSpec.DoubleValue CRACK_YIELD_THRESHOLD;
     public static final ModConfigSpec.DoubleValue BREAK_YIELD_THRESHOLD;
@@ -197,6 +198,8 @@ public final class TrueImpactConfig {
         
         HARDNESS_STRENGTH_FACTOR = BUILDER.comment("Strength added per 1.0 of vanilla block hardness. Hardness mainly resists the start of damage (Yield Point).")
                 .defineInRange("hardnessStrengthFactor", 2.0, 0.0, 1000.0);
+        BLAST_STRENGTH_FACTOR = BUILDER.comment("Strength added per 1.0 of vanilla explosion resistance. This keeps dense blast-proof materials from chipping before soft targets.")
+                .defineInRange("blastStrengthFactor", 4.0, 0.0, 1000.0);
         BLAST_TOUGHNESS_FACTOR = BUILDER.comment("How much a block's vanilla explosion resistance contributes to its physical toughness (impact absorption).")
                 .defineInRange("blastToughnessFactor", 0.5, 0.0, 1000.0);
         BUILDER.pop();

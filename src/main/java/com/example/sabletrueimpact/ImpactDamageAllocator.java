@@ -22,9 +22,7 @@ public final class ImpactDamageAllocator {
         if (rawHardness < 0.0f) {
             return 1_000_000.0;
         }
-        double hardness = Math.max(0.05, rawHardness);
-
-        double baseStrength = TrueImpactConfig.BASE_STRENGTH.get() + hardness * TrueImpactConfig.HARDNESS_STRENGTH_FACTOR.get();
+        double baseStrength = MaterialImpactProperties.baseStrength(level, pos, state);
         double strength = Math.max(MaterialImpactProperties.displayStrength(state, baseStrength), 1.0);
         double toughness = Math.max(MaterialImpactProperties.displayToughness(state, baseStrength), strength);
         

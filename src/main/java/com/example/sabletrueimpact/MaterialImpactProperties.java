@@ -1,7 +1,9 @@
 package com.example.sabletrueimpact;
 
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -116,6 +118,24 @@ public final class MaterialImpactProperties {
 
     public static double breakThreshold(BlockState state, double baseStrength) {
         return baseStrength * strengthMultiplier(state) * toughnessMultiplier(state);
+    }
+
+    public static double baseStrength(BlockGetter level, BlockPos pos, BlockState state) {
+        double hardness = Math.max(0.05, state.getDestroySpeed(level, pos));
+        double blast = Math.max(0.0, state.getBlock().getExplosionResistance());
+        return baseStrength(hardness, blast);
+    }
+
+    public static double baseStrength(double hardness, double blast) {
+        hardness = Math.max(0.05, hardness);
+        blast = Math.max(0.0, blast);
+        double base = TrueImpactConfig.BASE_STRENGTH.get()
+                + hardness * TrueImpactConfig.HARDNESS_STRENGTH_FACTOR.get()
+                + blast * TrueImpactConfig.BLAST_STRENGTH_FACTOR.get();
+        if (hardness < 1.0) {
+            base *= TrueImpactConfig.SOFT_BLOCK_STRENGTH_MULTIPLIER.get();
+        }
+        return base;
     }
 
     public static double displayStrength(BlockState state, double baseStrength) {

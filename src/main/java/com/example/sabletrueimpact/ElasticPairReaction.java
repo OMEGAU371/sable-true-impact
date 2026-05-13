@@ -190,14 +190,14 @@ public final class ElasticPairReaction {
         ServerLevel level = level(subLevel);
         if (level == null) return;
 
-        // Material-aware scaling: determine damage split between structure and terrain
-        BlockPos.MutableBlockPos selfPos = new BlockPos.MutableBlockPos();
-        BlockState selfState = findNearestNonAirSubLevelState(subLevel, localPoint, selfPos);
-        
         BlockPos.MutableBlockPos targetPos = new BlockPos.MutableBlockPos();
         BlockState targetState = findNearestNonAirTerrainState(level, globalPoint, targetPos);
 
-        // Warning: if detection systems overlap, the split logic will use the same block for both sides
+        // Material-aware scaling: determine damage split between structure and terrain.
+        // The terrain position is excluded from self lookup so a moving block does not inherit the target's material.
+        BlockPos.MutableBlockPos selfPos = new BlockPos.MutableBlockPos();
+        BlockState selfState = findNearestNonAirSubLevelState(subLevel, localPoint, targetPos, selfPos);
+
         if (selfPos.equals(targetPos)) {
             org.apache.logging.log4j.LogManager.getLogger().warn("[TrueImpact] Collision overlap: Self and Target position are identical at {}! Material matchup split may be incorrect.", selfPos);
         }
@@ -261,31 +261,43 @@ public final class ElasticPairReaction {
         return Blocks.AIR.defaultBlockState();
     }
 
-    private static BlockState findNearestNonAirSubLevelState(Object subLevel, Vector3d localPoint, BlockPos.MutableBlockPos outPos) {
+    private static BlockState findNearestNonAirSubLevelState(Object subLevel, Vector3d localPoint, BlockPos excludedWorldPos, BlockPos.MutableBlockPos outPos) {
         ServerLevel level = level(subLevel);
         Vector3d rotationPoint = rotationPoint(subLevel);
         if (level == null || rotationPoint == null) return Blocks.AIR.defaultBlockState();
-        
+
+        BlockState local = findNearestNonAirState(level, localPoint, null, outPos);
+        if (!local.isAir()) {
+            return local;
+        }
+
         Vector3d worldPoint = new Vector3d(localPoint).add(rotationPoint);
-        BlockPos center = BlockPos.containing(worldPoint.x, worldPoint.y, worldPoint.z);
-        
+        return findNearestNonAirState(level, worldPoint, excludedWorldPos, outPos);
+    }
+
+    private static BlockState findNearestNonAirState(ServerLevel level, Vector3d point, BlockPos excludedPos, BlockPos.MutableBlockPos outPos) {
+        BlockPos center = BlockPos.containing(point.x, point.y, point.z);
+
         BlockState direct = level.getBlockState(center);
-        if (!direct.isAir()) {
+        if (!direct.isAir() && !center.equals(excludedPos)) {
             outPos.set(center);
             return direct;
         }
-        
+
         BlockPos nearestPos = null;
         double minDistSq = Double.MAX_VALUE;
         BlockState nearestState = Blocks.AIR.defaultBlockState();
-        
+
         for (int x = -1; x <= 1; x++) {
             for (int y = -1; y <= 1; y++) {
                 for (int z = -1; z <= 1; z++) {
                     BlockPos p = center.offset(x, y, z);
+                    if (p.equals(excludedPos)) {
+                        continue;
+                    }
                     BlockState s = level.getBlockState(p);
                     if (!s.isAir()) {
-                        double d = p.distToCenterSqr(worldPoint.x, worldPoint.y, worldPoint.z);
+                        double d = p.distToCenterSqr(point.x, point.y, point.z);
                         if (d < minDistSq) {
                             minDistSq = d;
                             nearestPos = p;
@@ -295,12 +307,13 @@ public final class ElasticPairReaction {
                 }
             }
         }
-        
+
         if (nearestPos != null) {
             outPos.set(nearestPos);
             return nearestState;
         }
-        
+
+        outPos.set(center);
         return Blocks.AIR.defaultBlockState();
     }
 
@@ -350,9 +363,7 @@ public final class ElasticPairReaction {
                 BlockState state = level.getBlockState(pos);
                 if (state.isAir() || state.getDestroySpeed(level, pos) < 0 || state.is(Blocks.BEDROCK)) continue;
 
-                double strength = (state.getDestroySpeed(level, pos) * TrueImpactConfig.HARDNESS_STRENGTH_FACTOR.get())
-                        + TrueImpactConfig.BASE_STRENGTH.get();
-                if (state.getDestroySpeed(level, pos) < 1.0f) strength *= TrueImpactConfig.SOFT_BLOCK_STRENGTH_MULTIPLIER.get();
+                double strength = MaterialImpactProperties.baseStrength(level, pos, state);
                 
                 double materialThreshold = Math.max(MaterialImpactProperties.breakThreshold(state, strength), 1.0);
                 double yield = node.energy() / materialThreshold;
@@ -472,6 +483,11 @@ public final class ElasticPairReaction {
         ServerLevel level = level(subLevel);
         Vector3d rotationPoint = rotationPoint(subLevel);
         if (level == null || rotationPoint == null) return Blocks.AIR.defaultBlockState();
+        blockPos.set(localPoint.x, localPoint.y, localPoint.z);
+        BlockState local = level.getBlockState(blockPos);
+        if (!local.isAir()) {
+            return local;
+        }
         blockPos.set(localPoint.x + rotationPoint.x, localPoint.y + rotationPoint.y, localPoint.z + rotationPoint.z);
         return level.getBlockState(blockPos);
     }
