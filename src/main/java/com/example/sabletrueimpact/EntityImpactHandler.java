@@ -1,40 +1,57 @@
+/*
+ * Decompiled with CFR 0.152.
+ * 
+ * Could not load the following classes:
+ *  net.minecraft.server.level.ServerLevel
+ *  net.minecraft.world.entity.LivingEntity
+ *  net.minecraft.world.level.Level
+ *  net.minecraft.world.phys.AABB
+ *  net.minecraft.world.phys.Vec3
+ *  net.neoforged.bus.api.SubscribeEvent
+ *  net.neoforged.neoforge.event.tick.LevelTickEvent$Post
+ *  org.joml.Vector3d
+ *  org.joml.Vector3dc
+ */
 package com.example.sabletrueimpact;
 
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.neoforge.event.tick.LevelTickEvent;
-import org.joml.Vector3d;
-
+import com.example.sabletrueimpact.TrueImpactConfig;
+import com.example.sabletrueimpact.TrueImpactPerformance;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.event.tick.LevelTickEvent;
+import org.joml.Vector3d;
+import org.joml.Vector3dc;
 
 public final class EntityImpactHandler {
-    private static final Method GET_CONTAINER = findMethod("dev.ryanhcode.sable.api.sublevel.SubLevelContainer", "getContainer", net.minecraft.world.level.Level.class);
-    private static final Method GET_ALL_SUBLEVELS = findMethod("dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer", "getAllSubLevels");
-    private static final Method GET_MASS_TRACKER = findMethod("dev.ryanhcode.sable.sublevel.ServerSubLevel", "getMassTracker");
-    private static final Method GET_MASS = findMethod("dev.ryanhcode.sable.api.physics.mass.MassData", "getMass");
-    private static final Method BOUNDING_BOX = findMethod("dev.ryanhcode.sable.sublevel.SubLevel", "boundingBox");
-    private static final Field LATEST_LINEAR_VELOCITY = findField("dev.ryanhcode.sable.sublevel.ServerSubLevel", "latestLinearVelocity");
-    private static final Map<EntityHitKey, Long> LAST_HIT_TICK = new HashMap<>();
+    private static final Method GET_CONTAINER = EntityImpactHandler.findMethod("dev.ryanhcode.sable.api.sublevel.SubLevelContainer", "getContainer", Level.class);
+    private static final Method GET_ALL_SUBLEVELS = EntityImpactHandler.findMethod("dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer", "getAllSubLevels", new Class[0]);
+    private static final Method GET_MASS_TRACKER = EntityImpactHandler.findMethod("dev.ryanhcode.sable.sublevel.ServerSubLevel", "getMassTracker", new Class[0]);
+    private static final Method GET_MASS = EntityImpactHandler.findMethod("dev.ryanhcode.sable.api.physics.mass.MassData", "getMass", new Class[0]);
+    private static final Method BOUNDING_BOX = EntityImpactHandler.findMethod("dev.ryanhcode.sable.sublevel.SubLevel", "boundingBox", new Class[0]);
+    private static final Field LATEST_LINEAR_VELOCITY = EntityImpactHandler.findField("dev.ryanhcode.sable.sublevel.ServerSubLevel", "latestLinearVelocity");
+    private static final Map<EntityHitKey, Long> LAST_HIT_TICK = new HashMap<EntityHitKey, Long>();
 
+    /*
+     * WARNING - Removed try catching itself - possible behaviour change.
+     */
     @SubscribeEvent
     public static void onLevelTick(LevelTickEvent.Post event) {
-        if (!TrueImpactConfig.ENABLE_TRUE_IMPACT.get()
-                || !TrueImpactConfig.ENABLE_ENTITY_IMPACT_DAMAGE.get()
-                || !(event.getLevel() instanceof ServerLevel level)) {
+        Level level;
+        if (!(((Boolean)TrueImpactConfig.ENABLE_TRUE_IMPACT.get()).booleanValue() && ((Boolean)TrueImpactConfig.ENABLE_ENTITY_IMPACT_DAMAGE.get()).booleanValue() && (level = event.getLevel()) instanceof ServerLevel)) {
             return;
         }
-        int interval = TrueImpactConfig.ENTITY_IMPACT_SCAN_INTERVAL_TICKS.get();
-        if (interval > 1 && level.getGameTime() % interval != 0L) {
+        ServerLevel level2 = (ServerLevel)level;
+        int interval = (Integer)TrueImpactConfig.ENTITY_IMPACT_SCAN_INTERVAL_TICKS.get();
+        if (interval > 1 && level2.getGameTime() % (long)interval != 0L) {
             return;
         }
         long startedAt = TrueImpactPerformance.start();
@@ -42,181 +59,73 @@ public final class EntityImpactHandler {
         int candidateEntities = 0;
         int hits = 0;
         try {
-            Object container = GET_CONTAINER.invoke(null, level);
+            Object container = GET_CONTAINER.invoke(null, level2);
             if (container == null) {
                 return;
             }
-            Object allSubLevels = GET_ALL_SUBLEVELS.invoke(container);
-            if (!(allSubLevels instanceof Iterable<?> subLevels)) {
+            Object allSubLevels = GET_ALL_SUBLEVELS.invoke(container, new Object[0]);
+            if (!(allSubLevels instanceof Iterable)) {
                 return;
             }
-            int maxSubLevels = TrueImpactConfig.ENTITY_IMPACT_MAX_SUBLEVELS_PER_SCAN.get();
+            Iterable subLevels = (Iterable)allSubLevels;
+            int maxSubLevels = (Integer)TrueImpactConfig.ENTITY_IMPACT_MAX_SUBLEVELS_PER_SCAN.get();
             for (Object subLevel : subLevels) {
-                if (scannedSubLevels >= maxSubLevels) {
-                    break;
-                }
-                scannedSubLevels++;
-                EntityScanResult result = damageEntitiesNearSubLevel(level, subLevel);
+                if (scannedSubLevels >= maxSubLevels) break;
+                ++scannedSubLevels;
+                EntityScanResult result = EntityImpactHandler.damageEntitiesNearSubLevel(level2, subLevel);
                 candidateEntities += result.candidates();
                 hits += result.hits();
             }
-            cleanup(level.getGameTime());
-        } catch (ReflectiveOperationException | RuntimeException ignored) {
-        } finally {
+            EntityImpactHandler.cleanup(level2.getGameTime());
+        }
+        catch (ReflectiveOperationException | RuntimeException exception) {
+        }
+        finally {
             TrueImpactPerformance.recordEntityScan(startedAt, scannedSubLevels, candidateEntities, hits);
-            TrueImpactPerformance.maybeLog(level);
+            TrueImpactPerformance.maybeLog(level2);
         }
     }
 
     private static EntityScanResult damageEntitiesNearSubLevel(ServerLevel level, Object subLevel) throws ReflectiveOperationException {
-        Vector3d velocity = velocity(subLevel);
+        Vector3d velocity = EntityImpactHandler.velocity(subLevel);
         double speed = velocity.length();
-        if (speed < TrueImpactConfig.ENTITY_IMPACT_MIN_SPEED.get()) {
+        if (speed < (Double)TrueImpactConfig.ENTITY_IMPACT_MIN_SPEED.get()) {
             return EntityScanResult.EMPTY;
         }
-
-        double mass = Math.min(TrueImpactConfig.MAX_EFFECTIVE_MASS.get(),
-                Math.pow(Math.max(mass(subLevel), 1.0), TrueImpactConfig.MASS_EXPONENT.get()));
-
-        AABB bounds = bounds(subLevel);
-        AABB contactBounds = bounds.inflate(TrueImpactConfig.ENTITY_MOVING_IMPACT_CONTACT_MARGIN.get());
+        double mass = Math.min((Double)TrueImpactConfig.MAX_EFFECTIVE_MASS.get(), Math.pow(Math.max(EntityImpactHandler.mass(subLevel), 1.0), (Double)TrueImpactConfig.MASS_EXPONENT.get()));
+        AABB bounds = EntityImpactHandler.bounds(subLevel);
+        AABB contactBounds = bounds.inflate(((Double)TrueImpactConfig.ENTITY_MOVING_IMPACT_CONTACT_MARGIN.get()).doubleValue());
         int candidates = 0;
         int hits = 0;
-        AnchorScanResult anchorResult = damageCreateContraptionAnchorsNearSubLevel(level, subLevel, contactBounds, velocity, mass);
-        candidates += anchorResult.candidates();
-        hits += anchorResult.hits();
-        for (LivingEntity entity : level.getEntitiesOfClass(LivingEntity.class, contactBounds, entity -> entity.isAlive() && !entity.isSpectator())) {
-            candidates++;
-            if (isStandingOnSubLevel(entity.getBoundingBox(), bounds, velocity)) {
-                continue;
-            }
-            Vec3 entityVelocity = entity.getDeltaMovement();
-            Vector3d relativeVelocity = new Vector3d(
-                    velocity.x - entityVelocity.x,
-                    velocity.y - entityVelocity.y,
-                    velocity.z - entityVelocity.z
-            );
+        for (LivingEntity entity2 : level.getEntitiesOfClass(LivingEntity.class, contactBounds, entity -> entity.isAlive() && !entity.isSpectator())) {
+            double impactSpeed;
+            double baseDamage;
+            double closingSpeed;
+            ++candidates;
+            if (EntityImpactHandler.isStandingOnSubLevel(entity2.getBoundingBox(), bounds, velocity)) continue;
+            Vec3 entityVelocity = entity2.getDeltaMovement();
+            Vector3d relativeVelocity = new Vector3d(velocity.x - entityVelocity.x, velocity.y - entityVelocity.y, velocity.z - entityVelocity.z);
             double relativeSpeed = relativeVelocity.length();
-            double minSpeed = Math.max(TrueImpactConfig.ENTITY_MOVING_IMPACT_MIN_RELATIVE_SPEED.get(),
-                    TrueImpactConfig.CREATE_CONTRAPTION_MIN_IMPACT_SPEED.get());
-            if (relativeSpeed < minSpeed) {
-                continue;
-            }
-            double closingSpeed = closingSpeed(entity.getBoundingBox(), bounds, relativeVelocity);
-            if (closingSpeed < TrueImpactConfig.ENTITY_MOVING_IMPACT_MIN_CLOSING_SPEED.get()) {
-                continue;
-            }
-            double impactSpeed = Math.min(relativeSpeed, Math.max(closingSpeed, relativeSpeed * 0.35));
-            double baseDamage = impactSpeed * impactSpeed * mass * TrueImpactConfig.ENTITY_MOVING_IMPACT_DAMAGE_SCALE.get();
-            if (baseDamage < TrueImpactConfig.ENTITY_IMPACT_MIN_DAMAGE.get()) {
-                continue;
-            }
-            EntityHitKey key = new EntityHitKey(entity.getUUID(), System.identityHashCode(subLevel));
+            if (relativeSpeed < (Double)TrueImpactConfig.ENTITY_MOVING_IMPACT_MIN_RELATIVE_SPEED.get() || (closingSpeed = EntityImpactHandler.closingSpeed(entity2.getBoundingBox(), bounds, relativeVelocity)) < (Double)TrueImpactConfig.ENTITY_MOVING_IMPACT_MIN_CLOSING_SPEED.get() || (baseDamage = (impactSpeed = Math.min(relativeSpeed, Math.max(closingSpeed, relativeSpeed * 0.35))) * impactSpeed * mass * (Double)TrueImpactConfig.ENTITY_MOVING_IMPACT_DAMAGE_SCALE.get()) < (Double)TrueImpactConfig.ENTITY_IMPACT_MIN_DAMAGE.get()) continue;
+            EntityHitKey key = new EntityHitKey(entity2.getUUID(), System.identityHashCode(subLevel));
             long now = level.getGameTime();
-            if (LAST_HIT_TICK.getOrDefault(key, Long.MIN_VALUE) + TrueImpactConfig.ENTITY_IMPACT_COOLDOWN_TICKS.get() > now) {
-                continue;
-            }
-            double maxDamage = TrueImpactConfig.ENTITY_MOVING_IMPACT_MAX_DAMAGE.get();
-            float damage = (float) (maxDamage <= 0.0 ? baseDamage : Math.min(maxDamage, baseDamage));
-            if (damage >= TrueImpactConfig.ENTITY_IMPACT_MIN_DAMAGE.get() && entity.hurt(level.damageSources().cramming(), damage)) {
-                LAST_HIT_TICK.put(key, now);
-                hits++;
-            }
+            if (LAST_HIT_TICK.getOrDefault(key, Long.MIN_VALUE) + (long)((Integer)TrueImpactConfig.ENTITY_IMPACT_COOLDOWN_TICKS.get()).intValue() > now) continue;
+            double maxDamage = (Double)TrueImpactConfig.ENTITY_MOVING_IMPACT_MAX_DAMAGE.get();
+            double d = maxDamage <= 0.0 ? baseDamage : Math.min(maxDamage, baseDamage);
+            float damage = (float)d;
+            if (!((double)damage >= (Double)TrueImpactConfig.ENTITY_IMPACT_MIN_DAMAGE.get()) || !entity2.hurt(level.damageSources().cramming(), damage)) continue;
+            LAST_HIT_TICK.put(key, now);
+            ++hits;
         }
         return new EntityScanResult(candidates, hits);
     }
 
-    private static AnchorScanResult damageCreateContraptionAnchorsNearSubLevel(ServerLevel level, Object subLevel, AABB contactBounds,
-                                                                               Vector3d subLevelVelocity, double mass) {
-        if (!TrueImpactConfig.ENABLE_CREATE_CONTRAPTION_ANCHOR_DAMAGE.get()) {
-            return AnchorScanResult.EMPTY;
-        }
-        int candidates = 0;
-        int hits = 0;
-        double contactMargin = Math.max(0.08, TrueImpactConfig.ENTITY_MOVING_IMPACT_CONTACT_MARGIN.get());
-        AABB contraptionContactBounds = contactBounds.inflate(contactMargin);
-        for (Entity entity : level.getEntities((Entity) null, contraptionContactBounds,
-                EntityImpactHandler::isCreateContraptionEntity)) {
-            candidates++;
-            AABB entityBounds = entity.getBoundingBox();
-            if (!contraptionContactBounds.intersects(entityBounds)) {
-                continue;
-            }
-            Vec3 entityVelocity = entity.getDeltaMovement();
-            Vector3d relativeVelocity = new Vector3d(
-                    subLevelVelocity.x - entityVelocity.x,
-                    subLevelVelocity.y - entityVelocity.y,
-                    subLevelVelocity.z - entityVelocity.z
-            );
-            double relativeSpeed = relativeVelocity.length();
-            if (relativeSpeed < TrueImpactConfig.ENTITY_MOVING_IMPACT_MIN_RELATIVE_SPEED.get()) {
-                continue;
-            }
-            double closingSpeed = closingSpeed(entityBounds, contactBounds, relativeVelocity);
-            if (closingSpeed < TrueImpactConfig.ENTITY_MOVING_IMPACT_MIN_CLOSING_SPEED.get()) {
-                continue;
-            }
-
-            EntityHitKey key = new EntityHitKey(entity.getUUID(), System.identityHashCode(subLevel));
-            long now = level.getGameTime();
-            if (LAST_HIT_TICK.getOrDefault(key, Long.MIN_VALUE) + TrueImpactConfig.ENTITY_IMPACT_COOLDOWN_TICKS.get() > now) {
-                continue;
-            }
-
-            Vec3 point = closestPoint(entityBounds.getCenter(), contactBounds);
-            double impactSpeed = Math.min(relativeSpeed, Math.max(closingSpeed, relativeSpeed * 0.35));
-            double impactLoad = impactSpeed * impactSpeed
-                    * mass
-                    * TrueImpactConfig.ENTITY_MOVING_IMPACT_DAMAGE_SCALE.get()
-                    * 24.0;
-            CreateContraptionLoadAnalyzer.Result load = CreateContraptionLoadAnalyzer.analyze(level, entity);
-            double overload = Math.max(0.0, impactLoad - load.capacity());
-            if (TrueImpactConfig.CREATE_CONTRAPTION_DEBUG_LOGGING.get()) {
-                org.apache.logging.log4j.LogManager.getLogger().info(
-                        "[TrueImpact] Contraption impact id={} speed={} load={} capacity={} blocks={} fallback={} overload={}",
-                        BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()),
-                        String.format(java.util.Locale.ROOT, "%.2f", impactSpeed),
-                        String.format(java.util.Locale.ROOT, "%.2f", impactLoad),
-                        String.format(java.util.Locale.ROOT, "%.2f", load.capacity()),
-                        load.blocks(),
-                        load.fallback(),
-                        String.format(java.util.Locale.ROOT, "%.2f", overload));
-            }
-            if (overload <= 0.0) {
-                continue;
-            }
-            CreateContraptionAnchorDamage.apply(level, new Vector3d(point.x, point.y, point.z), overload);
-            LAST_HIT_TICK.put(key, now);
-            hits++;
-        }
-        return new AnchorScanResult(candidates, hits);
-    }
-
-    private static Vec3 closestPoint(Vec3 point, AABB bounds) {
-        return new Vec3(
-                clamp(point.x, bounds.minX, bounds.maxX),
-                clamp(point.y, bounds.minY, bounds.maxY),
-                clamp(point.z, bounds.minZ, bounds.maxZ)
-        );
-    }
-
-    private static boolean isCreateContraptionEntity(Entity entity) {
-        ResourceLocation id = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
-        if (id == null) {
-            return false;
-        }
-        String namespace = id.getNamespace().toLowerCase(java.util.Locale.ROOT);
-        String path = id.getPath().toLowerCase(java.util.Locale.ROOT);
-        return ("create".equals(namespace) || "aeronautics".equals(namespace) || "simulated".equals(namespace) || "offroad".equals(namespace))
-                && (path.contains("contraption") || path.contains("airship") || path.contains("aircraft") || path.contains("vehicle"));
-    }
-
     private static boolean isStandingOnSubLevel(AABB entityBounds, AABB subLevelBounds, Vector3d subLevelVelocity) {
-        if (subLevelVelocity.y > TrueImpactConfig.ENTITY_STANDING_MAX_UPWARD_SPEED.get()) {
+        if (subLevelVelocity.y > (Double)TrueImpactConfig.ENTITY_STANDING_MAX_UPWARD_SPEED.get()) {
             return false;
         }
         double footDelta = entityBounds.minY - subLevelBounds.maxY;
-        if (footDelta < -0.05 || footDelta > TrueImpactConfig.ENTITY_STANDING_SUPPORT_TOLERANCE.get()) {
+        if (footDelta < -0.05 || footDelta > (Double)TrueImpactConfig.ENTITY_STANDING_SUPPORT_TOLERANCE.get()) {
             return false;
         }
         double xOverlap = Math.min(entityBounds.maxX, subLevelBounds.maxX) - Math.max(entityBounds.minX, subLevelBounds.minX);
@@ -225,23 +134,19 @@ public final class EntityImpactHandler {
     }
 
     private static double closingSpeed(AABB entityBounds, AABB subLevelBounds, Vector3d relativeVelocity) {
+        double closestZ;
+        double closestY;
         Vec3 entityCenter = entityBounds.getCenter();
-        double closestX = clamp(entityCenter.x, subLevelBounds.minX, subLevelBounds.maxX);
-        double closestY = clamp(entityCenter.y, subLevelBounds.minY, subLevelBounds.maxY);
-        double closestZ = clamp(entityCenter.z, subLevelBounds.minZ, subLevelBounds.maxZ);
-        Vector3d normal = new Vector3d(entityCenter.x - closestX, entityCenter.y - closestY, entityCenter.z - closestZ);
+        double closestX = EntityImpactHandler.clamp(entityCenter.x, subLevelBounds.minX, subLevelBounds.maxX);
+        Vector3d normal = new Vector3d(entityCenter.x - closestX, entityCenter.y - (closestY = EntityImpactHandler.clamp(entityCenter.y, subLevelBounds.minY, subLevelBounds.maxY)), entityCenter.z - (closestZ = EntityImpactHandler.clamp(entityCenter.z, subLevelBounds.minZ, subLevelBounds.maxZ)));
         if (normal.lengthSquared() < 1.0E-6) {
-            normal.set(
-                    entityCenter.x - (subLevelBounds.minX + subLevelBounds.maxX) * 0.5,
-                    entityCenter.y - (subLevelBounds.minY + subLevelBounds.maxY) * 0.5,
-                    entityCenter.z - (subLevelBounds.minZ + subLevelBounds.maxZ) * 0.5
-            );
+            normal.set(entityCenter.x - (subLevelBounds.minX + subLevelBounds.maxX) * 0.5, entityCenter.y - (subLevelBounds.minY + subLevelBounds.maxY) * 0.5, entityCenter.z - (subLevelBounds.minZ + subLevelBounds.maxZ) * 0.5);
         }
         if (normal.lengthSquared() < 1.0E-6) {
             return 0.0;
         }
         normal.normalize();
-        return Math.max(0.0, relativeVelocity.dot(normal));
+        return Math.max(0.0, relativeVelocity.dot((Vector3dc)normal));
     }
 
     private static double clamp(double value, double min, double max) {
@@ -250,33 +155,32 @@ public final class EntityImpactHandler {
 
     private static Vector3d velocity(Object subLevel) throws ReflectiveOperationException {
         Object velocity = LATEST_LINEAR_VELOCITY.get(subLevel);
-        Method x = velocity.getClass().getMethod("x");
-        Method y = velocity.getClass().getMethod("y");
-        Method z = velocity.getClass().getMethod("z");
-        return new Vector3d(((Number) x.invoke(velocity)).doubleValue(), ((Number) y.invoke(velocity)).doubleValue(), ((Number) z.invoke(velocity)).doubleValue());
+        Method x = velocity.getClass().getMethod("x", new Class[0]);
+        Method y = velocity.getClass().getMethod("y", new Class[0]);
+        Method z = velocity.getClass().getMethod("z", new Class[0]);
+        return new Vector3d(((Number)x.invoke(velocity, new Object[0])).doubleValue(), ((Number)y.invoke(velocity, new Object[0])).doubleValue(), ((Number)z.invoke(velocity, new Object[0])).doubleValue());
     }
 
     private static double mass(Object subLevel) throws ReflectiveOperationException {
-        Object massTracker = GET_MASS_TRACKER.invoke(subLevel);
-        return ((Number) GET_MASS.invoke(massTracker)).doubleValue();
+        Object massTracker = GET_MASS_TRACKER.invoke(subLevel, new Object[0]);
+        return ((Number)GET_MASS.invoke(massTracker, new Object[0])).doubleValue();
     }
 
     private static AABB bounds(Object subLevel) throws ReflectiveOperationException {
-        Object bounds = BOUNDING_BOX.invoke(subLevel);
-        return new AABB(number(bounds, "minX"), number(bounds, "minY"), number(bounds, "minZ"),
-                number(bounds, "maxX"), number(bounds, "maxY"), number(bounds, "maxZ"));
+        Object bounds = BOUNDING_BOX.invoke(subLevel, new Object[0]);
+        return new AABB(EntityImpactHandler.number(bounds, "minX"), EntityImpactHandler.number(bounds, "minY"), EntityImpactHandler.number(bounds, "minZ"), EntityImpactHandler.number(bounds, "maxX"), EntityImpactHandler.number(bounds, "maxY"), EntityImpactHandler.number(bounds, "maxZ"));
     }
 
     private static double number(Object target, String methodName) throws ReflectiveOperationException {
-        Method method = target.getClass().getMethod(methodName);
-        return ((Number) method.invoke(target)).doubleValue();
+        Method method = target.getClass().getMethod(methodName, new Class[0]);
+        return ((Number)method.invoke(target, new Object[0])).doubleValue();
     }
 
     private static void cleanup(long gameTime) {
         if (gameTime % 200L != 0L) {
             return;
         }
-        LAST_HIT_TICK.entrySet().removeIf(entry -> gameTime - entry.getValue() > 1200L);
+        LAST_HIT_TICK.entrySet().removeIf(entry -> gameTime - (Long)entry.getValue() > 1200L);
     }
 
     private static Field findField(String className, String fieldName) {
@@ -284,29 +188,30 @@ public final class EntityImpactHandler {
             Field field = Class.forName(className).getDeclaredField(fieldName);
             field.setAccessible(true);
             return field;
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("Missing Sable field " + className + "#" + fieldName, e);
+        }
+        catch (Exception e) {
+            return null;
         }
     }
 
-    private static Method findMethod(String className, String methodName, Class<?>... parameterTypes) {
+    private static Method findMethod(String className, String methodName, Class<?> ... parameterTypes) {
         try {
             Method method = Class.forName(className).getMethod(methodName, parameterTypes);
             method.setAccessible(true);
             return method;
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("Missing Sable method " + className + "#" + methodName, e);
         }
-    }
-
-    private record EntityHitKey(UUID entityId, int subLevelId) {
+        catch (Exception e) {
+            // May fail on dedicated server if the class references client-only types (e.g. ClientLevel).
+            // Return null; callers are already wrapped in try/catch(RuntimeException).
+            return null;
+        }
     }
 
     private record EntityScanResult(int candidates, int hits) {
         private static final EntityScanResult EMPTY = new EntityScanResult(0, 0);
     }
 
-    private record AnchorScanResult(int candidates, int hits) {
-        private static final AnchorScanResult EMPTY = new AnchorScanResult(0, 0);
+    private record EntityHitKey(UUID entityId, int subLevelId) {
     }
 }
+

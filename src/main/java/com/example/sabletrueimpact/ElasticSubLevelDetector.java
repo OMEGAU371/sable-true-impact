@@ -1,143 +1,154 @@
+/*
+ * Decompiled with CFR 0.152.
+ * 
+ * Could not load the following classes:
+ *  dev.ryanhcode.sable.physics.config.block_properties.PhysicsBlockPropertyHelper
+ *  net.minecraft.core.BlockPos
+ *  net.minecraft.core.BlockPos$MutableBlockPos
+ *  net.minecraft.server.level.ServerLevel
+ *  net.minecraft.world.level.Level
+ *  net.minecraft.world.level.block.state.BlockState
+ */
 package com.example.sabletrueimpact;
 
+import com.example.sabletrueimpact.TrueImpactConfig;
 import dev.ryanhcode.sable.physics.config.block_properties.PhysicsBlockPropertyHelper;
-import net.minecraft.core.BlockPos;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.state.BlockState;
-
 import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
 
 public final class ElasticSubLevelDetector {
-    private static final Method GET_CONTAINER = findMethod("dev.ryanhcode.sable.api.sublevel.SubLevelContainer", "getContainer", Level.class);
-    private static final Method GET_ALL_SUBLEVELS = findMethod("dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer", "getAllSubLevels");
-    private static final Method GET_MASS_TRACKER = findMethod("dev.ryanhcode.sable.sublevel.ServerSubLevel", "getMassTracker");
-    private static final Method GET_MASS = findMethod("dev.ryanhcode.sable.api.physics.mass.MassData", "getMass");
-    private static final Method SUBLEVEL_BOUNDING_BOX = findMethod("dev.ryanhcode.sable.sublevel.SubLevel", "boundingBox");
-    private static final Method GET_PLOT = findMethod("dev.ryanhcode.sable.sublevel.SubLevel", "getPlot");
-
+    private static final Method GET_CONTAINER = ElasticSubLevelDetector.findMethod("dev.ryanhcode.sable.api.sublevel.SubLevelContainer", "getContainer", Level.class);
+    private static final Method GET_ALL_SUBLEVELS = ElasticSubLevelDetector.findMethod("dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer", "getAllSubLevels", new Class[0]);
+    private static final Method GET_MASS_TRACKER = ElasticSubLevelDetector.findMethod("dev.ryanhcode.sable.sublevel.ServerSubLevel", "getMassTracker", new Class[0]);
+    private static final Method GET_MASS = ElasticSubLevelDetector.findMethod("dev.ryanhcode.sable.api.physics.mass.MassData", "getMass", new Class[0]);
+    private static final Method SUBLEVEL_BOUNDING_BOX = ElasticSubLevelDetector.findMethod("dev.ryanhcode.sable.sublevel.SubLevel", "boundingBox", new Class[0]);
+    private static final Method GET_PLOT = ElasticSubLevelDetector.findMethod("dev.ryanhcode.sable.sublevel.SubLevel", "getPlot", new Class[0]);
     private static long cacheTick = Long.MIN_VALUE;
     private static String cacheDimension = "";
-    private static final Map<ProbeKey, Boolean> NEARBY_ELASTIC_CACHE = new HashMap<>();
-    private static final Map<ProbeKey, Boolean> NEARBY_SUBLEVEL_CACHE = new HashMap<>();
-    private static final Map<ProbeKey, Boolean> INSIDE_SUBLEVEL_CACHE = new HashMap<>();
-    private static final Map<ProbeKey, Double> NEARBY_MASS_CACHE = new HashMap<>();
-    private static final Map<Object, Boolean> ELASTIC_SUBLEVEL_CACHE = new IdentityHashMap<>();
-    private static final Map<Class<?>, Method> PLOT_BOUNDING_BOX_METHODS = new HashMap<>();
-    private static final Map<Class<?>, Map<String, Method>> NUMBER_METHODS = new HashMap<>();
+    private static final Map<ProbeKey, Boolean> NEARBY_ELASTIC_CACHE = new HashMap<ProbeKey, Boolean>();
+    private static final Map<ProbeKey, Boolean> NEARBY_SUBLEVEL_CACHE = new HashMap<ProbeKey, Boolean>();
+    private static final Map<ProbeKey, Boolean> INSIDE_SUBLEVEL_CACHE = new HashMap<ProbeKey, Boolean>();
+    private static final Map<ProbeKey, Double> NEARBY_MASS_CACHE = new HashMap<ProbeKey, Double>();
+    private static final Map<Object, Boolean> ELASTIC_SUBLEVEL_CACHE = new IdentityHashMap<Object, Boolean>();
+    private static final Map<Class<?>, Method> PLOT_BOUNDING_BOX_METHODS = new HashMap();
+    private static final Map<Class<?>, Map<String, Method>> NUMBER_METHODS = new HashMap();
 
     private ElasticSubLevelDetector() {
     }
 
     public static boolean hasNearbyElasticSubLevel(ServerLevel level, BlockPos impactPos) {
-        resetCacheIfNeeded(level);
-        ProbeKey key = key(impactPos);
-        Boolean cached = NEARBY_ELASTIC_CACHE.get(key);
-        if (cached != null) {
-            return cached;
-        }
-
-        boolean result = false;
-        try {
-            Object container = GET_CONTAINER.invoke(null, level);
-            if (container != null) {
-                Iterable<?> subLevels = getAllSubLevels(container);
+        boolean result;
+        ProbeKey key;
+        block4: {
+            ElasticSubLevelDetector.resetCacheIfNeeded(level);
+            key = ElasticSubLevelDetector.key(impactPos);
+            Boolean cached = NEARBY_ELASTIC_CACHE.get(key);
+            if (cached != null) {
+                return cached;
+            }
+            result = false;
+            try {
+                Object container = GET_CONTAINER.invoke(null, level);
+                if (container == null) break block4;
+                Iterable<?> subLevels = ElasticSubLevelDetector.getAllSubLevels(container);
                 for (Object subLevel : subLevels) {
-                    if ((plotContains(subLevel, impactPos)
-                            || isNear(subLevel, impactPos, TrueImpactConfig.ELASTIC_SUBLEVEL_DETECTION_RANGE.get()))
-                            && containsElasticBlock(subLevel, level)) {
-                        result = true;
-                        break;
-                    }
+                    if (!ElasticSubLevelDetector.plotContains(subLevel, impactPos) && !ElasticSubLevelDetector.isNear(subLevel, impactPos, (Double)TrueImpactConfig.ELASTIC_SUBLEVEL_DETECTION_RANGE.get()) || !ElasticSubLevelDetector.containsElasticBlock(subLevel, level)) continue;
+                    result = true;
+                    break;
                 }
             }
-        } catch (ReflectiveOperationException | RuntimeException e) {
-            result = false;
+            catch (ReflectiveOperationException | RuntimeException e) {
+                result = false;
+            }
         }
         NEARBY_ELASTIC_CACHE.put(key, result);
         return result;
     }
 
     public static boolean hasNearbySubLevel(ServerLevel level, BlockPos impactPos) {
-        resetCacheIfNeeded(level);
-        ProbeKey key = key(impactPos);
-        Boolean cached = NEARBY_SUBLEVEL_CACHE.get(key);
-        if (cached != null) {
-            return cached;
-        }
-
-        boolean result = false;
-        try {
-            Object container = GET_CONTAINER.invoke(null, level);
-            if (container != null) {
-                Iterable<?> subLevels = getAllSubLevels(container);
+        boolean result;
+        ProbeKey key;
+        block4: {
+            ElasticSubLevelDetector.resetCacheIfNeeded(level);
+            key = ElasticSubLevelDetector.key(impactPos);
+            Boolean cached = NEARBY_SUBLEVEL_CACHE.get(key);
+            if (cached != null) {
+                return cached;
+            }
+            result = false;
+            try {
+                Object container = GET_CONTAINER.invoke(null, level);
+                if (container == null) break block4;
+                Iterable<?> subLevels = ElasticSubLevelDetector.getAllSubLevels(container);
                 for (Object subLevel : subLevels) {
-                    if (plotContains(subLevel, impactPos)
-                            || isNear(subLevel, impactPos, TrueImpactConfig.ELASTIC_SUBLEVEL_DETECTION_RANGE.get())) {
-                        result = true;
-                        break;
-                    }
+                    if (!ElasticSubLevelDetector.plotContains(subLevel, impactPos) && !ElasticSubLevelDetector.isNear(subLevel, impactPos, (Double)TrueImpactConfig.ELASTIC_SUBLEVEL_DETECTION_RANGE.get())) continue;
+                    result = true;
+                    break;
                 }
             }
-        } catch (ReflectiveOperationException | RuntimeException e) {
-            result = false;
+            catch (ReflectiveOperationException | RuntimeException e) {
+                result = false;
+            }
         }
         NEARBY_SUBLEVEL_CACHE.put(key, result);
         return result;
     }
 
     public static boolean isInsideSubLevelPlot(ServerLevel level, BlockPos impactPos) {
-        resetCacheIfNeeded(level);
-        ProbeKey key = key(impactPos);
-        Boolean cached = INSIDE_SUBLEVEL_CACHE.get(key);
-        if (cached != null) {
-            return cached;
-        }
-
-        boolean result = false;
-        try {
-            Object container = GET_CONTAINER.invoke(null, level);
-            if (container != null) {
-                Iterable<?> subLevels = getAllSubLevels(container);
+        boolean result;
+        ProbeKey key;
+        block4: {
+            ElasticSubLevelDetector.resetCacheIfNeeded(level);
+            key = ElasticSubLevelDetector.key(impactPos);
+            Boolean cached = INSIDE_SUBLEVEL_CACHE.get(key);
+            if (cached != null) {
+                return cached;
+            }
+            result = false;
+            try {
+                Object container = GET_CONTAINER.invoke(null, level);
+                if (container == null) break block4;
+                Iterable<?> subLevels = ElasticSubLevelDetector.getAllSubLevels(container);
                 for (Object subLevel : subLevels) {
-                    if (plotContains(subLevel, impactPos)) {
-                        result = true;
-                        break;
-                    }
+                    if (!ElasticSubLevelDetector.plotContains(subLevel, impactPos)) continue;
+                    result = true;
+                    break;
                 }
             }
-        } catch (ReflectiveOperationException | RuntimeException e) {
-            result = false;
+            catch (ReflectiveOperationException | RuntimeException e) {
+                result = false;
+            }
         }
         INSIDE_SUBLEVEL_CACHE.put(key, result);
         return result;
     }
 
     public static double nearbyMaxMass(ServerLevel level, BlockPos impactPos, double fallbackMass) {
-        resetCacheIfNeeded(level);
-        ProbeKey key = key(impactPos);
+        ElasticSubLevelDetector.resetCacheIfNeeded(level);
+        ProbeKey key = ElasticSubLevelDetector.key(impactPos);
         Double cached = NEARBY_MASS_CACHE.get(key);
         if (cached != null) {
             return Math.max(fallbackMass, cached);
         }
-
         double maxMass = fallbackMass;
         try {
             Object container = GET_CONTAINER.invoke(null, level);
             if (container != null) {
-                Iterable<?> subLevels = getAllSubLevels(container);
+                Iterable<?> subLevels = ElasticSubLevelDetector.getAllSubLevels(container);
                 for (Object subLevel : subLevels) {
-                    if (plotContains(subLevel, impactPos)
-                            || isNear(subLevel, impactPos, TrueImpactConfig.ELASTIC_SUBLEVEL_DETECTION_RANGE.get())) {
-                        maxMass = Math.max(maxMass, mass(subLevel));
-                    }
+                    if (!ElasticSubLevelDetector.plotContains(subLevel, impactPos) && !ElasticSubLevelDetector.isNear(subLevel, impactPos, (Double)TrueImpactConfig.ELASTIC_SUBLEVEL_DETECTION_RANGE.get())) continue;
+                    maxMass = Math.max(maxMass, ElasticSubLevelDetector.mass(subLevel));
                 }
             }
-        } catch (ReflectiveOperationException | RuntimeException e) {
+        }
+        catch (ReflectiveOperationException | RuntimeException e) {
             return maxMass;
         }
         NEARBY_MASS_CACHE.put(key, maxMass);
@@ -145,34 +156,37 @@ public final class ElasticSubLevelDetector {
     }
 
     private static Iterable<?> getAllSubLevels(Object container) throws ReflectiveOperationException {
-        Object result = GET_ALL_SUBLEVELS.invoke(container);
-        return result instanceof Iterable<?> iterable ? iterable : Collections.emptyList();
+        Iterable<Object> iterable;
+        Object result = GET_ALL_SUBLEVELS.invoke(container, new Object[0]);
+        if (result instanceof Iterable) {
+            Iterable iterable2 = (Iterable)result;
+            iterable = iterable2;
+        } else {
+            iterable = Collections.emptyList();
+        }
+        return iterable;
     }
 
     private static boolean isNear(Object subLevel, BlockPos impactPos, double range) throws ReflectiveOperationException {
-        Object bounds = SUBLEVEL_BOUNDING_BOX.invoke(subLevel);
-        double minX = number(bounds, "minX") - range;
-        double minY = number(bounds, "minY") - range;
-        double minZ = number(bounds, "minZ") - range;
-        double maxX = number(bounds, "maxX") + range;
-        double maxY = number(bounds, "maxY") + range;
-        double maxZ = number(bounds, "maxZ") + range;
-        return impactPos.getX() + 0.5 >= minX && impactPos.getX() + 0.5 <= maxX
-                && impactPos.getY() + 0.5 >= minY && impactPos.getY() + 0.5 <= maxY
-                && impactPos.getZ() + 0.5 >= minZ && impactPos.getZ() + 0.5 <= maxZ;
+        Object bounds = SUBLEVEL_BOUNDING_BOX.invoke(subLevel, new Object[0]);
+        double minX = ElasticSubLevelDetector.number(bounds, "minX") - range;
+        double minY = ElasticSubLevelDetector.number(bounds, "minY") - range;
+        double minZ = ElasticSubLevelDetector.number(bounds, "minZ") - range;
+        double maxX = ElasticSubLevelDetector.number(bounds, "maxX") + range;
+        double maxY = ElasticSubLevelDetector.number(bounds, "maxY") + range;
+        double maxZ = ElasticSubLevelDetector.number(bounds, "maxZ") + range;
+        return (double)impactPos.getX() + 0.5 >= minX && (double)impactPos.getX() + 0.5 <= maxX && (double)impactPos.getY() + 0.5 >= minY && (double)impactPos.getY() + 0.5 <= maxY && (double)impactPos.getZ() + 0.5 >= minZ && (double)impactPos.getZ() + 0.5 <= maxZ;
     }
 
     private static boolean plotContains(Object subLevel, BlockPos pos) throws ReflectiveOperationException {
-        Object bounds = plotBounds(subLevel);
-        double minX = number(bounds, "minX");
-        double minY = number(bounds, "minY");
-        double minZ = number(bounds, "minZ");
-        double maxX = number(bounds, "maxX");
-        double maxY = number(bounds, "maxY");
-        double maxZ = number(bounds, "maxZ");
-        return pos.getX() >= minX && pos.getX() <= maxX
-                && pos.getY() >= minY && pos.getY() <= maxY
-                && pos.getZ() >= minZ && pos.getZ() <= maxZ;
+        Object bounds = ElasticSubLevelDetector.plotBounds(subLevel);
+        double minX = ElasticSubLevelDetector.number(bounds, "minX");
+        double minY = ElasticSubLevelDetector.number(bounds, "minY");
+        double minZ = ElasticSubLevelDetector.number(bounds, "minZ");
+        double maxX = ElasticSubLevelDetector.number(bounds, "maxX");
+        double maxY = ElasticSubLevelDetector.number(bounds, "maxY");
+        double maxZ = ElasticSubLevelDetector.number(bounds, "maxZ");
+        return (double)pos.getX() >= minX && (double)pos.getX() <= maxX && (double)pos.getY() >= minY && (double)pos.getY() <= maxY && (double)pos.getZ() >= minZ && (double)pos.getZ() <= maxZ;
     }
 
     private static boolean containsElasticBlock(Object subLevel, ServerLevel level) throws ReflectiveOperationException {
@@ -180,27 +194,23 @@ public final class ElasticSubLevelDetector {
         if (cached != null) {
             return cached;
         }
-
-        Object bounds = plotBounds(subLevel);
-        int minX = (int) number(bounds, "minX");
-        int minY = (int) number(bounds, "minY");
-        int minZ = (int) number(bounds, "minZ");
-        int maxX = (int) number(bounds, "maxX");
-        int maxY = (int) number(bounds, "maxY");
-        int maxZ = (int) number(bounds, "maxZ");
+        Object bounds = ElasticSubLevelDetector.plotBounds(subLevel);
+        int minX = (int)ElasticSubLevelDetector.number(bounds, "minX");
+        int minY = (int)ElasticSubLevelDetector.number(bounds, "minY");
+        int minZ = (int)ElasticSubLevelDetector.number(bounds, "minZ");
+        int maxX = (int)ElasticSubLevelDetector.number(bounds, "maxX");
+        int maxY = (int)ElasticSubLevelDetector.number(bounds, "maxY");
+        int maxZ = (int)ElasticSubLevelDetector.number(bounds, "maxZ");
         int scanned = 0;
-        int limit = TrueImpactConfig.ELASTIC_SUBLEVEL_SCAN_LIMIT.get();
+        int limit = (Integer)TrueImpactConfig.ELASTIC_SUBLEVEL_SCAN_LIMIT.get();
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-        for (int x = minX; x <= maxX && scanned < limit; x++) {
-            for (int y = minY; y <= maxY && scanned < limit; y++) {
-                for (int z = minZ; z <= maxZ && scanned < limit; z++) {
-                    scanned++;
-                    BlockState state = level.getBlockState(pos.set(x, y, z));
-                    if (!state.isAir()
-                            && PhysicsBlockPropertyHelper.getRestitution(state) >= TrueImpactConfig.BOUNCE_RESPONSE_THRESHOLD.get()) {
-                        ELASTIC_SUBLEVEL_CACHE.put(subLevel, true);
-                        return true;
-                    }
+        for (int x = minX; x <= maxX && scanned < limit; ++x) {
+            for (int y = minY; y <= maxY && scanned < limit; ++y) {
+                for (int z = minZ; z <= maxZ && scanned < limit; ++scanned, ++z) {
+                    BlockState state = level.getBlockState((BlockPos)pos.set(x, y, z));
+                    if (state.isAir() || !(PhysicsBlockPropertyHelper.getRestitution((BlockState)state) >= (Double)TrueImpactConfig.BOUNCE_RESPONSE_THRESHOLD.get())) continue;
+                    ELASTIC_SUBLEVEL_CACHE.put(subLevel, true);
+                    return true;
                 }
             }
         }
@@ -209,36 +219,38 @@ public final class ElasticSubLevelDetector {
     }
 
     private static Object plotBounds(Object subLevel) throws ReflectiveOperationException {
-        Object plot = GET_PLOT.invoke(subLevel);
+        Object plot = GET_PLOT.invoke(subLevel, new Object[0]);
         Method method = PLOT_BOUNDING_BOX_METHODS.computeIfAbsent(plot.getClass(), type -> {
             try {
-                Method found = type.getMethod("getBoundingBox");
+                Method found = type.getMethod("getBoundingBox", new Class[0]);
                 found.setAccessible(true);
                 return found;
-            } catch (ReflectiveOperationException e) {
+            }
+            catch (ReflectiveOperationException e) {
                 throw new IllegalStateException("Missing Sable plot getBoundingBox method", e);
             }
         });
-        return method.invoke(plot);
+        return method.invoke(plot, new Object[0]);
     }
 
     private static double number(Object target, String methodName) throws ReflectiveOperationException {
-        Map<String, Method> methods = NUMBER_METHODS.computeIfAbsent(target.getClass(), ignored -> new HashMap<>());
+        Map<String, Method> methods = NUMBER_METHODS.computeIfAbsent(target.getClass(), ignored -> new HashMap());
         Method method = methods.computeIfAbsent(methodName, name -> {
             try {
-                Method found = target.getClass().getMethod(name);
+                Method found = target.getClass().getMethod((String)name, new Class[0]);
                 found.setAccessible(true);
                 return found;
-            } catch (ReflectiveOperationException e) {
+            }
+            catch (ReflectiveOperationException e) {
                 throw new IllegalStateException("Missing numeric method " + name, e);
             }
         });
-        return ((Number) method.invoke(target)).doubleValue();
+        return ((Number)method.invoke(target, new Object[0])).doubleValue();
     }
 
     private static double mass(Object subLevel) throws ReflectiveOperationException {
-        Object massTracker = GET_MASS_TRACKER.invoke(subLevel);
-        return ((Number) GET_MASS.invoke(massTracker)).doubleValue();
+        Object massTracker = GET_MASS_TRACKER.invoke(subLevel, new Object[0]);
+        return ((Number)GET_MASS.invoke(massTracker, new Object[0])).doubleValue();
     }
 
     private static void resetCacheIfNeeded(ServerLevel level) {
@@ -260,12 +272,13 @@ public final class ElasticSubLevelDetector {
         return new ProbeKey(pos.asLong());
     }
 
-    private static Method findMethod(String className, String methodName, Class<?>... parameterTypes) {
+    private static Method findMethod(String className, String methodName, Class<?> ... parameterTypes) {
         try {
             Method method = Class.forName(className).getMethod(methodName, parameterTypes);
             method.setAccessible(true);
             return method;
-        } catch (ReflectiveOperationException e) {
+        }
+        catch (ReflectiveOperationException e) {
             throw new IllegalStateException("Missing Sable method " + className + "#" + methodName, e);
         }
     }

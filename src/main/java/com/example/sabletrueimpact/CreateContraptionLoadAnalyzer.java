@@ -1,202 +1,204 @@
 package com.example.sabletrueimpact;
 
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.level.block.state.BlockState;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Collection;
-import java.util.IdentityHashMap;
 import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import org.joml.Vector3d;
 
 public final class CreateContraptionLoadAnalyzer {
-    private static final Logger LOGGER = LogManager.getLogger();
-    private static final Map<UUID, CachedCapacity> CACHE = new ConcurrentHashMap<>();
+    private static final String CREATE_CONTRAPTION_ENTITY = "com.simibubi.create.content.contraptions.AbstractContraptionEntity";
+    private static final Method GET_CONTRAPTION = findMethod(CREATE_CONTRAPTION_ENTITY, "getContraption");
+    private static final Method GET_BLOCKS = findMethod("com.simibubi.create.content.contraptions.Contraption", "getBlocks");
+    private static final Method TO_GLOBAL_VECTOR = findMethod(CREATE_CONTRAPTION_ENTITY, "toGlobalVector", Vec3.class, Float.TYPE);
+    private static final Field CONTROLLER_POS = findField("com.simibubi.create.content.contraptions.ControlledContraptionEntity", "controllerPos");
 
     private CreateContraptionLoadAnalyzer() {
     }
 
-    public static Result analyze(ServerLevel level, Entity entity) {
-        long tick = level.getGameTime();
-        CachedCapacity cached = CACHE.get(entity.getUUID());
-        if (cached != null && tick - cached.tick() < 40L) {
-            return cached.result();
+    public static Result analyzeNearest(ServerLevel level, Vector3d impactPoint, double impactLoad) {
+        if (!((Boolean)TrueImpactConfig.ENABLE_CREATE_CONTRAPTION_LOAD_FAILURE.get()).booleanValue() || impactLoad <= 0.0 || GET_CONTRAPTION == null || GET_BLOCKS == null) {
+            return Result.none();
         }
-
-        Result result = compute(level, entity);
-        CACHE.put(entity.getUUID(), new CachedCapacity(tick, result));
-        return result;
+        double range = Math.max(1.0, (Double)TrueImpactConfig.CREATE_CONTRAPTION_LOAD_SCAN_RANGE.get());
+        AABB box = new AABB(impactPoint.x - range, impactPoint.y - range, impactPoint.z - range, impactPoint.x + range, impactPoint.y + range, impactPoint.z + range);
+        Result nearest = Result.none();
+        double nearestDistance = Double.MAX_VALUE;
+        for (Entity entity : level.getEntities((Entity)null, box, entity -> isCreateContraptionEntity(entity))) {
+            Result result = analyze(level, entity, impactLoad, impactPoint);
+            if (!result.found()) continue;
+            double distance = result.nearestBlockDistanceSq();
+            if (!(distance < nearestDistance)) continue;
+            nearestDistance = distance;
+            nearest = result;
+        }
+        return nearest;
     }
 
-    private static Result compute(ServerLevel level, Entity entity) {
-        Object contraption = contraption(entity);
-        if (contraption == null) {
-            return Result.unknownContraption();
-        }
-
-        Scan scan = new Scan(TrueImpactConfig.CREATE_CONTRAPTION_MAX_BLOCKS_SCANNED.get());
-        collectBlockStates(level, contraption, scan, new IdentityHashMap<>());
-
-        if (scan.blocks() <= 0) {
-            return Result.unknownContraption();
-        }
-
-        double capacity = scan.capacity() * TrueImpactConfig.CREATE_CONTRAPTION_LOAD_CAPACITY_SCALE.get();
-        Result result = new Result(capacity, scan.blocks(), false);
-        if (TrueImpactConfig.CREATE_CONTRAPTION_DEBUG_LOGGING.get()) {
-            LOGGER.info("[TrueImpact] Create contraption {} capacity={} blocks={}",
-                    BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()),
-                    String.format(java.util.Locale.ROOT, "%.2f", result.capacity()),
-                    result.blocks());
-        }
-        return result;
-    }
-
-    private static Object contraption(Entity entity) {
-        Object viaMethod = invokeNoArg(entity, "getContraption");
-        if (viaMethod != null) {
-            return viaMethod;
-        }
-        return readField(entity, "contraption");
-    }
-
-    private static void collectBlockStates(ServerLevel level, Object value, Scan scan, IdentityHashMap<Object, Boolean> visited) {
-        if (value == null || scan.isFull() || visited.containsKey(value)) {
-            return;
-        }
-        visited.put(value, Boolean.TRUE);
-
-        if (value instanceof BlockState state) {
-            scan.add(level, state);
-            return;
-        }
-        if (value instanceof Map<?, ?> map) {
-            for (Object entryValue : map.values()) {
-                collectBlockStates(level, entryValue, scan, visited);
-                if (scan.isFull()) return;
-            }
-            return;
-        }
-        if (value instanceof Collection<?> collection) {
-            for (Object entryValue : collection) {
-                collectBlockStates(level, entryValue, scan, visited);
-                if (scan.isFull()) return;
-            }
-            return;
-        }
-
-        Object state = firstNonNull(
-                invokeNoArg(value, "state"),
-                invokeNoArg(value, "getState"),
-                readField(value, "state"),
-                readField(value, "blockState")
-        );
-        if (state instanceof BlockState blockState) {
-            scan.add(level, blockState);
-            return;
-        }
-
-        Class<?> type = value.getClass();
-        if (type.getName().startsWith("java.") || type.isEnum()) {
-            return;
-        }
-        for (Field field : type.getDeclaredFields()) {
-            Class<?> fieldType = field.getType();
-            if (!(BlockState.class.isAssignableFrom(fieldType)
-                    || Map.class.isAssignableFrom(fieldType)
-                    || Collection.class.isAssignableFrom(fieldType)
-                    || fieldType.getName().startsWith("com.simibubi.create"))) {
-                continue;
-            }
-            try {
-                field.setAccessible(true);
-                collectBlockStates(level, field.get(value), scan, visited);
-                if (scan.isFull()) return;
-            } catch (ReflectiveOperationException | RuntimeException ignored) {
-            }
-        }
-    }
-
-    private static Object firstNonNull(Object... values) {
-        for (Object value : values) {
-            if (value != null) {
-                return value;
-            }
-        }
-        return null;
-    }
-
-    private static Object invokeNoArg(Object target, String methodName) {
+    private static Result analyze(ServerLevel level, Entity entity, double impactLoad, Vector3d impactPoint) {
         try {
-            Method method = target.getClass().getMethod(methodName);
-            method.setAccessible(true);
-            return method.invoke(target);
-        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            Object contraption = GET_CONTRAPTION.invoke(entity);
+            if (contraption == null) {
+                return Result.none();
+            }
+            Object blocksObject = GET_BLOCKS.invoke(contraption);
+            if (!(blocksObject instanceof Map<?, ?> blocks) || blocks.isEmpty()) {
+                return Result.none();
+            }
+            int limit = Math.max(1, (Integer)TrueImpactConfig.CREATE_CONTRAPTION_LOAD_SCAN_LIMIT.get());
+            int scanned = 0;
+            double capacity = 0.0;
+            double mass = 0.0;
+            double nearestDistanceSq = Double.MAX_VALUE;
+            BlockPos nearestLocalPos = null;
+            BlockPos nearestWorldPos = null;
+            BlockState nearestState = null;
+            Collection<?> values = blocks.values();
+            for (Object value : values) {
+                if (scanned++ >= limit) break;
+                BlockState state = blockState(value);
+                if (state == null || state.isAir()) continue;
+                double baseStrength = MaterialImpactProperties.baseStrength((BlockGetter)level, entity.blockPosition(), state);
+                double strength = MaterialImpactProperties.displayStrength(state, baseStrength);
+                double toughness = MaterialImpactProperties.displayToughness(state, baseStrength);
+                double blockMass = Math.max(0.05, MaterialImpactProperties.getMass(state, 1.0));
+                capacity += (strength + toughness * 0.65) * Math.sqrt(blockMass);
+                mass += blockMass;
+                BlockPos localPos = blockPos(value);
+                Vec3 worldCenter = worldCenter(entity, localPos);
+                if (localPos == null || worldCenter == null) continue;
+                double distanceSq = worldCenter.distanceToSqr(impactPoint.x, impactPoint.y, impactPoint.z);
+                if (!(distanceSq < nearestDistanceSq)) continue;
+                nearestDistanceSq = distanceSq;
+                nearestLocalPos = localPos.immutable();
+                nearestWorldPos = BlockPos.containing(worldCenter);
+                nearestState = state;
+            }
+            if (capacity <= 0.0) {
+                return Result.none();
+            }
+            if (nearestState == null) {
+                nearestDistanceSq = entity.distanceToSqr(impactPoint.x, impactPoint.y, impactPoint.z);
+                nearestWorldPos = entity.blockPosition();
+            }
+            double scaledCapacity = capacity * (Double)TrueImpactConfig.CREATE_CONTRAPTION_LOAD_CAPACITY_SCALE.get();
+            double threshold = scaledCapacity * (Double)TrueImpactConfig.CREATE_CONTRAPTION_LOAD_SAFETY_FACTOR.get();
+            boolean overloaded = impactLoad > threshold;
+            double overloadRatio = overloaded ? impactLoad / Math.max(threshold, 1.0E-6) : 0.0;
+            return new Result(true, overloaded, scaledCapacity, threshold, overloadRatio, mass, Math.min(scanned, values.size()), entity, controllerPos(entity), entity.getClass().getName(), contraption.getClass().getName(), nearestLocalPos, nearestWorldPos, nearestState, nearestDistanceSq);
+        }
+        catch (ReflectiveOperationException | RuntimeException e) {
+            return Result.none();
+        }
+    }
+
+    private static BlockState blockState(Object value) {
+        if (value instanceof StructureTemplate.StructureBlockInfo info) {
+            return info.state();
+        }
+        try {
+            Method stateMethod = value.getClass().getMethod("state");
+            Object state = stateMethod.invoke(value);
+            return state instanceof BlockState blockState ? blockState : null;
+        }
+        catch (ReflectiveOperationException | RuntimeException e) {
             return null;
         }
     }
 
-    private static Object readField(Object target, String fieldName) {
-        Class<?> type = target.getClass();
-        while (type != null && type != Object.class) {
+    private static BlockPos blockPos(Object value) {
+        if (value instanceof StructureTemplate.StructureBlockInfo info) {
+            return info.pos();
+        }
+        try {
+            Method posMethod = value.getClass().getMethod("pos");
+            Object pos = posMethod.invoke(value);
+            return pos instanceof BlockPos blockPos ? blockPos : null;
+        }
+        catch (ReflectiveOperationException | RuntimeException e) {
+            return null;
+        }
+    }
+
+    private static Vec3 worldCenter(Entity entity, BlockPos localPos) {
+        if (localPos == null) {
+            return null;
+        }
+        Vec3 localCenter = Vec3.atCenterOf(localPos);
+        if (TO_GLOBAL_VECTOR != null) {
             try {
-                Field field = type.getDeclaredField(fieldName);
-                field.setAccessible(true);
-                return field.get(target);
-            } catch (ReflectiveOperationException | RuntimeException ignored) {
-                type = type.getSuperclass();
+                Object value = TO_GLOBAL_VECTOR.invoke(entity, localCenter, 1.0f);
+                if (value instanceof Vec3 vec) {
+                    return vec;
+                }
+            }
+            catch (ReflectiveOperationException | RuntimeException ignored) {
             }
         }
-        return null;
+        return entity.position().add(localCenter);
     }
 
-    public record Result(double capacity, int blocks, boolean fallback) {
-        public static Result unknownContraption() {
-            return new Result(250.0 * TrueImpactConfig.CREATE_CONTRAPTION_LOAD_CAPACITY_SCALE.get(), 0, true);
+    private static boolean isCreateContraptionEntity(Entity entity) {
+        return classNamed(entity.getClass(), CREATE_CONTRAPTION_ENTITY);
+    }
+
+    private static BlockPos controllerPos(Entity entity) {
+        if (CONTROLLER_POS == null) {
+            return null;
+        }
+        try {
+            Object value = CONTROLLER_POS.get(entity);
+            return value instanceof BlockPos pos ? pos.immutable() : null;
+        }
+        catch (IllegalAccessException | RuntimeException e) {
+            return null;
         }
     }
 
-    private record CachedCapacity(long tick, Result result) {
-    }
-
-    private static final class Scan {
-        private final int maxBlocks;
-        private int blocks;
-        private double capacity;
-
-        private Scan(int maxBlocks) {
-            this.maxBlocks = Math.max(1, maxBlocks);
-        }
-
-        private void add(ServerLevel level, BlockState state) {
-            if (isFull() || state.isAir()) {
-                return;
+    private static boolean classNamed(Class<?> type, String name) {
+        Class<?> current = type;
+        while (current != null) {
+            if (name.equals(current.getName())) {
+                return true;
             }
-            double base = MaterialImpactProperties.baseStrength(level, BlockPos.ZERO, state);
-            double strength = Math.max(MaterialImpactProperties.displayStrength(state, base), 1.0);
-            double toughness = Math.max(MaterialImpactProperties.displayToughness(state, base), strength);
-            double mass = Math.max(0.25, MaterialImpactProperties.getMass(state, 1.0));
-            capacity += Math.sqrt(strength * toughness) * (0.75 + Math.sqrt(mass) * 0.25);
-            blocks++;
+            current = current.getSuperclass();
         }
+        return false;
+    }
 
-        private boolean isFull() {
-            return blocks >= maxBlocks;
+    private static Method findMethod(String className, String methodName, Class<?> ... parameterTypes) {
+        try {
+            Method method = Class.forName(className).getMethod(methodName, parameterTypes);
+            method.setAccessible(true);
+            return method;
         }
-
-        private int blocks() {
-            return blocks;
+        catch (ReflectiveOperationException | RuntimeException e) {
+            return null;
         }
+    }
 
-        private double capacity() {
-            return capacity;
+    private static Field findField(String className, String fieldName) {
+        try {
+            Field field = Class.forName(className).getDeclaredField(fieldName);
+            field.setAccessible(true);
+            return field;
+        }
+        catch (ReflectiveOperationException | RuntimeException e) {
+            return null;
+        }
+    }
+
+    public record Result(boolean found, boolean overloaded, double capacity, double threshold, double overloadRatio, double mass, int scannedBlocks, Entity entity, BlockPos controllerPos, String entityClass, String contraptionClass, BlockPos nearestLocalPos, BlockPos nearestWorldPos, BlockState nearestState, double nearestBlockDistanceSq) {
+        public static Result none() {
+            return new Result(false, false, 0.0, 0.0, 0.0, 0.0, 0, null, null, "", "", null, null, null, Double.MAX_VALUE);
         }
     }
 }

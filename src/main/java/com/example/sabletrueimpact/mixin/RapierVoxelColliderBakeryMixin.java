@@ -1,3 +1,14 @@
+/*
+ * Decompiled with CFR 0.152.
+ * 
+ * Could not load the following classes:
+ *  dev.ryanhcode.sable.api.block.BlockWithSubLevelCollisionCallback
+ *  dev.ryanhcode.sable.api.physics.callback.BlockSubLevelCollisionCallback
+ *  net.minecraft.world.level.block.state.BlockState
+ *  org.spongepowered.asm.mixin.Mixin
+ *  org.spongepowered.asm.mixin.injection.At
+ *  org.spongepowered.asm.mixin.injection.Redirect
+ */
 package com.example.sabletrueimpact.mixin;
 
 import com.example.sabletrueimpact.ImpactCallbackDecider;
@@ -8,17 +19,12 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
-@Mixin(targets = "dev.ryanhcode.sable.physics.impl.rapier.collider.RapierVoxelColliderBakery", remap = false)
+@Mixin(targets={"dev.ryanhcode.sable.physics.impl.rapier.collider.RapierVoxelColliderBakery"}, remap=false)
 public abstract class RapierVoxelColliderBakeryMixin {
-    @Redirect(
-            method = "buildPhysicsDataForBlock",
-            at = @At(
-                    value = "INVOKE",
-                    target = "Ldev/ryanhcode/sable/api/block/BlockWithSubLevelCollisionCallback;sable$getCallback(Lnet/minecraft/world/level/block/state/BlockState;)Ldev/ryanhcode/sable/api/physics/callback/BlockSubLevelCollisionCallback;"
-            )
-    )
+    @Redirect(method={"buildPhysicsDataForBlock"}, at=@At(value="INVOKE", target="Ldev/ryanhcode/sable/api/block/BlockWithSubLevelCollisionCallback;sable$getCallback(Lnet/minecraft/world/level/block/state/BlockState;)Ldev/ryanhcode/sable/api/physics/callback/BlockSubLevelCollisionCallback;"))
     private BlockSubLevelCollisionCallback sabletrueimpact$wrapCollisionCallback(BlockState state) {
-        BlockSubLevelCollisionCallback original = BlockWithSubLevelCollisionCallback.sable$getCallback(state);
+        BlockSubLevelCollisionCallback original = BlockWithSubLevelCollisionCallback.sable$getCallback((BlockState)state);
         return ImpactCallbackDecider.callbackFor(state, original);
     }
 }
+
