@@ -1,35 +1,298 @@
-# True Impact
+# Sable: True Impact
 
-True Impact is an experimental NeoForge add-on for Sable that adds impact damage, cumulative cracking, entity impact damage, and structural fracture behavior to Sable physical sub-levels.
+**Sable: True Impact**, or **TI** for short, is an experimental NeoForge add-on for Sable. It adds physics-based impact damage, cumulative cracking, terrain destruction, entity impact damage, and early structure fracture behavior to Sable physical sub-levels.
 
-It is designed for Minecraft 1.21.1, NeoForge, and Sable 1.2.2+.
+TI is built for Minecraft 1.21.1, NeoForge, and Sable 1.2.2+. It also includes early compatibility logic for Create and Create Aeronautics style moving structures.
 
-## Features
+> Current public version: **1.0.0-gamma**
+>
+> This is a preview release for testing and feedback. Back up worlds before using it.
 
-- Impact-based terrain damage using collision force, material hardness, blast resistance, mass, and support.
-- Cumulative block cracking before full block breakage.
-- Structural fracture for Sable sub-levels, using Sable's native splitting system.
-- Local structural strength analysis:
-  - straight mixed-material seams are more likely to split,
-  - checkerboard/interlocked materials resist fracture,
-  - beams, girders, frames, supports, and chassis-like blocks strengthen local structure,
-  - Create super glue entities and honey/sticky/glue-like blocks greatly reinforce connections.
-- Fracture analysis is internally split into a local world snapshot and a pure candidate calculation step, preparing the system for safe async analysis later.
-- Entity impact damage based on relative closing speed, with standing-on-vehicle filtering to avoid hurting riders.
-- Step-contact forgiveness so vehicles do not easily destroy terrain when driving over small height differences.
-- Server-side TOML configuration for damage, fracture, terrain protection, entity damage, and structure-strength tuning.
+<!-- Recommended header image:
+![Large Sable structure impact demo](docs/images/impact-demo.png)
+Theme: a large Sable physical structure hitting terrain, with visible cracks or a crater.
+-->
 
-## Dependencies
+## What TI Does
 
-Required at runtime:
+Minecraft blocks normally survive most large moving-structure impacts unless another mod handles the damage. TI adds a damage layer on top of Sable physics so that heavy physical structures can interact with the world in a more readable and destructive way.
+
+In the gamma version, TI can:
+
+- damage terrain when a Sable physical structure hits normal world blocks,
+- show cumulative cracking before some blocks break,
+- fracture Sable physical structures under strong impacts,
+- damage entities hit by moving physical structures,
+- apply early explosion impulse and explosion fracture behavior,
+- estimate material strength using hardness, blast resistance, friction, toughness, brittleness, and block-category rules,
+- reduce false static-contact damage so decorations and side-mounted blocks are less likely to break while resting,
+- detect some Create contraption anchors and apply impact damage to bearings, pistons, pulleys, gantries, minecart assemblers, tracks, supports, and related blocks.
+
+## Current Features
+
+### Terrain Impact Damage
+
+When a Sable physical structure collides with the normal world, TI samples contact positions and converts collision force into terrain damage. Large impacts can crack, weaken, or destroy nearby blocks.
+
+The gamma release includes improved large-surface sampling compared with earlier builds. Flat structures should no longer damage only four corner points in most common tests, but this system is still being tuned.
+
+<!-- Recommended image:
+![Terrain impact before and after](docs/images/terrain-impact-before-after.png)
+Theme: side-by-side or sequence screenshot showing terrain before and after a large impact.
+-->
+
+### Cumulative Cracking
+
+Blocks do not always break instantly. Repeated near-threshold impacts can accumulate damage and show Minecraft crack progress before the block finally breaks.
+
+Very small hits are filtered out so strong materials should not be slowly destroyed by tiny weak impacts.
+
+### Material-Aware Damage
+
+TI compares colliding materials instead of treating every block equally. Strong blocks are protected from weak materials more aggressively than in earlier beta builds.
+
+Current material logic considers:
+
+- block hardness,
+- blast resistance,
+- friction,
+- explosion resistance,
+- toughness,
+- brittleness,
+- sticky or glue-like support,
+- beam, frame, girder, chassis, and support-like blocks,
+- same-material and mixed-material structural connections.
+
+This is not a full stress simulation yet. It is a practical material model for the gamma version.
+
+### Sable Structure Fracture
+
+Physical structures can split when impact force is high enough. TI uses Sable's native sub-level splitting behavior instead of inventing a separate physics entity system.
+
+To avoid the old self-destruction bug, structure fracture now checks relative speed and closing speed. Static support force, resting contact, and slow rubbing should not normally cause fracture.
+
+Important current rules:
+
+- structure fracture needs enough force,
+- two structures must be moving toward each other fast enough,
+- fracture candidates are filtered to the target sub-level's own blocks,
+- explosion fracture does not use the same relative-speed gate because explosions are external force sources.
+
+### Entity Impact Damage
+
+Moving physical structures can hurt nearby living entities when relative speed and closing speed are high enough.
+
+TI filters common false positives such as riders standing on a moving structure.
+
+### Explosion Interaction
+
+Explosions can apply early shockwave-style behavior to nearby Sable physical structures. This includes fracture pressure and optional impulse.
+
+This is still an early system. A deeper explosion rework is planned for future versions.
+
+### Create Integration
+
+TI has early support for Create-related dynamic structures and anchor blocks. When impacts occur near Create mechanisms, the mod can apply damage to likely load-bearing parts.
+
+Current examples include:
+
+- mechanical bearings,
+- pistons,
+- rope pulleys and pulley lines,
+- gantries,
+- minecart assemblers and minecarts,
+- train tracks,
+- nearby support blocks.
+
+This is not a full Create contraption physics rewrite. Vanilla Create behavior for normal block collision is left to Create itself.
+
+<!-- Recommended image:
+![Create anchor damage example](docs/images/create-anchor-damage.png)
+Theme: a bearing, pulley, gantry, minecart assembler, or track being damaged by a physical impact.
+-->
+
+## Configuration
+
+TI generates server and client config files in the Minecraft instance config folder.
+
+Server config:
+
+```text
+config/sabletrueimpact-server.toml
+```
+
+Client config:
+
+```text
+config/sabletrueimpact-client.toml
+```
+
+The internal mod id is still `sabletrueimpact` for compatibility. The public name is **Sable: True Impact**.
+
+If you update from an older build and want the newest defaults, delete the old TI config files and restart the game.
+
+### Presets
+
+The gamma version includes preset-based tuning.
+
+Main mode:
+
+- `presetMode = auto`: applies the selected performance and destruction presets on config load.
+- `presetMode = custom`: keeps advanced values untouched.
+
+Destruction presets:
+
+- `off`: disables TI damage behavior.
+- `low`: lighter damage, fewer expensive effects.
+- `medium`: default gamma balance.
+- `high`: stronger and more visible destruction.
+- `cinematic`: dramatic destruction for screenshots and test worlds.
+
+Performance presets:
+
+- `potato`
+- `very_low`
+- `low`
+- `medium`
+- `high`
+- `very_high`
+- `destructive`
+
+Higher performance presets allow more fracture checks, terrain samples, explosion rays, entity scans, and cumulative damage records. They can be heavier on servers.
+
+### Useful Config Options
+
+General:
+
+- `enableTrueImpact`: master switch.
+- `enablePhysicalDestruction`: global toggle for internal physical-structure destruction.
+- `enableWorldDestruction`: global toggle for terrain and normal world block destruction.
+- `enableUniversalImpactCallback`: attaches TI collision handling through Sable collider data.
+
+Impact and terrain:
+
+- `impact.enableCracks`: enables visible cracks and cumulative crack marks.
+- `impact.enableBlockBreaking`: allows direct impact block breaking.
+- `impact.movingStructuresBreakBlocks`: allows moving Sable structures to damage normal world blocks.
+- `impact.impactVelocityExponent`: makes fast impacts more destructive when raised.
+- `terrainImpact.enableTerrainImpactDamage`: enables terrain damage from Sable sub-level impacts.
+- `terrainImpact.terrainImpactForceExponent`: controls how strongly force increases terrain damage.
+- `terrainImpact.terrainImpactMaxBlocks`: caps terrain blocks damaged per event.
+- `terrainImpact.terrainImpactContactSamples`: controls contact sampling detail for terrain impacts.
+
+Structure fracture:
+
+- `subLevelFracture.enableSubLevelFracture`: enables Sable physical-structure fracture.
+- `subLevelFracture.subLevelFractureMinRelativeSpeed`: minimum relative speed for structure-vs-structure fracture.
+- `subLevelFracture.subLevelFractureMinClosingSpeed`: minimum speed along the contact normal.
+- `subLevelFracture.subLevelFractureMaxCandidateChecks`: maximum nearby block positions inspected per fracture scan.
+- `subLevelFracture.subLevelFractureMaxBlocks`: maximum internal blocks removed by one fracture event.
+- `subLevelFracture.subLevelFractureFatigueScale`: stores near-miss fracture force as cumulative cracks.
+
+Material behavior:
+
+- `enableMaterialMatchupDamage`: compares colliding material strength before distributing damage.
+- `materialMatchupExponent`: controls how strongly strong materials resist weak materials.
+- `strongMaterialFatigueImmunityRatio`: ignores repeated weak impacts below this strength ratio.
+- `strongMaterialSelfDamageCap`: caps self-damage when a stronger material hits a much weaker one.
+- `enableMaterialToughness`: enables additional toughness and brittleness multipliers.
+
+Entity damage:
+
+- `entityImpact.enableEntityImpactDamage`: enables direct entity impact damage.
+- `entityImpact.entityMovingImpactMinRelativeSpeed`: minimum relative speed for entity hits.
+- `entityImpact.entityMovingImpactMinClosingSpeed`: minimum closing speed toward the entity.
+- `entityImpact.entityImpactScanIntervalTicks`: scan interval. Higher values are cheaper.
+
+Explosion behavior:
+
+- `explosionImpact.enableExplosionImpactFracture`: explosions can crack or fracture nearby physical structures.
+- `explosionImpact.enableExplosionImpulse`: explosions can push Sable physical structures.
+- `explosionImpact.explosionImpactForceScale`: scales explosion pressure.
+- `explosionImpact.enableImpactExplosions`: allows massive crashes to trigger Minecraft explosions. Disabled by default.
+
+Create support:
+
+- `create.enableCreateContraptionAnchorDamage`: enables anchor damage for Create mechanisms.
+- `create.enableCreateContraptionLoadFailure`: estimates moving contraption load and amplifies anchor damage when overloaded.
+- `create.createContraptionLoadSafetyFactor`: overload safety factor.
+- `create.createContraptionOverloadAnchorDamageScale`: extra anchor damage scale when overloaded.
+
+Performance:
+
+- `performance.performancePreset`: global cost budget preset.
+- `performance.enablePerformanceLogging`: logs periodic TI performance counters.
+- `performance.performanceLogIntervalTicks`: performance log interval.
+- `performance.enableAsyncFractureAnalysis`: experimental background fracture candidate calculation. World reads and block changes still run on the server thread.
+
+## Recommended Testing
+
+Use a creative test world first.
+
+Basic terrain test:
+
+1. Build or spawn a simple Sable physical structure.
+2. Drop it onto grass, dirt, stone, or deepslate.
+3. Check whether terrain damage appears near the real contact area.
+4. Repeat with different `destructionPreset` and `performancePreset` values.
+
+Static-contact test:
+
+1. Place two Sable physical structures touching each other.
+2. Let them rest for several minutes.
+3. Side-mounted logs, chains, decorations, and weak blocks should not keep gaining cracks while nothing is moving.
+
+Material test:
+
+1. Hit dirt, grass, logs, stone, deepslate, iron, and netherite-like blocks with different physical structures.
+2. Strong materials should resist weak terrain better than old beta builds.
+3. Weak materials should still fail under large enough impacts.
+
+Create test:
+
+1. Place a bearing, pulley, gantry, minecart assembler, or track setup.
+2. Hit it with a Sable physical structure.
+3. Check whether the load-bearing Create block or nearby support takes damage.
+
+Explosion test:
+
+1. Place a physical structure near TNT or another explosion source.
+2. Trigger the explosion.
+3. Check for movement, cracking, and fracture.
+
+## Known Limitations
+
+The gamma version is playable for testing, but it is not a stable final physics system.
+
+Known limitations:
+
+- force transmission through an entire physical structure is still incomplete,
+- internal stress simulation is not fully implemented,
+- friction wear damage is planned but not implemented as a true sliding-wear system,
+- very large or unusual contact surfaces may still need tuning,
+- explosion shockwaves are early and will be rewritten later,
+- Create support is anchor/load based, not a full contraption physics simulation,
+- compatibility with large modpacks is not guaranteed,
+- destructive configs can damage worlds quickly.
+
+Back up worlds before testing TI.
+
+## Compatibility Notes
+
+Required:
 
 - Minecraft 1.21.1
 - NeoForge 21.1.x
 - Sable 1.2.2 or newer
 
-Optional integrations are detected by block/entity identifiers, including Create super glue, honey, stickers, girders, beams, frames, and similar support blocks.
+Recommended or optional:
 
-## Building
+- Create 6.0.x for Create interaction tests
+- Create Aeronautics for Sable-based moving-structure gameplay
+
+TI is an unofficial add-on. It is not affiliated with or endorsed by Sable, Create, or Create Aeronautics.
+
+## Building From Source
 
 This repository does not redistribute Sable's jar. To build locally, place the Sable jar here:
 
@@ -49,69 +312,59 @@ The built mod jar will be in:
 build/libs/
 ```
 
-## Configuration
+## Troubleshooting
 
-Server configuration is generated in the Minecraft instance config folder:
+### The mod feels too weak or too strong
+
+Adjust `destructionPreset` first. Use advanced values only after presets are tested.
+
+### The game stutters during large crashes
+
+Lower `performancePreset`, reduce terrain contact samples, reduce fracture candidate checks, or disable async fracture if it causes issues in your environment.
+
+### Old config values are still used after updating
+
+Delete:
 
 ```text
 config/sabletrueimpact-server.toml
-```
-
-Existing worlds keep their old config values. Delete or edit the server config after updating if you want new defaults.
-
-Client-only configuration is generated at:
-
-```text
 config/sabletrueimpact-client.toml
 ```
 
-Useful feature switches:
+Then restart the game.
 
-- `enableTrueImpact`: master switch for all added behavior.
-- `impact.enableCracks`: visual cracks and cumulative crack marks.
-- `impact.enableBlockBreaking`: direct impact block breaking.
-- `impact.movingStructuresBreakBlocks`: whether moving Sable physical structures may break or cumulatively damage normal world blocks. Defaults to `true`.
-- `impact.impactVelocityExponent`: velocity exponent for block impact damage. Values above `2.0` make fast impacts much more destructive.
-- `impact.enableCrackPropagation`: crack spread from catastrophic hits.
-- `terrainImpact.enableTerrainImpactDamage`: Sable sub-level damage against normal terrain.
-- `terrainImpact.terrainImpactForceExponent`: force exponent for terrain impact damage. Values above `1.0` make violent impacts dig harder.
-- `entityImpact.enableEntityImpactDamage`: damage dealt to living entities.
-- `entityImpact.entityImpactScanIntervalTicks`: direct entity impact scan interval. Higher values reduce CPU load.
-- `subLevelFracture.enableSubLevelFracture`: internal fracture of Sable physical structures.
-- `subLevelFracture.subLevelFractureForceExponent`: force exponent for internal structure fracture. Values above `1.0` make high-force crashes split structures more aggressively.
-- `subLevelFracture.subLevelFractureMaxCandidateChecks`: maximum nearby positions inspected by one fracture event.
-- `subLevelFracture.subLevelFractureMaxCandidates`: maximum fracture candidates kept for sorting and chance checks.
-- `subLevelFracture.enableAsyncFractureAnalysis`: experimental background fracture candidate calculation. World reads and block changes still run on the server thread.
-- `subLevelFracture.asyncFractureMaxQueuedJobs`: queue limit for async fracture jobs.
-- `subLevelFracture.asyncFractureMaxAppliedJobsPerTick`: completed async fracture jobs applied per server tick.
-- `pairReaction.enablePairReaction`: elastic pair-collision counter impulse.
-- `cumulativeDamage.enableCumulativeBlockDamage`: repeated crack-level hits accumulate until breakage.
-- `performance.enablePerformanceLogging`: periodic low-level counters for collision, fracture, and entity scan cost.
-- `performance.performanceLogIntervalTicks`: logging interval when performance logging is enabled.
+### A crash happens with Create-related blocks
 
-## Future Roadmap
+Send the full `latest.log`, `debug.log`, and crash report. Some crashes may be compatibility issues between Sable, Create, Petrolpark, Create Aeronautics, and block destruction timing.
 
-Low-level Sable physics work:
+## Roadmap
 
-- Investigate why Newton's cradle setups built with default Sable behavior do not transfer motion correctly.
-- Rework collision force handling so physical objects exchange force through contacts more consistently.
-- Improve force propagation through connected physical structures instead of treating every impact as a local block event.
-- Add a safer force application path for sleeping or paused Rapier islands before re-enabling pair reaction impulses by default.
-- Add explosion shockwave impulse transfer so blasts push Sable physical structures outward, not only crack or fracture them.
+Short-term goals:
 
-Presentation and feedback:
+- improve remaining terrain contact sampling edge cases,
+- tune material toughness and fatigue further,
+- harden Create and Petrolpark compatibility,
+- improve performance presets and config descriptions,
+- add clearer visual and audio feedback for impacts.
 
-- Add configurable impact particles for cracks, heavy collisions, structure fracture, and explosion shockwaves.
-- Add configurable impact and fracture sound effects so large crashes are easier to read in gameplay.
+Long-term goals:
 
-## Safety
-
-This mod intentionally changes physical collision outcomes and can break terrain, split structures, and damage entities. Back up worlds before testing.
+- full stress simulation for physical structures,
+- force transmission through connected blocks,
+- realistic crack propagation,
+- friction-based wear damage,
+- soft-terrain deformation such as heavy objects sinking into sand,
+- block indentation without spawning new physical structures,
+- explosion shockwaves and impulse transfer through Sable internals,
+- automatic physicalization of unsupported floating structures,
+- delayed restoration of automatically generated sub-level fragments.
 
 ## License
 
-True Impact is licensed under LGPL-3.0-only.
+Sable: True Impact is licensed under the **GNU Lesser General Public License v3.0**.
+
+See [LICENSE](LICENSE) for the full license text.
 
 ## Disclaimer
 
-This is an unofficial add-on for Sable. It is not affiliated with or endorsed by Sable's original author.
+Sable: True Impact is an unofficial add-on for Sable. It is not affiliated with or endorsed by Sable's original author.
