@@ -8,10 +8,7 @@ TI is built for Minecraft 1.21.1, NeoForge, and Sable 1.2.2+. It also includes e
 >
 > This is a preview release for testing and feedback. Back up worlds before using it.
 
-<!-- Recommended header image:
-![Large Sable structure impact demo](docs/images/impact-demo.png)
-Theme: a large Sable physical structure hitting terrain, with visible cracks or a crater.
--->
+<img width="2672" height="1024" alt="STICOVER" src="https://github.com/user-attachments/assets/21864da7-ce8c-422b-87c9-eda0640dc7f0" />
 
 ## What TI Does
 
