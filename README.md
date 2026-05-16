@@ -356,6 +356,12 @@ Long-term goals:
 - automatic physicalization of unsupported floating structures,
 - delayed restoration of automatically generated sub-level fragments.
 
+## Development Notice
+
+Sable: True Impact is designed, tested, and maintained by its author. Some parts of the code, documentation, changelogs, and English descriptions may be written or edited with AI assistance, especially because the author is not a native English speaker.
+
+All AI-assisted changes are reviewed and tested before release. Bug reports, compatibility notes, and pull requests are welcome.
+
 ## License
 
 Sable: True Impact is licensed under the **GNU Lesser General Public License v3.0**.
