@@ -55,6 +55,11 @@ public final class SubLevelFracture {
     private static final Method GET_ON_SOLID_REMOVED = SubLevelFracture.findMethod("dev.ryanhcode.sable.sublevel.plot.heat.SubLevelHeatMapManager", "onSolidRemoved", BlockPos.class);
     private static final Method LOGICAL_POSE = SubLevelFracture.findMethod("dev.ryanhcode.sable.sublevel.SubLevel", "logicalPose", new Class[0]);
     private static final Method ROTATION_POINT = SubLevelFracture.findMethod("dev.ryanhcode.sable.companion.math.Pose3d", "rotationPoint", new Class[0]);
+    // Sublevel blocks are embedded in the real world at plotLocalPos + plotCenter (fixed offset).
+    // rotationPoint is the physics-world position and diverges from plotCenter when the structure moves.
+    private static final Method GET_PLOT = SubLevelFracture.findMethodSafe("dev.ryanhcode.sable.sublevel.SubLevel", "getPlot", new Class[0]);
+    private static final Method GET_CENTER_BLOCK = SubLevelFracture.findMethodSafe("dev.ryanhcode.sable.sublevel.plot.LevelPlot", "getCenterBlock", new Class[0]);
+    private static final Method GET_BOUNDING_BOX = SubLevelFracture.findMethodSafe("dev.ryanhcode.sable.sublevel.plot.LevelPlot", "getBoundingBox", new Class[0]);
     private static final Map<Integer, List<Offset>> OFFSET_CACHE = new ConcurrentHashMap<Integer, List<Offset>>();
     private static final ExecutorService FRACTURE_EXECUTOR = Executors.newSingleThreadExecutor(new FractureThreadFactory());
     private static final ConcurrentLinkedQueue<PendingFracture> COMPLETED_FRACTURES = new ConcurrentLinkedQueue();
@@ -87,6 +92,10 @@ public final class SubLevelFracture {
             return;
         }
         BlockPos center = BlockPos.containing((double)worldPoint.x, (double)worldPoint.y, (double)worldPoint.z);
+        SubLevelBounds bounds = SubLevelFracture.subLevelBounds(subLevel);
+        if (bounds == null || !bounds.contains(center)) {
+            return;
+        }
         double scaledForce = SubLevelFracture.scaledForceAboveThreshold(forceAmount, (Double)TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_THRESHOLD.get(), (Double)TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_EXPONENT.get());
         double fracturePower = (scaledForce - (Double)TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_THRESHOLD.get()) * (Double)TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_SCALE.get() * SubLevelFracture.structureMultiplier(subLevel, localPoint) * (Double)TrueImpactConfig.GLOBAL_STRENGTH_SCALE.get() * externalDamageScale;
         if (fracturePower <= 0.0) {
@@ -101,11 +110,11 @@ public final class SubLevelFracture {
         FractureSnapshot snapshot = FractureSnapshot.capture(level, center, SubLevelFracture.radiusForSnapshot());
         Object heatMapManager = SubLevelFracture.heatMapManager(subLevel);
         if (((Boolean)TrueImpactConfig.ENABLE_ASYNC_FRACTURE_ANALYSIS.get()).booleanValue()) {
-            SubLevelFracture.submitAsync(level, snapshot, center, planeNormal, fracturePower, heatMapManager, startedAt);
+            SubLevelFracture.submitAsync(level, snapshot, center, planeNormal, fracturePower, heatMapManager, bounds, startedAt);
             return;
         }
         level.getServer().execute(() -> {
-            CandidateScan scan = SubLevelFracture.candidates(snapshot, center, planeNormal, fracturePower);
+            CandidateScan scan = SubLevelFracture.candidates(snapshot, center, planeNormal, fracturePower, bounds);
             int removed = SubLevelFracture.applyCandidates(level, heatMapManager, scan.candidates());
             TrueImpactPerformance.recordFracture(startedAt, scan.checkedBlocks(), scan.candidates().size(), removed);
         });
@@ -176,7 +185,7 @@ public final class SubLevelFracture {
         }
     }
 
-    private static void submitAsync(ServerLevel level, FractureSnapshot snapshot, BlockPos center, Vector3d normal, double fracturePower, Object heatMapManager, long startedAt) {
+    private static void submitAsync(ServerLevel level, FractureSnapshot snapshot, BlockPos center, Vector3d normal, double fracturePower, Object heatMapManager, SubLevelBounds bounds, long startedAt) {
         int maxQueued = (Integer)TrueImpactConfig.ASYNC_FRACTURE_MAX_QUEUED_JOBS.get();
         if (QUEUED_ASYNC_JOBS.incrementAndGet() > maxQueued) {
             QUEUED_ASYNC_JOBS.decrementAndGet();
@@ -186,7 +195,7 @@ public final class SubLevelFracture {
         Vector3d normalCopy = new Vector3d((Vector3dc)normal);
         FRACTURE_EXECUTOR.execute(() -> {
             try {
-                CandidateScan scan = SubLevelFracture.candidates(snapshot, center, normalCopy, fracturePower);
+                CandidateScan scan = SubLevelFracture.candidates(snapshot, center, normalCopy, fracturePower, bounds);
                 COMPLETED_FRACTURES.add(new PendingFracture(dimension, heatMapManager, scan, startedAt));
             }
             finally {
@@ -217,7 +226,7 @@ public final class SubLevelFracture {
         return removed;
     }
 
-    private static CandidateScan candidates(FractureSnapshot snapshot, BlockPos center, Vector3d normal, double fracturePower) {
+    private static CandidateScan candidates(FractureSnapshot snapshot, BlockPos center, Vector3d normal, double fracturePower, SubLevelBounds bounds) {
         ArrayList<Candidate> result = new ArrayList<Candidate>();
         int radius = (int)Math.ceil((Double)TrueImpactConfig.SUBLEVEL_FRACTURE_RADIUS.get());
         double radiusSquared = (Double)TrueImpactConfig.SUBLEVEL_FRACTURE_RADIUS.get() * (Double)TrueImpactConfig.SUBLEVEL_FRACTURE_RADIUS.get();
@@ -230,6 +239,7 @@ public final class SubLevelFracture {
             if (offset.distanceSquared() > radiusSquared) continue;
             ++checked;
             BlockPos pos = center.offset(offset.x(), offset.y(), offset.z());
+            if (bounds == null || !bounds.contains(pos)) continue;
             BlockState state = snapshot.getBlockState(pos);
             double destroySpeed = snapshot.destroySpeed(pos);
             if (state.isAir() || state.is(Blocks.BEDROCK) || destroySpeed < 0.0 || StructuralStrengthAnalyzer.isAdhesiveBlock(state) || (structure = StructuralStrengthAnalyzer.analyze(snapshot, pos, state, normal)).seamWeakness() <= 0.0) continue;
@@ -399,18 +409,92 @@ public final class SubLevelFracture {
         }
     }
 
-    static Vector3d toWorldPoint(Object subLevel, Vector3d localPoint) {
+    private static Method findMethodSafe(String className, String methodName, Class<?> ... parameterTypes) {
+        try {
+            Method method = Class.forName(className).getMethod(methodName, parameterTypes);
+            method.setAccessible(true);
+            return method;
+        }
+        catch (ReflectiveOperationException e) {
+            return null;
+        }
+    }
+
+    private static BlockPos plotCenter(Object subLevel) {
+        if (GET_PLOT == null || GET_CENTER_BLOCK == null) return null;
+        try {
+            Object plot = GET_PLOT.invoke(subLevel, new Object[0]);
+            if (plot == null) return null;
+            return (BlockPos) GET_CENTER_BLOCK.invoke(plot, new Object[0]);
+        }
+        catch (ReflectiveOperationException | RuntimeException e) {
+            return null;
+        }
+    }
+
+    private static SubLevelBounds subLevelBounds(Object subLevel) {
+        if (GET_PLOT == null || GET_CENTER_BLOCK == null || GET_BOUNDING_BOX == null) return null;
+        try {
+            Object plot = GET_PLOT.invoke(subLevel, new Object[0]);
+            if (plot == null) return null;
+            BlockPos center = (BlockPos)GET_CENTER_BLOCK.invoke(plot, new Object[0]);
+            Object box = GET_BOUNDING_BOX.invoke(plot, new Object[0]);
+            if (center == null || box == null) return null;
+            int minX = center.getX() + (int)SubLevelFracture.number(box, "minX");
+            int minY = center.getY() + (int)SubLevelFracture.number(box, "minY");
+            int minZ = center.getZ() + (int)SubLevelFracture.number(box, "minZ");
+            int maxX = center.getX() + (int)SubLevelFracture.number(box, "maxX");
+            int maxY = center.getY() + (int)SubLevelFracture.number(box, "maxY");
+            int maxZ = center.getZ() + (int)SubLevelFracture.number(box, "maxZ");
+            return new SubLevelBounds(minX, minY, minZ, maxX, maxY, maxZ);
+        }
+        catch (ReflectiveOperationException | RuntimeException e) {
+            return null;
+        }
+    }
+
+    private static double number(Object target, String methodName) throws ReflectiveOperationException {
+        return ((Number)target.getClass().getMethod(methodName, new Class[0]).invoke(target, new Object[0])).doubleValue();
+    }
+
+    private static Vector3d rotationPointVec(Object subLevel) {
         try {
             Object pose = LOGICAL_POSE.invoke(subLevel, new Object[0]);
             Object rp = ROTATION_POINT.invoke(pose, new Object[0]);
             double rx = ((Number)rp.getClass().getMethod("x", new Class[0]).invoke(rp, new Object[0])).doubleValue();
             double ry = ((Number)rp.getClass().getMethod("y", new Class[0]).invoke(rp, new Object[0])).doubleValue();
             double rz = ((Number)rp.getClass().getMethod("z", new Class[0]).invoke(rp, new Object[0])).doubleValue();
-            return new Vector3d(localPoint.x + rx, localPoint.y + ry, localPoint.z + rz);
+            return new Vector3d(rx, ry, rz);
         }
         catch (ReflectiveOperationException | RuntimeException e) {
             return null;
         }
+    }
+
+    /**
+     * Converts a body-frame local position to the embedded-world position where the sublevel block
+     * is actually stored: embeddedWorld = localPoint + plotCenter.
+     * This is NOT the physics-world position — use tryFracturePhysicsWorldPos() when the caller
+     * has a physics-world coordinate (e.g. from an explosion ray or bounding-box hit).
+     */
+    static Vector3d toWorldPoint(Object subLevel, Vector3d localPoint) {
+        BlockPos center = SubLevelFracture.plotCenter(subLevel);
+        if (center == null) return null;
+        return new Vector3d(localPoint.x + center.getX(), localPoint.y + center.getY(), localPoint.z + center.getZ());
+    }
+
+    /**
+     * Entry point for callers that have a physics-world coordinate (e.g. ExplosionImpactHandler).
+     * Converts physicsWorldPoint → body-frame by subtracting rotationPoint, then calls tryFracture().
+     */
+    public static void tryFracturePhysicsWorldPos(Object subLevel, Vector3d physicsWorldPoint, Vector3d normal, double forceAmount) {
+        Vector3d rp = SubLevelFracture.rotationPointVec(subLevel);
+        if (rp == null) {
+            // rotationPoint unavailable — skip rather than fracturing at wrong position
+            return;
+        }
+        Vector3d bodyFramePoint = new Vector3d(physicsWorldPoint.x - rp.x, physicsWorldPoint.y - rp.y, physicsWorldPoint.z - rp.z);
+        SubLevelFracture.tryFracture(subLevel, bodyFramePoint, normal, forceAmount);
     }
 
     private static final class FractureSnapshot
@@ -495,6 +579,12 @@ public final class SubLevelFracture {
     private record PendingFracture(String dimension, Object heatMapManager, CandidateScan scan, long startedAt) {
     }
 
+    private record SubLevelBounds(int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
+        private boolean contains(BlockPos pos) {
+            return pos.getX() >= this.minX && pos.getX() <= this.maxX && pos.getY() >= this.minY && pos.getY() <= this.maxY && pos.getZ() >= this.minZ && pos.getZ() <= this.maxZ;
+        }
+    }
+
     private record CandidateScan(List<Candidate> candidates, int checkedBlocks) {
     }
 
@@ -520,4 +610,3 @@ public final class SubLevelFracture {
     private record BlockMaterial(float destroySpeed, float blastResistance) {
     }
 }
-

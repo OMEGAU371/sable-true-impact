@@ -6,8 +6,7 @@
   "refmap": "sabletrueimpact.refmap.json",
   "mixins": [
     "RapierVoxelColliderBakeryMixin",
-    "RapierPhysicsPipelineMixin",
-    "SableCollisionMixin"
+    "RapierPhysicsPipelineMixin"
   ],
   "client": [
   ],

@@ -31,11 +31,11 @@ public abstract class RapierPhysicsPipelineMixin {
     @Final
     private Int2ObjectMap<?> activeSubLevels;
 
-    // Bug 2 fix: flush queued pair-reaction impulses at the start of pre-step (before Rapier runs)
-    // so they are applied in a clean physics state, avoiding the "island should be awake" panic.
-    @Inject(method={"prePhysicsTicks"}, at=@At(value="HEAD"))
+    // Flush after Rapier3D.tick() has advanced/woken the scene, but before the next Rapier3D.step().
+    // Flushing at HEAD still runs before Sable's native scene tick and can hit stale island wake state.
+    @Inject(method={"prePhysicsTicks"}, at=@At(value="TAIL"))
     private void sabletrueimpact$flushPendingImpulses(CallbackInfo ci) {
-        ElasticPairReaction.flushPendingImpulses();
+        ElasticPairReaction.flushPendingImpulses(this.activeSubLevels);
     }
 
     @Redirect(method={"processCollisionEffects"}, at=@At(value="INVOKE", target="Ldev/ryanhcode/sable/physics/impl/rapier/Rapier3D;clearCollisions(I)[D"))
@@ -45,4 +45,3 @@ public abstract class RapierPhysicsPipelineMixin {
         return collisions;
     }
 }
-

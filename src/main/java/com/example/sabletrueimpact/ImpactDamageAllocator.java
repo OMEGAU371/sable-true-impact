@@ -48,6 +48,12 @@ public final class ImpactDamageAllocator {
         double selfResistance = self.resistance();
         double targetResistance = target.resistance();
         double ratio = targetResistance / Math.max(selfResistance, 1.0);
+        if (ratio <= (Double)TrueImpactConfig.STRONG_MATERIAL_FATIGUE_IMMUNITY_RATIO.get()) {
+            if (((Boolean)TrueImpactConfig.ENABLE_DEBUG_IMPACT_LOGGING.get()).booleanValue()) {
+                ImpactDamageAllocator.logMatchup(level, selfPos, selfState, selfResistance, targetPos, targetState, targetResistance, 0.0, -1.0);
+            }
+            return 0.0;
+        }
         if (ratio <= (Double)TrueImpactConfig.SELF_DAMAGE_IMMUNITY_RATIO.get()) {
             if (((Boolean)TrueImpactConfig.ENABLE_DEBUG_IMPACT_LOGGING.get()).booleanValue()) {
                 ImpactDamageAllocator.logMatchup(level, selfPos, selfState, selfResistance, targetPos, targetState, targetResistance, 0.0, -1.0);
@@ -62,6 +68,9 @@ public final class ImpactDamageAllocator {
             finalScale = Math.max(capped, (Double)TrueImpactConfig.MIN_SELF_DAMAGE_SCALE.get());
         } else {
             finalScale = Math.max((Double)TrueImpactConfig.MIN_SELF_DAMAGE_SCALE.get(), Math.min(scale, (Double)TrueImpactConfig.MAX_SELF_DAMAGE_SCALE.get()));
+        }
+        if (ratio < 0.75) {
+            finalScale = Math.min(finalScale, (Double)TrueImpactConfig.STRONG_MATERIAL_SELF_DAMAGE_CAP.get());
         }
         if (((Boolean)TrueImpactConfig.ENABLE_DEBUG_IMPACT_LOGGING.get()).booleanValue()) {
             ImpactDamageAllocator.logMatchup(level, selfPos, selfState, selfResistance, targetPos, targetState, targetResistance, finalScale, -1.0);
@@ -142,4 +151,3 @@ public final class ImpactDamageAllocator {
     private record MaterialStats(double strength, double toughness, double resistance) {
     }
 }
-

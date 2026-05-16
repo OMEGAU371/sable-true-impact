@@ -2,7 +2,7 @@
  * Decompiled with CFR 0.152.
  * 
  * Could not load the following classes:
- *  dev.ryanhcode.sable.physics.impl.rapier.Rapier3D
+ *  dev.ryanhcode.sable.api.physics.handle.RigidBodyHandle
  *  net.minecraft.core.BlockPos
  *  net.minecraft.core.BlockPos$MutableBlockPos
  *  net.minecraft.server.level.ServerLevel
@@ -21,7 +21,8 @@ package com.example.sabletrueimpact;
 import com.example.sabletrueimpact.SubLevelFracture;
 import com.example.sabletrueimpact.TrueImpactConfig;
 import com.example.sabletrueimpact.TrueImpactPerformance;
-import dev.ryanhcode.sable.physics.impl.rapier.Rapier3D;
+import dev.ryanhcode.sable.api.physics.handle.RigidBodyHandle;
+import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -102,7 +103,8 @@ public final class ExplosionImpactHandler {
                 if (normal.lengthSquared() < 1.0E-8) {
                     normal.set(0.0, 1.0, 0.0);
                 }
-                SubLevelFracture.tryFracture(subLevel, localPoint, normal, force);
+                // localPoint here is a physics-world position from the explosion ray, not body-frame.
+                SubLevelFracture.tryFracturePhysicsWorldPos(subLevel, localPoint, normal, force);
                 ExplosionImpactHandler.applyExplosionImpulse(level2, subLevel, normal, force);
                 ++processed;
                 ++fractures;
@@ -210,9 +212,7 @@ public final class ExplosionImpactHandler {
         if (!((Boolean)TrueImpactConfig.ENABLE_EXPLOSION_IMPULSE.get()).booleanValue() || normal.lengthSquared() < 1.0E-8) {
             return;
         }
-        Integer runtimeId = ExplosionImpactHandler.runtimeId(subLevel);
-        Vector3d centerOfMass = ExplosionImpactHandler.centerOfMass(subLevel);
-        if (runtimeId == null || centerOfMass == null) {
+        if (!(subLevel instanceof ServerSubLevel serverSubLevel) || serverSubLevel.isRemoved()) {
             return;
         }
         double impulse = Math.min((Double)TrueImpactConfig.EXPLOSION_MAX_IMPULSE.get(), force * (Double)TrueImpactConfig.EXPLOSION_IMPULSE_SCALE.get());
@@ -220,7 +220,11 @@ public final class ExplosionImpactHandler {
             return;
         }
         Vector3d outward = new Vector3d((Vector3dc)normal).normalize().mul(impulse);
-        Rapier3D.applyForce((int)Rapier3D.getID((ServerLevel)level), (int)runtimeId, (double)0.0, (double)0.0, (double)0.0, (double)outward.x, (double)outward.y, (double)outward.z, (boolean)true);
+        RigidBodyHandle handle = RigidBodyHandle.of(serverSubLevel);
+        if (handle == null || !handle.isValid()) {
+            return;
+        }
+        handle.applyLinearImpulse(outward);
     }
 
     private static Vector3d centerOfMass(Object subLevel) {
@@ -249,14 +253,18 @@ public final class ExplosionImpactHandler {
         }
     }
 
+    // Returns null on any failure so <clinit> can complete even if Sable internals or
+    // client-only classes (e.g. ClientLevel referenced by SubLevelContainer) can't be loaded
+    // on a dedicated server. The onExplosionDetonate body already catches RuntimeException,
+    // so null-field NPEs are silently swallowed and explosion fracture simply does nothing.
     private static Method findMethod(String className, String methodName, Class<?> ... parameterTypes) {
         try {
             Method method = Class.forName(className).getMethod(methodName, parameterTypes);
             method.setAccessible(true);
             return method;
         }
-        catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("Missing Sable method " + className + "#" + methodName, e);
+        catch (Exception e) {
+            return null;
         }
     }
 
@@ -266,8 +274,8 @@ public final class ExplosionImpactHandler {
             field.setAccessible(true);
             return field;
         }
-        catch (ReflectiveOperationException e) {
-            throw new IllegalStateException("Missing Sable field " + className + "#" + fieldName, e);
+        catch (Exception e) {
+            return null;
         }
     }
 
@@ -285,4 +293,3 @@ public final class ExplosionImpactHandler {
         private static final RayResult ESCAPED = new RayResult(false);
     }
 }
-

@@ -95,36 +95,36 @@ public final class TrueImpactPresets {
     private static void applyPerformance(String preset) {
         switch (preset) {
             case "potato": {
-                TrueImpactPresets.budgets(2, 24, 12, 4, 1, 1, false, 6, 4, 2, 512, 6, 64, 12, 4);
+                TrueImpactPresets.budgets(2, 24, 12, 4, 1, 1, false, 6, 4, 2, 4, 512, 6, 64, 12, 4);
                 break;
             }
             case "very_low": {
-                TrueImpactPresets.budgets(3, 48, 24, 6, 1, 2, false, 10, 8, 2, 1024, 12, 96, 16, 6);
+                TrueImpactPresets.budgets(3, 48, 24, 6, 1, 2, false, 10, 8, 2, 6, 1024, 12, 96, 16, 6);
                 break;
             }
             case "low": {
-                TrueImpactPresets.budgets(4, 96, 48, 8, 2, 2, false, 18, 16, 3, 2048, 24, 128, 24, 8);
+                TrueImpactPresets.budgets(4, 96, 48, 8, 2, 2, false, 18, 16, 3, 10, 2048, 24, 128, 24, 8);
                 break;
             }
             case "high": {
-                TrueImpactPresets.budgets(8, 768, 160, 32, 8, 1, true, 80, 64, 8, 8192, 96, 384, 64, 24);
+                TrueImpactPresets.budgets(8, 768, 160, 32, 8, 1, true, 80, 64, 8, 32, 8192, 96, 384, 64, 24);
                 break;
             }
             case "very_high": {
-                TrueImpactPresets.budgets(12, 1200, 256, 48, 12, 1, true, 128, 96, 12, 12000, 128, 512, 96, 32);
+                TrueImpactPresets.budgets(12, 1200, 256, 48, 12, 1, true, 128, 96, 12, 48, 12000, 128, 512, 96, 32);
                 break;
             }
             case "destructive": {
-                TrueImpactPresets.budgets(24, 2400, 512, 96, 24, 1, true, 256, 160, 24, 20000, 192, 768, 160, 48);
+                TrueImpactPresets.budgets(24, 2400, 512, 96, 24, 1, true, 256, 160, 24, 96, 20000, 192, 768, 160, 48);
                 break;
             }
             default: {
-                TrueImpactPresets.budgets(6, 384, 96, 18, 4, 2, false, 48, 32, 4, 4096, 48, 256, 32, 18);
+                TrueImpactPresets.budgets(6, 384, 96, 18, 4, 2, false, 48, 32, 4, 18, 4096, 48, 256, 32, 18);
             }
         }
     }
 
-    private static void budgets(int fractureAttempts, int fractureChecks, int fractureCandidates, int fractureBlocks, int asyncApplied, int entityScanInterval, boolean asyncFracture, int entitySubLevels, int explosionRays, int terrainBlocks, int cumulativeEntries, int elasticScanLimit, int explosionSubLevels, int maxPropagationBlocks, int impactExplosionBatch) {
+    private static void budgets(int fractureAttempts, int fractureChecks, int fractureCandidates, int fractureBlocks, int asyncApplied, int entityScanInterval, boolean asyncFracture, int entitySubLevels, int explosionRays, int terrainBlocks, int terrainContactSamples, int cumulativeEntries, int elasticScanLimit, int explosionSubLevels, int maxPropagationBlocks, int impactExplosionBatch) {
         TrueImpactConfig.SUBLEVEL_FRACTURE_MAX_ATTEMPTS_PER_TICK.set(fractureAttempts);
         TrueImpactConfig.SUBLEVEL_FRACTURE_MAX_CANDIDATE_CHECKS.set(fractureChecks);
         TrueImpactConfig.SUBLEVEL_FRACTURE_MAX_CANDIDATES.set(fractureCandidates);
@@ -135,6 +135,7 @@ public final class TrueImpactPresets {
         TrueImpactConfig.ENTITY_IMPACT_MAX_SUBLEVELS_PER_SCAN.set(entitySubLevels);
         TrueImpactConfig.EXPLOSION_IMPACT_RAY_SAMPLES.set(explosionRays);
         TrueImpactConfig.TERRAIN_IMPACT_MAX_BLOCKS.set(terrainBlocks);
+        TrueImpactConfig.TERRAIN_IMPACT_CONTACT_SAMPLES.set(terrainContactSamples);
         TrueImpactConfig.CUMULATIVE_BLOCK_DAMAGE_MAX_ENTRIES.set(cumulativeEntries);
         TrueImpactConfig.ELASTIC_SUBLEVEL_SCAN_LIMIT.set(elasticScanLimit);
         TrueImpactConfig.EXPLOSION_IMPACT_MAX_SUBLEVELS.set(explosionSubLevels);

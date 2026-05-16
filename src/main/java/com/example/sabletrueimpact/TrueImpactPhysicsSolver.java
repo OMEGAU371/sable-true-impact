@@ -81,6 +81,7 @@ public class TrueImpactPhysicsSolver {
             boolean protectedSubLevelImpact;
             boolean hasVelocity;
             Vector3d velocityVec;
+            double actualSubLevelSpeed;
             double mass;
             double structuralIntegrity;
             BlockState state;
@@ -106,7 +107,9 @@ public class TrueImpactPhysicsSolver {
                     return BlockSubLevelCollisionCallback.CollisionResult.NONE;
                 }
                 if (((Boolean)TrueImpactConfig.ENABLE_SOIL_COMPACTION.get()).booleanValue() && COMPACTABLE_SOIL.contains(state.getBlock()) && impactVelocity >= (Double)TrueImpactConfig.SOIL_COMPACTION_MIN_VELOCITY.get() && impactVelocity < (Double)TrueImpactConfig.SOIL_COMPACTION_MAX_VELOCITY.get()) {
-                    level.setBlock(pos, Blocks.DIRT.defaultBlockState(), 3);
+                    final ServerLevel compactLevel = level;
+                    final BlockPos compactPos = pos;
+                    level.getServer().execute(() -> compactLevel.setBlock(compactPos, Blocks.DIRT.defaultBlockState(), 3));
                     return new BlockSubLevelCollisionCallback.CollisionResult((Vector3dc)new Vector3d(), false);
                 }
                 float blastResistance = state.getBlock().getExplosionResistance();
@@ -123,6 +126,7 @@ public class TrueImpactPhysicsSolver {
                 mass = (Double)TrueImpactConfig.FALLBACK_IMPACT_MASS.get();
                 velocityVec = new Vector3d(0.0, -1.0, 0.0);
                 hasVelocity = false;
+                actualSubLevelSpeed = Double.NaN;
                 // Bug 1 fix: use queryIntersecting to find the sublevel physically at the impact point.
                 // getSubLevels() was removed from SubLevelPhysicsSystem in Sable 1.2.2.
                 try {
@@ -135,7 +139,8 @@ public class TrueImpactPhysicsSolver {
                             Object tracker = SUBLEVEL_GET_MASS_TRACKER.invoke(ssl);
                             mass = Math.max(((Number)SUBLEVEL_MASS_DATA_GET_MASS.invoke(tracker)).doubleValue(), 1.0E-6);
                             Vector3d linVel = ssl.latestLinearVelocity;
-                            if (linVel.lengthSquared() > 0.001) {
+                            actualSubLevelSpeed = linVel.length();
+                            if (actualSubLevelSpeed > 0.001) {
                                 velocityVec = new Vector3d((Vector3dc)linVel).normalize();
                                 hasVelocity = true;
                             }
@@ -144,6 +149,12 @@ public class TrueImpactPhysicsSolver {
                     }
                 }
                 catch (Exception ignored) {}
+            }
+            if (Double.isFinite(actualSubLevelSpeed)) {
+                if (actualSubLevelSpeed < (Double)TrueImpactConfig.MIN_EFFECT_VELOCITY.get()) {
+                    return BlockSubLevelCollisionCallback.CollisionResult.NONE;
+                }
+                impactVelocity = Math.min(impactVelocity, actualSubLevelSpeed);
             }
             mass = Math.max(mass, ElasticSubLevelDetector.nearbyMaxMass(level, pos, mass));
             double angleMultiplier = 1.0;
@@ -169,31 +180,45 @@ public class TrueImpactPhysicsSolver {
             double crackResistance = Math.sqrt(materialStrength * materialToughness);
             double crackRatio = scaledKineticEnergy / Math.max(crackResistance, 1.0);
             double yieldRatio = scaledKineticEnergy / materialStrength;
-            boolean suppressCallbackDamage = ImpactResolver.shouldSuppressCallbackDamage(level, pos, state);
             double elasticBreakVelocity = (Double)TrueImpactConfig.MIN_BREAK_VELOCITY.get() * (1.0 + restitution * (Double)TrueImpactConfig.RESTITUTION_BREAK_VELOCITY_MULTIPLIER.get());
             double elasticPropagationVelocity = (Double)TrueImpactConfig.MIN_PROPAGATION_VELOCITY.get() * (1.0 + restitution * (Double)TrueImpactConfig.RESTITUTION_BREAK_VELOCITY_MULTIPLIER.get());
             boolean elasticImpactingSubLevel = (Boolean)TrueImpactConfig.ELASTIC_BLOCKS_BREAK_BLOCKS.get() == false && ElasticSubLevelDetector.hasNearbyElasticSubLevel(level, pos);
             boolean bl = protectedSubLevelImpact = (Boolean)TrueImpactConfig.ELASTIC_BLOCKS_BREAK_BLOCKS.get() == false && (Boolean)TrueImpactConfig.PROTECT_NEARBY_SUBLEVEL_IMPACTS.get() != false && ElasticSubLevelDetector.hasNearbySubLevel(level, pos);
-            if ((suppressCallbackDamage || restitution >= (Double)TrueImpactConfig.BOUNCE_RESPONSE_THRESHOLD.get() || elasticImpactingSubLevel || protectedSubLevelImpact) && !((Boolean)TrueImpactConfig.ELASTIC_BLOCKS_BREAK_BLOCKS.get()).booleanValue() && !fragile) {
+            if ((restitution >= (Double)TrueImpactConfig.BOUNCE_RESPONSE_THRESHOLD.get() || elasticImpactingSubLevel || protectedSubLevelImpact) && !((Boolean)TrueImpactConfig.ELASTIC_BLOCKS_BREAK_BLOCKS.get()).booleanValue() && !fragile) {
                 return new BlockSubLevelCollisionCallback.CollisionResult((Vector3dc)HardnessFragileCallback.reactionMotion(pos, hitPos, impactVelocity, Math.max(yieldRatio, 1.0), Math.max(restitution, 0.5)), false);
             }
             if (restitution >= (Double)TrueImpactConfig.BOUNCE_RESPONSE_THRESHOLD.get() && impactVelocity < (Double)TrueImpactConfig.ELASTIC_SHATTER_VELOCITY.get() && !fragile) {
                 return new BlockSubLevelCollisionCallback.CollisionResult((Vector3dc)HardnessFragileCallback.reactionMotion(pos, hitPos, impactVelocity, Math.max(yieldRatio, 1.0), restitution), false);
             }
-            boolean bl2 = canBreakWorldBlocks = (Boolean)TrueImpactConfig.ENABLE_BLOCK_BREAKING.get() != false && (Boolean)TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.get() != false && (Boolean)TrueImpactConfig.ENABLE_WORLD_DESTRUCTION.get() != false && !suppressCallbackDamage && MaterialImpactProperties.isDestructible(state, true);
+            boolean bl2 = canBreakWorldBlocks = (Boolean)TrueImpactConfig.ENABLE_BLOCK_BREAKING.get() != false && (Boolean)TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.get() != false && (Boolean)TrueImpactConfig.ENABLE_WORLD_DESTRUCTION.get() != false && MaterialImpactProperties.isDestructible(state, true);
             if (canBreakWorldBlocks && impactVelocity >= elasticPropagationVelocity && yieldRatio >= (Double)TrueImpactConfig.PROPAGATION_YIELD_THRESHOLD.get()) {
-                level.destroyBlock(pos, false);
-                if (((Boolean)TrueImpactConfig.ENABLE_CRACK_PROPAGATION.get()).booleanValue()) {
-                    CrackPropagationUtils.propagateCracks(level, pos, state.getBlock(), scaledKineticEnergy * (Double)TrueImpactConfig.PROPAGATION_ENERGY_SCALE.get());
-                }
-                return new BlockSubLevelCollisionCallback.CollisionResult((Vector3dc)new Vector3d(), true);
+                // Defer destroyBlock — calling it during Rapier3D.step() removes the voxel collider
+                // mid-step which corrupts island wake state and causes the "island should be awake" panic.
+                final ServerLevel destroyLevel = level;
+                final BlockPos destroyPos = pos;
+                final Block blockForPropagation = state.getBlock();
+                final double propagEnergy = scaledKineticEnergy * (Double)TrueImpactConfig.PROPAGATION_ENERGY_SCALE.get();
+                final boolean doPropagation = ((Boolean)TrueImpactConfig.ENABLE_CRACK_PROPAGATION.get()).booleanValue();
+                level.getServer().execute(() -> {
+                    destroyLevel.destroyBlock(destroyPos, false);
+                    if (doPropagation) {
+                        CrackPropagationUtils.propagateCracks(destroyLevel, destroyPos, blockForPropagation, propagEnergy);
+                    }
+                });
+                // removeCollision=false: let Sable/Rapier keep the voxel collider until destroyBlock fires
+                // next tick. Returning true here removes the collider mid-step → island state inconsistency
+                // → "island should be awake" panic in narrow_phase.rs.
+                return new BlockSubLevelCollisionCallback.CollisionResult((Vector3dc)new Vector3d(), false);
             }
             if (canBreakWorldBlocks && impactVelocity >= elasticBreakVelocity && yieldRatio > (Double)TrueImpactConfig.HEAVY_BREAK_YIELD_THRESHOLD.get()) {
                 if (yieldRatio < (Double)TrueImpactConfig.REACTION_YIELD_LIMIT.get()) {
                     return new BlockSubLevelCollisionCallback.CollisionResult((Vector3dc)HardnessFragileCallback.reactionMotion(pos, hitPos, impactVelocity, yieldRatio, restitution), false);
                 }
-                level.destroyBlock(pos, true);
-                return new BlockSubLevelCollisionCallback.CollisionResult((Vector3dc)new Vector3d(), true);
+                final ServerLevel destroyLevel = level;
+                final BlockPos destroyPos = pos;
+                level.getServer().execute(() -> destroyLevel.destroyBlock(destroyPos, true));
+                // removeCollision=false: same reason as propagation path above.
+                return new BlockSubLevelCollisionCallback.CollisionResult((Vector3dc)new Vector3d(), false);
             }
             if (canBreakWorldBlocks && impactVelocity >= elasticBreakVelocity && yieldRatio > (Double)TrueImpactConfig.BREAK_YIELD_THRESHOLD.get() && impactVelocity * yieldRatio > elasticBreakVelocity * ((Double)TrueImpactConfig.BREAK_YIELD_THRESHOLD.get() + 1.5)) {
                 double overstress = Math.max(0.0, scaledKineticEnergy - materialStrength);
@@ -205,7 +230,7 @@ public class TrueImpactPhysicsSolver {
                 BlockDamageAccumulator.apply(level, pos, MaterialImpactProperties.fatigueDamage(state, overstress * 0.65), materialToughness * (Double)TrueImpactConfig.BREAK_YIELD_THRESHOLD.get(), system.hashCode() + pos.hashCode());
                 return new BlockSubLevelCollisionCallback.CollisionResult((Vector3dc)HardnessFragileCallback.reactionMotion(pos, hitPos, impactVelocity, yieldRatio, restitution), false);
             }
-            if (((Boolean)TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.get()).booleanValue() && ((Boolean)TrueImpactConfig.ENABLE_CRACKS.get()).booleanValue() && !suppressCallbackDamage && crackRatio > (Double)TrueImpactConfig.CRACK_YIELD_THRESHOLD.get()) {
+            if (((Boolean)TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.get()).booleanValue() && ((Boolean)TrueImpactConfig.ENABLE_CRACKS.get()).booleanValue() && crackRatio > (Double)TrueImpactConfig.CRACK_YIELD_THRESHOLD.get()) {
                 double crackOverStress = Math.max(0.0, scaledKineticEnergy - crackResistance);
                 BlockDamageAccumulator.apply(level, pos, MaterialImpactProperties.fatigueDamage(state, crackOverStress), materialToughness * (Double)TrueImpactConfig.BREAK_YIELD_THRESHOLD.get(), system.hashCode() + pos.hashCode());
             }

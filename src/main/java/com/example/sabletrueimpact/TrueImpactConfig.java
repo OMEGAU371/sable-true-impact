@@ -33,6 +33,8 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.DoubleValue MATERIAL_MATCHUP_EXPONENT;
     public static final ModConfigSpec.DoubleValue TOUGHNESS_MATCHUP_EXPONENT;
     public static final ModConfigSpec.DoubleValue SELF_DAMAGE_IMMUNITY_RATIO;
+    public static final ModConfigSpec.DoubleValue STRONG_MATERIAL_FATIGUE_IMMUNITY_RATIO;
+    public static final ModConfigSpec.DoubleValue STRONG_MATERIAL_SELF_DAMAGE_CAP;
     public static final ModConfigSpec.DoubleValue MIN_SELF_DAMAGE_SCALE;
     public static final ModConfigSpec.DoubleValue MAX_SELF_DAMAGE_SCALE;
     public static final ModConfigSpec.DoubleValue MIN_TARGET_DAMAGE_SCALE;
@@ -96,6 +98,7 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.DoubleValue TERRAIN_STEP_SIDE_NORMAL_THRESHOLD;
     public static final ModConfigSpec.DoubleValue TERRAIN_IMPACT_BREAK_YIELD;
     public static final ModConfigSpec.IntValue TERRAIN_IMPACT_MAX_BLOCKS;
+    public static final ModConfigSpec.IntValue TERRAIN_IMPACT_CONTACT_SAMPLES;
     public static final ModConfigSpec.BooleanValue ENABLE_ENTITY_IMPACT_DAMAGE;
     public static final ModConfigSpec.DoubleValue ENTITY_IMPACT_DAMAGE_SCALE;
     public static final ModConfigSpec.DoubleValue ENTITY_IMPACT_MIN_DAMAGE;
@@ -114,6 +117,9 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.IntValue ENTITY_IMPACT_MAX_SUBLEVELS_PER_SCAN;
     public static final ModConfigSpec.BooleanValue ENABLE_SUBLEVEL_FRACTURE;
     public static final ModConfigSpec.DoubleValue SUBLEVEL_FRACTURE_FORCE_THRESHOLD;
+    public static final ModConfigSpec.DoubleValue SUBLEVEL_FRACTURE_MIN_RELATIVE_SPEED;
+    public static final ModConfigSpec.DoubleValue SUBLEVEL_FRACTURE_MIN_CLOSING_SPEED;
+    public static final ModConfigSpec.DoubleValue SUBLEVEL_FRACTURE_STATIC_FORCE_DAMAGE_SCALE;
     public static final ModConfigSpec.DoubleValue SUBLEVEL_FRACTURE_FORCE_SCALE;
     public static final ModConfigSpec.DoubleValue SUBLEVEL_FRACTURE_FORCE_EXPONENT;
     public static final ModConfigSpec.DoubleValue SUBLEVEL_FRACTURE_RADIUS;
@@ -164,6 +170,7 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.DoubleValue BLAST_BRITTLENESS_DECAY;
     public static final ModConfigSpec.BooleanValue ENABLE_CUMULATIVE_BLOCK_DAMAGE;
     public static final ModConfigSpec.DoubleValue CUMULATIVE_BLOCK_DAMAGE_SCALE;
+    public static final ModConfigSpec.DoubleValue MIN_CUMULATIVE_DAMAGE_RATIO;
     public static final ModConfigSpec.IntValue CUMULATIVE_BLOCK_DAMAGE_DECAY_TICKS;
     public static final ModConfigSpec.IntValue CUMULATIVE_BLOCK_DAMAGE_MAX_ENTRIES;
     public static final ModConfigSpec.IntValue PERFORMANCE_LOG_INTERVAL_TICKS;
@@ -230,6 +237,8 @@ public final class TrueImpactConfig {
         MATERIAL_MATCHUP_EXPONENT = BUILDER.comment("Controls the severity of the damage split. 1.0 is linear; higher values make strong materials much more resistant to weak materials.").defineInRange("materialMatchupExponent", 0.85, 0.0, 4.0);
         TOUGHNESS_MATCHUP_EXPONENT = BUILDER.comment("Extra damage split from toughness ratio. Higher values make tough materials chip less and brittle materials crack more.").defineInRange("toughnessMatchupExponent", 0.45, 0.0, 4.0);
         SELF_DAMAGE_IMMUNITY_RATIO = BUILDER.comment("If target impact resistance is below this fraction of the moving material's resistance, the moving material takes no fracture damage.").defineInRange("selfDamageImmunityRatio", 0.25, 0.0, 1.0);
+        STRONG_MATERIAL_FATIGUE_IMMUNITY_RATIO = BUILDER.comment("Repeated weak impacts below this target/self resistance ratio do not accumulate fatigue on the stronger material.").defineInRange("strongMaterialFatigueImmunityRatio", 0.55, 0.0, 1.0);
+        STRONG_MATERIAL_SELF_DAMAGE_CAP = BUILDER.comment("Maximum self damage multiplier when a stronger material hits a noticeably weaker material.").defineInRange("strongMaterialSelfDamageCap", 0.015, 0.0, 1.0);
         MIN_SELF_DAMAGE_SCALE = BUILDER.comment("The minimum possible damage multiplier for a strong material hitting a weak material.").defineInRange("minSelfDamageScale", 0.0, 0.0, 1.0);
         MAX_SELF_DAMAGE_SCALE = BUILDER.comment("The maximum possible damage multiplier for a weak material hitting a strong material.").defineInRange("maxSelfDamageScale", 3.0, 1.0, 100.0);
         MIN_TARGET_DAMAGE_SCALE = BUILDER.comment("The minimum possible damage multiplier applied to a target hit by a much weaker structure.").defineInRange("minTargetDamageScale", 0.25, 0.0, 1.0);
@@ -301,8 +310,9 @@ public final class TrueImpactConfig {
         TERRAIN_IMPACT_MAX_EFFECTIVE_MASS = BUILDER.comment("Separate effective mass cap for terrain damage.").defineInRange("terrainImpactMaxEffectiveMass", 35.0, 1.0, 100000.0);
         TERRAIN_STEP_CONTACT_FORGIVENESS = BUILDER.comment("Horizontal impacts within this distance below a block top are treated as step-up contact, not terrain damage.").defineInRange("terrainStepContactForgiveness", 0.22, 0.0, 1.0);
         TERRAIN_STEP_SIDE_NORMAL_THRESHOLD = BUILDER.comment("Contacts with vertical normal component below this are considered side contacts for step forgiveness.").defineInRange("terrainStepSideNormalThreshold", 0.35, 0.0, 1.0);
-        TERRAIN_IMPACT_BREAK_YIELD = BUILDER.defineInRange("terrainImpactBreakYield", 8.5, 0.0, 1000.0);
+        TERRAIN_IMPACT_BREAK_YIELD = BUILDER.defineInRange("terrainImpactBreakYield", 3.5, 0.0, 1000.0);
         TERRAIN_IMPACT_MAX_BLOCKS = BUILDER.comment("Maximum terrain blocks broken by one terrain impact collision.").defineInRange("terrainImpactMaxBlocks", 4, 0, 10000);
+        TERRAIN_IMPACT_CONTACT_SAMPLES = BUILDER.comment("Maximum contact points sampled for a flat terrain impact. Higher values reduce corner-only craters at higher CPU cost.").defineInRange("terrainImpactContactSamples", 24, 1, 10000);
         BUILDER.pop();
         BUILDER.push("entityImpact");
         ENABLE_ENTITY_IMPACT_DAMAGE = BUILDER.comment("Damages living entities near a Sable sublevel impact point.").define("enableEntityImpactDamage", true);
@@ -323,6 +333,9 @@ public final class TrueImpactConfig {
         BUILDER.push("subLevelFracture");
         ENABLE_SUBLEVEL_FRACTURE = BUILDER.comment("Experimental: very strong impacts can cut weak internal connections so Sable's native splitter creates new sublevels.").define("enableSubLevelFracture", true);
         SUBLEVEL_FRACTURE_FORCE_THRESHOLD = BUILDER.comment("Minimum collision force before internal sublevel fracture is considered. Raise this if vehicles split too easily.").defineInRange("subLevelFractureForceThreshold", 620.0, 0.0, 1.0E9);
+        SUBLEVEL_FRACTURE_MIN_RELATIVE_SPEED = BUILDER.comment("Minimum relative speed between two Sable physical structures before contact force can cause internal fracture. This filters static support/contact forces.").defineInRange("subLevelFractureMinRelativeSpeed", 3.0, 0.0, 1000.0);
+        SUBLEVEL_FRACTURE_MIN_CLOSING_SPEED = BUILDER.comment("Minimum speed along the contact normal before two Sable structures are considered to be crashing into each other.").defineInRange("subLevelFractureMinClosingSpeed", 1.5, 0.0, 1000.0);
+        SUBLEVEL_FRACTURE_STATIC_FORCE_DAMAGE_SCALE = BUILDER.comment("Damage scale for high-force but low-speed static contacts. 0 disables static pressure fracture in the impact model.").defineInRange("subLevelFractureStaticForceDamageScale", 0.0, 0.0, 1000.0);
         SUBLEVEL_FRACTURE_FORCE_SCALE = BUILDER.comment("Scales raw collision force into fracture damage.").defineInRange("subLevelFractureForceScale", 0.068, 0.0, 1000.0);
         SUBLEVEL_FRACTURE_FORCE_EXPONENT = BUILDER.comment("Exponent applied to collision force above the fracture threshold. 1.0 keeps current linear behavior; higher values make high-speed/high-force crashes split structures much more aggressively.").defineInRange("subLevelFractureForceExponent", 1.0, 0.0, 8.0);
         SUBLEVEL_FRACTURE_RADIUS = BUILDER.comment("Maximum radius around the impact point scanned for weak connections.").defineInRange("subLevelFractureRadius", 4.0, 0.0, 32.0);
@@ -375,6 +388,7 @@ public final class TrueImpactConfig {
         BUILDER.push("cumulativeDamage");
         ENABLE_CUMULATIVE_BLOCK_DAMAGE = BUILDER.comment("Accumulates repeated crack-level hits until the block breaks.").define("enableCumulativeBlockDamage", true);
         CUMULATIVE_BLOCK_DAMAGE_SCALE = BUILDER.defineInRange("cumulativeBlockDamageScale", 0.65, 0.0, 1000.0);
+        MIN_CUMULATIVE_DAMAGE_RATIO = BUILDER.comment("Per-hit cumulative damage below this fraction of the break threshold is ignored. This prevents hard blocks from being sanded down by tiny weak impacts.").defineInRange("minCumulativeDamageRatio", 0.035, 0.0, 1.0);
         CUMULATIVE_BLOCK_DAMAGE_DECAY_TICKS = BUILDER.comment("Ticks before stored block damage expires if the block is not hit again.").defineInRange("cumulativeBlockDamageDecayTicks", 600, 20, 72000);
         CUMULATIVE_BLOCK_DAMAGE_MAX_ENTRIES = BUILDER.comment("Safety cap for remembered damaged blocks.").defineInRange("cumulativeBlockDamageMaxEntries", 4096, 128, 1000000);
         BUILDER.pop();

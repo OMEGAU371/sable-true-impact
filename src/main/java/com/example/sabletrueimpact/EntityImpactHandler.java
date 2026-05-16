@@ -154,7 +154,13 @@ public final class EntityImpactHandler {
     }
 
     private static Vector3d velocity(Object subLevel) throws ReflectiveOperationException {
+        if (LATEST_LINEAR_VELOCITY == null) {
+            throw new ReflectiveOperationException("latestLinearVelocity field not available");
+        }
         Object velocity = LATEST_LINEAR_VELOCITY.get(subLevel);
+        if (velocity == null) {
+            return new Vector3d(0.0, 0.0, 0.0);
+        }
         Method x = velocity.getClass().getMethod("x", new Class[0]);
         Method y = velocity.getClass().getMethod("y", new Class[0]);
         Method z = velocity.getClass().getMethod("z", new Class[0]);

@@ -35,14 +35,20 @@ public final class BlockDamageAccumulator {
         if (state.isAir() || state.is(Blocks.BEDROCK) || state.getDestroySpeed((BlockGetter)level, pos) < 0.0f) {
             return false;
         }
+        double scaledDamage = damage * (Double)TrueImpactConfig.CUMULATIVE_BLOCK_DAMAGE_SCALE.get();
+        if (scaledDamage < breakThreshold * (Double)TrueImpactConfig.MIN_CUMULATIVE_DAMAGE_RATIO.get()) {
+            return false;
+        }
         BlockDamageAccumulator.cleanup(level.getGameTime());
         DamageKey key = new DamageKey(level.dimension().location().toString(), pos.asLong());
         DamageRecord record = DAMAGE.computeIfAbsent(key, ignored -> new DamageRecord(0.0, level.getGameTime()));
-        record.damage += damage * (Double)TrueImpactConfig.CUMULATIVE_BLOCK_DAMAGE_SCALE.get();
+        record.damage += scaledDamage;
         record.lastTick = level.getGameTime();
         if (record.damage >= breakThreshold) {
             DAMAGE.remove(key);
-            level.destroyBlock(pos, true);
+            final ServerLevel destroyLevel = level;
+            final BlockPos destroyPos = pos.immutable();
+            level.getServer().execute(() -> destroyLevel.destroyBlock(destroyPos, true));
             return true;
         }
         if (((Boolean)TrueImpactConfig.ENABLE_CRACKS.get()).booleanValue()) {
@@ -90,4 +96,3 @@ public final class BlockDamageAccumulator {
         }
     }
 }
-

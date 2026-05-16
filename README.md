@@ -1,6 +1,6 @@
-# Sable True Impact
+# True Impact
 
-Sable True Impact is an experimental NeoForge add-on for Sable that adds impact damage, cumulative cracking, entity impact damage, and structural fracture behavior to Sable physical sub-levels.
+True Impact is an experimental NeoForge add-on for Sable that adds impact damage, cumulative cracking, entity impact damage, and structural fracture behavior to Sable physical sub-levels.
 
 It is designed for Minecraft 1.21.1, NeoForge, and Sable 1.2.2+.
 
@@ -107,6 +107,10 @@ Presentation and feedback:
 ## Safety
 
 This mod intentionally changes physical collision outcomes and can break terrain, split structures, and damage entities. Back up worlds before testing.
+
+## License
+
+True Impact is licensed under LGPL-3.0-only.
 
 ## Disclaimer
 
