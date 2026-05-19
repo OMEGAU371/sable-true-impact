@@ -6,8 +6,6 @@ Join the official community server for bug reports, suggestions, testing, releas
 
 **Discord:** https://discord.gg/QrRpR8XMHs
 
-<img width="660" height="1070" alt="DC-Poster_LARGE" src="https://github.com/user-attachments/assets/9ef18977-de7a-480e-8863-0157a66ebf28" />
-
 Please use official download pages for builds. Do not download random `.jar` files from Discord or other unofficial sources.
 
 **Sable: True Impact**, or **TI** for short, is an experimental NeoForge add-on for Sable. It adds physics-based impact damage, cumulative cracking, terrain destruction, entity impact damage, and early structure fracture behavior to Sable physical sub-levels.
