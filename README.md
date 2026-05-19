@@ -2,9 +2,11 @@
 
 ## Community
 
-Join the official community server **The Babel** for bug reports, suggestions, testing, release discussion, and cursed Sable / Create: Aeronautics contraptions:
+Join the official community server for bug reports, suggestions, testing, release discussion, and cursed Sable / Create: Aeronautics contraptions:
 
 **Discord:** https://discord.gg/QrRpR8XMHs
+
+<img width="660" height="1070" alt="DC-Poster_LARGE" src="https://github.com/user-attachments/assets/9ef18977-de7a-480e-8863-0157a66ebf28" />
 
 Please use official download pages for builds. Do not download random `.jar` files from Discord or other unofficial sources.
 
