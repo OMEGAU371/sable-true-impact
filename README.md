@@ -1,5 +1,13 @@
 # Sable: True Impact
 
+## Community
+
+Join the official community server **The Babel** for bug reports, suggestions, testing, release discussion, and cursed Sable / Create: Aeronautics contraptions:
+
+**Discord:** https://discord.gg/QrRpR8XMHs
+
+Please use official download pages for builds. Do not download random `.jar` files from Discord or other unofficial sources.
+
 **Sable: True Impact**, or **TI** for short, is an experimental NeoForge add-on for Sable. It adds physics-based impact damage, cumulative cracking, terrain destruction, entity impact damage, and early structure fracture behavior to Sable physical sub-levels.
 
 TI is built for Minecraft 1.21.1, NeoForge, and Sable 1.2.2+. It also includes early compatibility logic for Create and Create Aeronautics style moving structures.
