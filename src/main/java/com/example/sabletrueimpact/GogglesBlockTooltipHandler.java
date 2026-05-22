@@ -43,19 +43,13 @@ public final class GogglesBlockTooltipHandler {
         double toughness = MaterialImpactProperties.displayToughness(state, baseStrength);
         double brittleness = MaterialImpactProperties.brittleness(state);
 
-        event.getToolTip().add(Component.literal("Sable True Impact").withStyle(ChatFormatting.DARK_AQUA));
-        event.getToolTip().add(line("Mass", "%.2f kpg", mass));
-        event.getToolTip().add(line("Friction", "%.2f", friction));
-        event.getToolTip().add(line("Restitution", "%.2f", restitution));
-        event.getToolTip().add(line("Strength", "%.1f pN", strength));
-        event.getToolTip().add(line("Toughness", "%.1f pN*s", toughness));
-        event.getToolTip().add(line("Brittleness", "%.2f", brittleness));
-    }
-
-    private static Component line(String label, String format, Object... values) {
-        return Component.literal("  " + label + ": ")
-                .withStyle(ChatFormatting.GRAY)
-                .append(Component.literal(String.format(Locale.ROOT, format, values)).withStyle(ChatFormatting.AQUA));
+        event.getToolTip().add(Component.translatable("sabletrueimpact.title").withStyle(ChatFormatting.DARK_AQUA));
+        event.getToolTip().add(Component.translatable("sabletrueimpact.mass", mass));
+        event.getToolTip().add(Component.translatable("sabletrueimpact.friction", friction));
+        event.getToolTip().add(Component.translatable("sabletrueimpact.restitution", restitution));
+        event.getToolTip().add(Component.translatable("sabletrueimpact.strength", strength));
+        event.getToolTip().add(Component.translatable("sabletrueimpact.toughness", toughness));
+        event.getToolTip().add(Component.translatable("sabletrueimpact.brittleness", brittleness));
     }
 
     private static boolean wearsAviatorGoggles(Player player) {
