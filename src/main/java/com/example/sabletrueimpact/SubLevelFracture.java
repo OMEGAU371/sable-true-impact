@@ -92,20 +92,12 @@ public final class SubLevelFracture {
             TrueImpactPerformance.recordFractureSkippedBudget();
             return;
         }
-        // 1.2.0 SD-port: rope-CONSTRAINED structures route to SubLevelDetacher (carve cluster +
-        // SubLevelAssemblyHelper.assembleBlocks → free debris sub-level). This sidesteps Sable's
-        // heatmap-driven SUB_LEVEL_SPLITTING, which is the only known way a constrained body
-        // can be safely shattered without triggering narrow_phase.rs:1115 (sable#950). The
-        // detach work is deferred through ImpactBreakQueue inside requestDetach() — guaranteed
-        // post-step execution. Free (unconstrained) structures continue through the existing
-        // heatmap-split path below; it's been working fine for them and doesn't crash.
-        if (RopeBindingRegistry.isRopeSubLevel(subLevel)) {
-            org.apache.logging.log4j.LogManager.getLogger("TIDetach").info(
-                "[beta] tryFracture rope-branch hit: world={} force={}",
-                worldPoint, forceAmount);
-            SubLevelDetacher.requestDetach(level, worldPoint, normal, forceAmount);
-            return;
-        }
+        // beta.6: rope-sub-level fracture exemption REMOVED. Rope structures now go through
+        // the normal fracture path. applyCandidates() below skips rope_connector blocks by
+        // type — so the anchor stays safe — but non-anchor blocks can be picked up as fracture
+        // candidates and broken. The anchor-containing part stays attached to the rope; if
+        // Sable's heatmap split fires, it can only split OFF non-anchor pieces, which have no
+        // rope attached → free debris → safe.
         BlockPos center = BlockPos.containing((double)worldPoint.x, (double)worldPoint.y, (double)worldPoint.z);
         SubLevelBounds bounds = SubLevelFracture.subLevelBounds(subLevel);
         if (bounds == null || !bounds.contains(center)) {
@@ -227,6 +219,9 @@ public final class SubLevelFracture {
             if (removed >= maxBlocks) break;
             BlockState current = level.getBlockState(candidate.pos());
             if (current.isAir() || current.is(Blocks.BEDROCK) || current.getDestroySpeed((BlockGetter)level, candidate.pos()) < 0.0f || !MaterialImpactProperties.isDestructible(current, true)) continue;
+            // beta.6: rope-anchor blocks (rope_connector) must NEVER be destroyed by fracture
+            // either. Destroying one orphans Sable's rope joint → narrow_phase panic.
+            if (RopeBindingRegistry.isRopeAnchorBlockType(current)) continue;
             boolean brokeFromFatigue = BlockDamageAccumulator.apply(level, candidate.pos(), candidate.fatigueDamage() * (Double)TrueImpactConfig.SUBLEVEL_FRACTURE_FATIGUE_SCALE.get(), candidate.breakThreshold(), candidate.pos().hashCode() * 23);
             if (brokeFromFatigue) {
                 SubLevelFracture.notifyRemoved(heatMapManager, candidate.pos());

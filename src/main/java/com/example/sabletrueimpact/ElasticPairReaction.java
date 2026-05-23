@@ -114,16 +114,12 @@ public final class ElasticPairReaction {
             int idB = (int)collisions[start + 1];
             Object slA = activeSubLevels.get(idA);
             Object slB = activeSubLevels.get(idB);
-            // fork_31: rope-exemption RESTORED (fork_2's, removed by fork_27). fork_27's theory
-            // — "destroy rope structures so interpenetration resolves" — was disproven by every
-            // crash since: ANY True Impact destruction on a rope-connected (constrained)
-            // structure rebakes its collider while a rope joint references it → narrow_phase
-            // crash, fast. fork_25 (full exemption) survived smashes for minutes; fork_27+
-            // (exemption gone) crashes on the first hit. So any collision where either side is
-            // a rope sub-level is skipped entirely — no terrain hit, no cluster, no fracture.
-            if (RopeBindingRegistry.isRopeSubLevel(slA) || RopeBindingRegistry.isRopeSubLevel(slB)) {
-                continue;
-            }
+            // beta.6: broad rope-sub-level exemption REMOVED. The narrow rope_connector block
+            // type protection (in HardnessFragileCallback + SubLevelFracture.applyCandidates)
+            // is the real, surgical fix; this skip-everything-rope was over-cautious. Now
+            // rope-structure collisions process normally — per-contact terrain destruction
+            // works, fracture clusters can form, debris flies. The rope's anchor blocks stay
+            // safe because they're block-type-protected.
             // fork_6: per-contact terrain hit (HARDNESS_CALLBACK port, WORLD side).
             // fork_9: + sub-level-side hit so the structure's own blocks chip on impact.
             // fork_13: each call wrapped in try/catch — a throw inside per-contact (e.g. a
@@ -752,9 +748,9 @@ public final class ElasticPairReaction {
 
     private static void applyImpulse(Int2ObjectMap<?> activeSubLevels, PendingImpulse pending) {
         Object subLevel = pending.subLevel;
-        if (RopeBindingRegistry.isRopeSubLevel(subLevel)) {
-            return;
-        }
+        // beta.6: rope-sub-level impulse exemption REMOVED — pair reaction is config-gated
+        // (default off) and the anchor-block protection at the destruction sites is what
+        // actually keeps things safe. Rope structures get impulses if pair reaction is on.
         Vector3d localPoint = pending.localPoint;
         Vector3d normal = pending.normal;
         double impulse = pending.impulse;

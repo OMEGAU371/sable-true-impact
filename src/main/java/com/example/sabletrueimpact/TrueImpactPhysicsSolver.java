@@ -149,44 +149,14 @@ public class TrueImpactPhysicsSolver {
                     );
                     for (SubLevel sl : system.queryIntersecting(queryBox)) {
                         if (sl instanceof ServerSubLevel ssl) {
-                            // fork_31: rope-exemption RESTORED (fork_1's, removed by fork_27).
-                            // ANY True Impact destruction on a rope-connected structure rebakes
-                            // its collider while a rope joint still references it → narrow_phase
-                            // crash on the next step. Empirically proven across forks 27-30:
-                            // fork_25 (full exemption) survived smashes for minutes; every fork
-                            // since (exemption gone) crashes on the first hit. A rope sub-level
-                            // takes ZERO True Impact destruction — return NONE immediately.
-                            if (RopeBindingRegistry.isRopeSubLevel(ssl)) {
-                                // 1.2.0 SD-port (beta.3): instead of returning inert NONE, route the
-                                // hit through SubLevelDetacher. Carves a small cluster of this rope
-                                // structure's blocks into a free debris sub-level via Sable's own
-                                // assembleBlocks — never touches the rope joint, never triggers the
-                                // heatmap split that crashes narrow_phase (sable#950). Throttled to
-                                // ~5/s globally inside requestDetach so the per-block callback storm
-                                // during a smash doesn't saturate TIDetachRegistry.
-                                org.joml.Vector3d worldCenter = new org.joml.Vector3d(
-                                    pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
-                                // beta.4 fix: hitPos is the contact world POSITION, not a
-                                // direction. Compute outward direction = hitPos - blockCenter.
-                                org.joml.Vector3d dir;
-                                if (hitPos != null && Double.isFinite(hitPos.x) && Double.isFinite(hitPos.y) && Double.isFinite(hitPos.z)) {
-                                    dir = new org.joml.Vector3d(
-                                        hitPos.x - worldCenter.x,
-                                        hitPos.y - worldCenter.y,
-                                        hitPos.z - worldCenter.z);
-                                    if (dir.lengthSquared() < 1.0e-6) {
-                                        dir.set(0.0, 1.0, 0.0); // straight up — gentle "knocked off" default
-                                    } else {
-                                        dir.normalize();
-                                    }
-                                } else {
-                                    dir = new org.joml.Vector3d(0.0, 1.0, 0.0);
-                                }
-                                double forceProxy = Math.max(0.0, impactVelocity) * 100.0;
-                                com.example.sabletrueimpact.detach.SubLevelDetacher.requestDetach(
-                                    level, worldCenter, dir, forceProxy);
-                                return BlockSubLevelCollisionCallback.CollisionResult.NONE;
-                            }
+                            // beta.6: broad rope-sub-level exemption REMOVED. The crash was never
+                            // about "rope-connected structures take damage" — it was specifically
+                            // about the rope_connector block being destroyed (which orphans the
+                            // joint). With that block type now hard-protected at the top of this
+                            // callback, the rest of a rope structure CAN take normal destruction:
+                            // hull blocks crumble, fragments fly, heatmap split may fire on
+                            // non-anchor parts (free fragments, no rope → safe). The rope-anchored
+                            // portion stays alive because its anchor block can't be destroyed.
                             if (SUBLEVEL_GET_MASS_TRACKER != null && SUBLEVEL_MASS_DATA_GET_MASS != null) {
                                 Object tracker = SUBLEVEL_GET_MASS_TRACKER.invoke(ssl);
                                 mass = Math.max(((Number)SUBLEVEL_MASS_DATA_GET_MASS.invoke(tracker)).doubleValue(), 1.0E-6);
