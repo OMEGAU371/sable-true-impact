@@ -144,6 +144,22 @@ public class TrueImpactPhysicsSolver {
                             // since (exemption gone) crashes on the first hit. A rope sub-level
                             // takes ZERO True Impact destruction — return NONE immediately.
                             if (RopeBindingRegistry.isRopeSubLevel(ssl)) {
+                                // 1.2.0 SD-port (beta.3): instead of returning inert NONE, route the
+                                // hit through SubLevelDetacher. Carves a small cluster of this rope
+                                // structure's blocks into a free debris sub-level via Sable's own
+                                // assembleBlocks — never touches the rope joint, never triggers the
+                                // heatmap split that crashes narrow_phase (sable#950). Throttled to
+                                // ~5/s globally inside requestDetach so the per-block callback storm
+                                // during a smash doesn't saturate TIDetachRegistry.
+                                org.joml.Vector3d worldCenter = new org.joml.Vector3d(
+                                    pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
+                                org.joml.Vector3d dir = (hitPos != null
+                                        && Double.isFinite(hitPos.x) && Double.isFinite(hitPos.y) && Double.isFinite(hitPos.z))
+                                    ? new org.joml.Vector3d((org.joml.Vector3dc) hitPos)
+                                    : new org.joml.Vector3d(0.0, -1.0, 0.0);
+                                double forceProxy = Math.max(0.0, impactVelocity) * 100.0;
+                                com.example.sabletrueimpact.detach.SubLevelDetacher.requestDetach(
+                                    level, worldCenter, dir, forceProxy);
                                 return BlockSubLevelCollisionCallback.CollisionResult.NONE;
                             }
                             if (SUBLEVEL_GET_MASS_TRACKER != null && SUBLEVEL_MASS_DATA_GET_MASS != null) {

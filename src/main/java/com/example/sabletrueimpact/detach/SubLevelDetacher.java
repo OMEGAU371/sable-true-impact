@@ -57,6 +57,14 @@ public final class SubLevelDetacher {
     private SubLevelDetacher() {
     }
 
+    // Global throttle (across all callers and sub-levels). The block-impact callback fires
+    // dozens of times per smash; without this, a single hard hit floods TIDetachRegistry's
+    // 32-slot cap in <1 s and starts evicting (pipe.remove'ing) live debris immediately —
+    // each eviction is a Sable physics op with non-zero crash risk. 200 ms = 5 detaches/s
+    // across the whole server, which is plenty for visible debris without saturating the cap.
+    private static final long REQUEST_COOLDOWN_MS = 200L;
+    private static volatile long lastRequestMs = 0L;
+
     // Default params for v1 — step 5 will replace with TrueImpactConfig-driven values.
     public static final DetachParams DEFAULT_PARAMS = new DetachParams(
         6,     // targetClusterSize  — small chunks (~ a 2x3x1 plate)
@@ -89,6 +97,13 @@ public final class SubLevelDetacher {
         if (level.getServer() == null) {
             return;
         }
+        // Global throttle — see REQUEST_COOLDOWN_MS comment.
+        long now = System.currentTimeMillis();
+        long last = lastRequestMs;
+        if (now - last < REQUEST_COOLDOWN_MS) {
+            return;
+        }
+        lastRequestMs = now;
         final BlockPos seed = BlockPos.containing(worldPoint.x, worldPoint.y, worldPoint.z);
         final Vector3d dir = new Vector3d(impactDirection);
         double proxy = Math.cbrt(Math.max(0.0, forceAmount));
