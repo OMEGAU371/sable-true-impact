@@ -160,6 +160,18 @@ public class TrueImpactPhysicsSolver {
                             // hull blocks crumble, fragments fly, heatmap split may fire on
                             // non-anchor parts (free fragments, no rope → safe). The rope-anchored
                             // portion stays alive because its anchor block can't be destroyed.
+                            //
+                            // beta.8 — B2 fix (Discord John Aeronautics): respect
+                            // enablePhysicalDestruction here. The callback was the missing path —
+                            // user's `enablePhysicalDestruction=false` was correctly preventing
+                            // SubLevelFracture but the per-block callback destruction below was
+                            // bypassing it entirely. Now: when the hit block IS on a sub-level
+                            // AND user has disabled physical destruction, return NONE before any
+                            // of the destruction ladder runs (crack / break / propagate). Terrain
+                            // (no ssl) is unaffected — only sub-level block destruction is gated.
+                            if (!((Boolean) TrueImpactConfig.ENABLE_PHYSICAL_DESTRUCTION.get()).booleanValue()) {
+                                return BlockSubLevelCollisionCallback.CollisionResult.NONE;
+                            }
                             if (SUBLEVEL_GET_MASS_TRACKER != null && SUBLEVEL_MASS_DATA_GET_MASS != null) {
                                 Object tracker = SUBLEVEL_GET_MASS_TRACKER.invoke(ssl);
                                 mass = Math.max(((Number)SUBLEVEL_MASS_DATA_GET_MASS.invoke(tracker)).doubleValue(), 1.0E-6);
