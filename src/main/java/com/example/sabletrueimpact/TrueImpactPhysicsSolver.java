@@ -153,10 +153,22 @@ public class TrueImpactPhysicsSolver {
                                 // during a smash doesn't saturate TIDetachRegistry.
                                 org.joml.Vector3d worldCenter = new org.joml.Vector3d(
                                     pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
-                                org.joml.Vector3d dir = (hitPos != null
-                                        && Double.isFinite(hitPos.x) && Double.isFinite(hitPos.y) && Double.isFinite(hitPos.z))
-                                    ? new org.joml.Vector3d((org.joml.Vector3dc) hitPos)
-                                    : new org.joml.Vector3d(0.0, -1.0, 0.0);
+                                // beta.4 fix: hitPos is the contact world POSITION, not a
+                                // direction. Compute outward direction = hitPos - blockCenter.
+                                org.joml.Vector3d dir;
+                                if (hitPos != null && Double.isFinite(hitPos.x) && Double.isFinite(hitPos.y) && Double.isFinite(hitPos.z)) {
+                                    dir = new org.joml.Vector3d(
+                                        hitPos.x - worldCenter.x,
+                                        hitPos.y - worldCenter.y,
+                                        hitPos.z - worldCenter.z);
+                                    if (dir.lengthSquared() < 1.0e-6) {
+                                        dir.set(0.0, 1.0, 0.0); // straight up — gentle "knocked off" default
+                                    } else {
+                                        dir.normalize();
+                                    }
+                                } else {
+                                    dir = new org.joml.Vector3d(0.0, 1.0, 0.0);
+                                }
                                 double forceProxy = Math.max(0.0, impactVelocity) * 100.0;
                                 com.example.sabletrueimpact.detach.SubLevelDetacher.requestDetach(
                                     level, worldCenter, dir, forceProxy);

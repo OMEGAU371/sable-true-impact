@@ -79,26 +79,39 @@ public final class ClusterCarver {
         if (level == null || seed == null || random == null) {
             return null;
         }
+        org.apache.logging.log4j.Logger log = org.apache.logging.log4j.LogManager.getLogger("TIDetach");
         BlockState seedState;
         try {
             seedState = level.getBlockState(seed);
         } catch (Throwable t) {
+            log.info("[beta] plan null: getBlockState threw at {}", seed);
             return null;
         }
-        if (seedState == null || seedState.isAir() || seedState.hasBlockEntity()) {
-            // Block entities (chests, furnaces, etc.) are too coupled to vanilla state to
-            // safely move into a free sub-level — drop the whole plan rather than partial.
+        if (seedState == null) {
+            log.info("[beta] plan null: seedState null at {}", seed);
+            return null;
+        }
+        if (seedState.isAir()) {
+            log.info("[beta] plan null: seed is AIR at {} (block-moved-or-destroyed)", seed);
+            return null;
+        }
+        if (seedState.hasBlockEntity()) {
+            log.info("[beta] plan null: seed has block entity at {} (state={})", seed, seedState);
             return null;
         }
         SubLevel parent;
         try {
             parent = Sable.HELPER.getContaining((Level) level, (Vec3i) seed);
         } catch (Throwable t) {
+            log.info("[beta] plan null: getContaining threw at {}: {}", seed, t.toString());
             return null;
         }
-        if (parent == null || parent.isRemoved()) {
-            // Seed isn't part of any live sub-level — caller is mistaken about what's at that
-            // position, or the structure was removed mid-tick. Either way, no cluster.
+        if (parent == null) {
+            log.info("[beta] plan null: getContaining returned null at {} (seedState={})", seed, seedState);
+            return null;
+        }
+        if (parent.isRemoved()) {
+            log.info("[beta] plan null: parent isRemoved at {}", seed);
             return null;
         }
         int target = Math.max(MIN_CLUSTER, Math.min(MAX_CLUSTER, targetSize));
