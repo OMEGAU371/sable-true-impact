@@ -5,6 +5,7 @@ package com.example.sabletrueimpact;
 
 import com.example.sabletrueimpact.TrueImpactConfig;
 import java.util.Locale;
+import net.neoforged.neoforge.common.ModConfigSpec;
 
 public final class TrueImpactPresets {
     private TrueImpactPresets() {
@@ -75,19 +76,45 @@ public final class TrueImpactPresets {
         }
     }
 
+    // beta.7 — B2 fix. Previously every preset (low/default/high/cinematic) unconditionally
+    // overwrote every destruction toggle to true. Result: any user who set, say,
+    // `enablePhysicalDestruction=false` in their config had their value silently flipped back
+    // to true on every load — preset's wishes always won. Bug reported by John Aeronautics
+    // (Discord, 2026-05-18 ~290~300): "toggle doesn't work, blocks still break".
+    //
+    // New rule: a preset only writes a toggle if that toggle is at its DEFAULT value (no
+    // user override). If the user has explicitly changed a toggle, it's left alone. Defaults
+    // for all destruction toggles are `true`, so `setIfDefault(cfg, target, true)` means:
+    //   - user value `true` (default)  → preset can change to `target`
+    //   - user value `false` (override) → preset SKIPS, keeps user value
+    //
+    // The `off` preset above is unaffected — it's the explicit "bulk disable" convenience
+    // and still uses .set() directly. Anyone using `destructionPreset = off` is asking for
+    // everything turned off, so we honour that.
     private static void detailToggles(boolean cracks, boolean blockBreaking, boolean propagation, boolean fracture, boolean explosions, boolean materialMatchup) {
-        TrueImpactConfig.ENABLE_CRACKS.set(cracks);
-        TrueImpactConfig.ENABLE_CUMULATIVE_BLOCK_DAMAGE.set(cracks);
-        TrueImpactConfig.ENABLE_BLOCK_BREAKING.set(blockBreaking);
-        TrueImpactConfig.ENABLE_WORLD_DESTRUCTION.set(blockBreaking);
-        TrueImpactConfig.ENABLE_TERRAIN_IMPACT_DAMAGE.set(blockBreaking);
-        TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.set(blockBreaking);
-        TrueImpactConfig.ENABLE_PHYSICAL_DESTRUCTION.set(fracture);
-        TrueImpactConfig.ENABLE_CRACK_PROPAGATION.set(propagation);
-        TrueImpactConfig.ENABLE_SUBLEVEL_FRACTURE.set(fracture);
-        TrueImpactConfig.ENABLE_EXPLOSION_IMPACT_FRACTURE.set(explosions);
-        TrueImpactConfig.ENABLE_EXPLOSION_IMPULSE.set(explosions);
-        TrueImpactConfig.ENABLE_MATERIAL_MATCHUP_DAMAGE.set(materialMatchup);
+        setIfDefault(TrueImpactConfig.ENABLE_CRACKS, cracks, true);
+        setIfDefault(TrueImpactConfig.ENABLE_CUMULATIVE_BLOCK_DAMAGE, cracks, true);
+        setIfDefault(TrueImpactConfig.ENABLE_BLOCK_BREAKING, blockBreaking, true);
+        setIfDefault(TrueImpactConfig.ENABLE_WORLD_DESTRUCTION, blockBreaking, true);
+        setIfDefault(TrueImpactConfig.ENABLE_TERRAIN_IMPACT_DAMAGE, blockBreaking, true);
+        setIfDefault(TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS, blockBreaking, true);
+        setIfDefault(TrueImpactConfig.ENABLE_PHYSICAL_DESTRUCTION, fracture, true);
+        setIfDefault(TrueImpactConfig.ENABLE_CRACK_PROPAGATION, propagation, true);
+        setIfDefault(TrueImpactConfig.ENABLE_SUBLEVEL_FRACTURE, fracture, true);
+        setIfDefault(TrueImpactConfig.ENABLE_EXPLOSION_IMPACT_FRACTURE, explosions, true);
+        setIfDefault(TrueImpactConfig.ENABLE_EXPLOSION_IMPULSE, explosions, true);
+        setIfDefault(TrueImpactConfig.ENABLE_MATERIAL_MATCHUP_DAMAGE, materialMatchup, true);
+    }
+
+    // Helper for the "respect user override" semantics — see detailToggles' comment.
+    private static void setIfDefault(ModConfigSpec.BooleanValue cfg, boolean target, boolean defaultValue) {
+        try {
+            if (cfg.get() == defaultValue) {
+                cfg.set(target);
+            }
+        } catch (Throwable t) {
+            // Best-effort — never crash config load over preset application.
+        }
     }
 
     private static void applyPerformance(String preset) {

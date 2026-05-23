@@ -110,7 +110,14 @@ public final class ExplosionImpactHandler {
                 ++fractures;
             }
         }
-        catch (ReflectiveOperationException | RuntimeException exception) {
+        catch (ReflectiveOperationException | RuntimeException | LinkageError exception) {
+            // beta.7 B4 fix: widen catch to include LinkageError. Reported by STAR (Discord #52,
+            // 2026-05-11): TNT explosion near a sub-level crashed the game. Diagnosis at the
+            // time was a missing `ServerSubLevel.isSleeping()` reflection on their Sable
+            // version — that path no longer exists in our code, but ANY Sable API shape change
+            // produces a NoSuchMethodError / NoClassDefFoundError, both of which are
+            // LinkageErrors that the old catch missed. Now any Sable-version mismatch quietly
+            // skips this explosion's fracture impact instead of crashing the game.
         }
         finally {
             TrueImpactPerformance.recordExplosionImpact(startedAt, rays, hits, fractures);
