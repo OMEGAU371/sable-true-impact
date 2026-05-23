@@ -15,6 +15,7 @@
  */
 package com.example.sabletrueimpact.detach;
 
+import com.example.sabletrueimpact.ImpactBreakQueue;
 import com.example.sabletrueimpact.PhysicsStepGate;
 import dev.ryanhcode.sable.api.SubLevelAssemblyHelper;
 import dev.ryanhcode.sable.api.physics.PhysicsPipeline;
@@ -54,6 +55,49 @@ import org.joml.Vector3dc;
 public final class SubLevelDetacher {
 
     private SubLevelDetacher() {
+    }
+
+    // Default params for v1 — step 5 will replace with TrueImpactConfig-driven values.
+    public static final DetachParams DEFAULT_PARAMS = new DetachParams(
+        6,     // targetClusterSize  — small chunks (~ a 2x3x1 plate)
+        3,     // clusterRadius      — Chebyshev cap
+        0.3,   // hardnessSimilarity — lenient, mixed hardness OK
+        0.8,   // kickScale          — most of approach speed → kick
+        8.0,   // maxKickSpeed       — hard cap (sane physics)
+        1.5,   // scatterStrength    — moderate organic spread
+        2.0,   // spinStrength       — modest rotation
+        32     // maxActiveDebris    — global cap
+    );
+
+    // High-level convenience used by impact callers (SubLevelFracture). Defers the actual
+    // carve+assemble work to ImpactBreakQueue → guaranteed post-step execution → safe to
+    // call from inside ElasticPairReaction / mid-step callback paths. Failures are silent;
+    // there is no return value to act on.
+    //
+    // `worldPoint` is the impact location in world coords (already converted from body-frame).
+    // `impactDirection` is any reasonable direction vector — normal, contact-velocity, etc.
+    // `forceAmount` is converted to an approach-speed proxy (cube root — Sable forces are
+    // large integers, cube-root scales them to m/s-ish for kick magnitude).
+    public static void requestDetach(ServerLevel level, Vector3d worldPoint,
+                                     Vector3d impactDirection, double forceAmount) {
+        if (level == null || worldPoint == null || impactDirection == null) {
+            return;
+        }
+        if (!Double.isFinite(worldPoint.x) || !Double.isFinite(worldPoint.y) || !Double.isFinite(worldPoint.z)) {
+            return;
+        }
+        if (level.getServer() == null) {
+            return;
+        }
+        final BlockPos seed = BlockPos.containing(worldPoint.x, worldPoint.y, worldPoint.z);
+        final Vector3d dir = new Vector3d(impactDirection);
+        double proxy = Math.cbrt(Math.max(0.0, forceAmount));
+        if (!Double.isFinite(proxy)) proxy = 0.0;
+        final double approach = Math.min(proxy, 40.0);
+        final ServerLevel finalLevel = level;
+        ImpactBreakQueue.enqueue(() -> {
+            SubLevelDetacher.detach(finalLevel, seed, dir.x, dir.y, dir.z, approach, DEFAULT_PARAMS);
+        });
     }
 
     // Tuning knobs for one detach call. Caller assembles from TrueImpactConfig in step 5.

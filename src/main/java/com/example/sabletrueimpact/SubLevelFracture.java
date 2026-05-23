@@ -21,6 +21,7 @@ import com.example.sabletrueimpact.MaterialImpactProperties;
 import com.example.sabletrueimpact.StructuralStrengthAnalyzer;
 import com.example.sabletrueimpact.TrueImpactConfig;
 import com.example.sabletrueimpact.TrueImpactPerformance;
+import com.example.sabletrueimpact.detach.SubLevelDetacher;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -78,18 +79,6 @@ public final class SubLevelFracture {
         if (!((Boolean)TrueImpactConfig.ENABLE_TRUE_IMPACT.get()).booleanValue() || !((Boolean)TrueImpactConfig.ENABLE_SUBLEVEL_FRACTURE.get()).booleanValue() || !((Boolean)TrueImpactConfig.ENABLE_PHYSICAL_DESTRUCTION.get()).booleanValue() || subLevel == null || externalDamageScale <= 0.0 || forceAmount < (Double)TrueImpactConfig.SUBLEVEL_FRACTURE_FORCE_THRESHOLD.get() || (Integer)TrueImpactConfig.SUBLEVEL_FRACTURE_MAX_BLOCKS.get() <= 0) {
             return;
         }
-        // fork_30: rope-CONSTRAINED structures are exempt from fracture. Splitting a
-        // constrained structure (Sable's heatmap splitter) makes the fragments inherit a rope
-        // joint on a rebaked body → joint explosion → narrow_phase crash. fork_29 tried cutting
-        // the rope first, but RopeHandle.remove() called more than once on the same rope (many
-        // fracture calls fire per tick) is a native double-free → rapier/rope.rs:244 panic, and
-        // it also desyncs Create Simulated's rope_connector block entity. Until a proper
-        // SD-style self-assembly path exists (carve a cluster, assemble it as free debris,
-        // never touching the rope or Sable's splitter), rope structures do not fracture — they
-        // still crumble block by block from the impact callback.
-        if (RopeBindingRegistry.isRopeSubLevel(subLevel)) {
-            return;
-        }
         long startedAt = TrueImpactPerformance.start();
         ServerLevel level = SubLevelFracture.level(subLevel);
         if (level == null) {
@@ -101,6 +90,17 @@ public final class SubLevelFracture {
         }
         if (!SubLevelFracture.claimFractureBudget(level, subLevel)) {
             TrueImpactPerformance.recordFractureSkippedBudget();
+            return;
+        }
+        // 1.2.0 SD-port: rope-CONSTRAINED structures route to SubLevelDetacher (carve cluster +
+        // SubLevelAssemblyHelper.assembleBlocks → free debris sub-level). This sidesteps Sable's
+        // heatmap-driven SUB_LEVEL_SPLITTING, which is the only known way a constrained body
+        // can be safely shattered without triggering narrow_phase.rs:1115 (sable#950). The
+        // detach work is deferred through ImpactBreakQueue inside requestDetach() — guaranteed
+        // post-step execution. Free (unconstrained) structures continue through the existing
+        // heatmap-split path below; it's been working fine for them and doesn't crash.
+        if (RopeBindingRegistry.isRopeSubLevel(subLevel)) {
+            SubLevelDetacher.requestDetach(level, worldPoint, normal, forceAmount);
             return;
         }
         BlockPos center = BlockPos.containing((double)worldPoint.x, (double)worldPoint.y, (double)worldPoint.z);
