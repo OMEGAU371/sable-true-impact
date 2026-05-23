@@ -1,0 +1,9 @@
+{
+  "sabletrueimpact.title": "Sable True Impact",
+  "sabletrueimpact.mass": "Mass: %.2f kpg",
+  "sabletrueimpact.friction": "Friction: %.2f",
+  "sabletrueimpact.restitution": "Restitution: %.2f",
+  "sabletrueimpact.strength": "Strength: %.2f pN",
+  "sabletrueimpact.toughness": "Toughness: %.2f pN*s",
+  "sabletrueimpact.brittleness": "Brittleness: %.2f"
+}

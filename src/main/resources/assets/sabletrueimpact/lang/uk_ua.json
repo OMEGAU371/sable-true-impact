@@ -1,0 +1,10 @@
+{
+  "sabletrueimpact.title": "Sable True Impact",
+  "sabletrueimpact.mass": "Маса: %.2f кпг",
+  "sabletrueimpact.friction": "Тертя: %.2f",
+  "sabletrueimpact.restitution": "Пружність: %.2f",
+  "sabletrueimpact.strength": "Сила: %.2f пН",
+  "sabletrueimpact.toughness": "Твердість: %.2f пН*с",
+  "sabletrueimpact.brittleness": "Крихкість: %.2f",
+  "fml.menu.mods.info.description.sabletrueimpact": "Додає пошкодження від удару, сукупне розбиття, шкоду від впливу на сутностей та поведінку структурних руйнувань до фізичних структур Sable.\n\nЦе неофіційне доповнення для Sable, воно не пов’язане з оригінальним автором Sable і не підтримується ним."
+}
