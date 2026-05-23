@@ -23,6 +23,7 @@ import com.example.sabletrueimpact.SubLevelFracture;
 import com.example.sabletrueimpact.TrueImpactConfig;
 import com.example.sabletrueimpact.TrueImpactPerformance;
 import com.example.sabletrueimpact.TrueImpactPresets;
+import com.example.sabletrueimpact.detach.TIDetachLifecycleHandler;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
@@ -48,6 +49,7 @@ public class TrueImpactMod {
         NeoForge.EVENT_BUS.register(SubLevelFracture.class);
         NeoForge.EVENT_BUS.register(TrueImpactPerformance.class);
         NeoForge.EVENT_BUS.register(ImpactBreakQueue.class);
+        NeoForge.EVENT_BUS.register(TIDetachLifecycleHandler.class);
         if (FMLEnvironment.dist == Dist.CLIENT) {
             NeoForge.EVENT_BUS.register(GogglesBlockTooltipHandler.class);
         }
