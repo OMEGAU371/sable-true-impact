@@ -1,14 +1,26 @@
+/*
+ * Decompiled with CFR 0.152.
+ * 
+ * Could not load the following classes:
+ *  net.minecraft.server.level.ServerLevel
+ *  net.minecraft.world.level.Level
+ *  net.neoforged.bus.api.SubscribeEvent
+ *  net.neoforged.neoforge.event.tick.LevelTickEvent$Post
+ *  org.slf4j.Logger
+ *  org.slf4j.LoggerFactory
+ */
 package com.example.sabletrueimpact;
 
+import com.example.sabletrueimpact.TrueImpactConfig;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public final class TrueImpactPerformance {
-    private static final Logger LOGGER = LoggerFactory.getLogger(TrueImpactMod.MODID);
-
+    private static final Logger LOGGER = LoggerFactory.getLogger((String)"sabletrueimpact");
     private static long lastLogTick = Long.MIN_VALUE;
     private static long collisionBatches;
     private static long collisionRecords;
@@ -34,94 +46,77 @@ public final class TrueImpactPerformance {
 
     @SubscribeEvent
     public static void onLevelTick(LevelTickEvent.Post event) {
-        if (event.getLevel() instanceof ServerLevel level) {
-            maybeLog(level);
+        Level level = event.getLevel();
+        if (level instanceof ServerLevel) {
+            ServerLevel level2 = (ServerLevel)level;
+            TrueImpactPerformance.maybeLog(level2);
         }
     }
 
     public static long start() {
-        return TrueImpactConfig.ENABLE_PERFORMANCE_LOGGING.get() ? System.nanoTime() : 0L;
+        return (Boolean)TrueImpactConfig.ENABLE_PERFORMANCE_LOGGING.get() != false ? System.nanoTime() : 0L;
     }
 
     public static void recordCollisionBatch(int records) {
-        if (!TrueImpactConfig.ENABLE_PERFORMANCE_LOGGING.get()) {
+        if (!((Boolean)TrueImpactConfig.ENABLE_PERFORMANCE_LOGGING.get()).booleanValue()) {
             return;
         }
-        collisionBatches++;
-        collisionRecords += Math.max(records, 0);
+        ++collisionBatches;
+        collisionRecords += (long)Math.max(records, 0);
     }
 
     public static void recordFracture(long startedAt, int checked, int candidates, int removed) {
-        if (!TrueImpactConfig.ENABLE_PERFORMANCE_LOGGING.get()) {
+        if (!((Boolean)TrueImpactConfig.ENABLE_PERFORMANCE_LOGGING.get()).booleanValue()) {
             return;
         }
-        fractureAttempts++;
-        fractureCandidateChecks += Math.max(checked, 0);
-        fractureCandidates += Math.max(candidates, 0);
-        fractureRemovedBlocks += Math.max(removed, 0);
-        fractureNanos += elapsed(startedAt);
+        ++fractureAttempts;
+        fractureCandidateChecks += (long)Math.max(checked, 0);
+        fractureCandidates += (long)Math.max(candidates, 0);
+        fractureRemovedBlocks += (long)Math.max(removed, 0);
+        fractureNanos += TrueImpactPerformance.elapsed(startedAt);
     }
 
     public static void recordFractureSkippedBudget() {
-        if (!TrueImpactConfig.ENABLE_PERFORMANCE_LOGGING.get()) {
+        if (!((Boolean)TrueImpactConfig.ENABLE_PERFORMANCE_LOGGING.get()).booleanValue()) {
             return;
         }
-        fractureSkippedBudget++;
+        ++fractureSkippedBudget;
     }
 
     public static void recordEntityScan(long startedAt, int subLevels, int candidates, int hits) {
-        if (!TrueImpactConfig.ENABLE_PERFORMANCE_LOGGING.get()) {
+        if (!((Boolean)TrueImpactConfig.ENABLE_PERFORMANCE_LOGGING.get()).booleanValue()) {
             return;
         }
-        entityScanTicks++;
-        entitySubLevels += Math.max(subLevels, 0);
-        entityCandidates += Math.max(candidates, 0);
-        entityHits += Math.max(hits, 0);
-        entityNanos += elapsed(startedAt);
+        ++entityScanTicks;
+        entitySubLevels += (long)Math.max(subLevels, 0);
+        entityCandidates += (long)Math.max(candidates, 0);
+        entityHits += (long)Math.max(hits, 0);
+        entityNanos += TrueImpactPerformance.elapsed(startedAt);
     }
 
     public static void recordExplosionImpact(long startedAt, int rays, int hits, int fractures) {
-        if (!TrueImpactConfig.ENABLE_PERFORMANCE_LOGGING.get()) {
+        if (!((Boolean)TrueImpactConfig.ENABLE_PERFORMANCE_LOGGING.get()).booleanValue()) {
             return;
         }
-        explosionEvents++;
-        explosionRays += Math.max(rays, 0);
-        explosionHits += Math.max(hits, 0);
-        explosionFractures += Math.max(fractures, 0);
-        explosionNanos += elapsed(startedAt);
+        ++explosionEvents;
+        explosionRays += (long)Math.max(rays, 0);
+        explosionHits += (long)Math.max(hits, 0);
+        explosionFractures += (long)Math.max(fractures, 0);
+        explosionNanos += TrueImpactPerformance.elapsed(startedAt);
     }
 
     public static void maybeLog(ServerLevel level) {
-        if (!TrueImpactConfig.ENABLE_PERFORMANCE_LOGGING.get()) {
+        if (!((Boolean)TrueImpactConfig.ENABLE_PERFORMANCE_LOGGING.get()).booleanValue()) {
             return;
         }
         long tick = level.getGameTime();
-        int interval = TrueImpactConfig.PERFORMANCE_LOG_INTERVAL_TICKS.get();
-        if (lastLogTick != Long.MIN_VALUE && tick - lastLogTick < interval) {
+        int interval = (Integer)TrueImpactConfig.PERFORMANCE_LOG_INTERVAL_TICKS.get();
+        if (lastLogTick != Long.MIN_VALUE && tick - lastLogTick < (long)interval) {
             return;
         }
         lastLogTick = tick;
-
-        LOGGER.info("True Impact perf: collisionBatches={}, collisionRecords={}, fractureAttempts={}, fractureChecked={}, fractureCandidates={}, fractureRemoved={}, fractureSkippedBudget={}, fractureMs={}, entityScanTicks={}, entitySubLevels={}, entityCandidates={}, entityHits={}, entityMs={}, explosionEvents={}, explosionRays={}, explosionHits={}, explosionFractures={}, explosionMs={}",
-                collisionBatches,
-                collisionRecords,
-                fractureAttempts,
-                fractureCandidateChecks,
-                fractureCandidates,
-                fractureRemovedBlocks,
-                fractureSkippedBudget,
-                nanosToMillis(fractureNanos),
-                entityScanTicks,
-                entitySubLevels,
-                entityCandidates,
-                entityHits,
-                nanosToMillis(entityNanos),
-                explosionEvents,
-                explosionRays,
-                explosionHits,
-                explosionFractures,
-                nanosToMillis(explosionNanos));
-        reset();
+        LOGGER.info("True Impact perf: collisionBatches={}, collisionRecords={}, fractureAttempts={}, fractureChecked={}, fractureCandidates={}, fractureRemoved={}, fractureSkippedBudget={}, fractureMs={}, entityScanTicks={}, entitySubLevels={}, entityCandidates={}, entityHits={}, entityMs={}, explosionEvents={}, explosionRays={}, explosionHits={}, explosionFractures={}, explosionMs={}", new Object[]{collisionBatches, collisionRecords, fractureAttempts, fractureCandidateChecks, fractureCandidates, fractureRemovedBlocks, fractureSkippedBudget, TrueImpactPerformance.nanosToMillis(fractureNanos), entityScanTicks, entitySubLevels, entityCandidates, entityHits, TrueImpactPerformance.nanosToMillis(entityNanos), explosionEvents, explosionRays, explosionHits, explosionFractures, TrueImpactPerformance.nanosToMillis(explosionNanos)});
+        TrueImpactPerformance.reset();
     }
 
     private static long elapsed(long startedAt) {
@@ -129,7 +124,7 @@ public final class TrueImpactPerformance {
     }
 
     private static double nanosToMillis(long nanos) {
-        return nanos / 1_000_000.0;
+        return (double)nanos / 1000000.0;
     }
 
     private static void reset() {
@@ -153,3 +148,4 @@ public final class TrueImpactPerformance {
         explosionNanos = 0L;
     }
 }
+

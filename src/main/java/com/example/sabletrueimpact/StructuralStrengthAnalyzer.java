@@ -1,6 +1,28 @@
+/*
+ * Decompiled with CFR 0.152.
+ * 
+ * Could not load the following classes:
+ *  dev.ryanhcode.sable.physics.config.block_properties.PhysicsBlockPropertyHelper
+ *  net.minecraft.core.BlockPos
+ *  net.minecraft.core.Direction
+ *  net.minecraft.core.Direction$Axis
+ *  net.minecraft.core.registries.BuiltInRegistries
+ *  net.minecraft.resources.ResourceLocation
+ *  net.minecraft.server.level.ServerLevel
+ *  net.minecraft.world.entity.Entity
+ *  net.minecraft.world.level.block.Blocks
+ *  net.minecraft.world.level.block.state.BlockState
+ *  net.minecraft.world.phys.AABB
+ *  org.joml.Vector3d
+ *  org.joml.Vector3dc
+ */
 package com.example.sabletrueimpact;
 
+import com.example.sabletrueimpact.TrueImpactConfig;
 import dev.ryanhcode.sable.physics.config.block_properties.PhysicsBlockPropertyHelper;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -11,94 +33,78 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import org.joml.Vector3d;
-
-import java.util.HashMap;
-import java.util.Locale;
-import java.util.Map;
+import org.joml.Vector3dc;
 
 public final class StructuralStrengthAnalyzer {
     private static long glueCacheTick = Long.MIN_VALUE;
     private static String glueCacheDimension = "";
-    private static final Map<Long, Boolean> GLUE_ENTITY_CACHE = new HashMap<>();
+    private static final Map<Long, Boolean> GLUE_ENTITY_CACHE = new HashMap<Long, Boolean>();
 
     private StructuralStrengthAnalyzer() {
     }
 
-    public interface BlockLookup {
-        BlockState getBlockState(BlockPos pos);
-
-        boolean hasGlueEntity(BlockPos pos);
-    }
-
     public static Result analyze(ServerLevel level, BlockPos pos, BlockState state, Vector3d impactNormal) {
-        return analyze(new LevelBlockLookup(level), pos, state, impactNormal);
+        return StructuralStrengthAnalyzer.analyze(new LevelBlockLookup(level), pos, state, impactNormal);
     }
 
     public static Result analyze(BlockLookup lookup, BlockPos pos, BlockState state, Vector3d impactNormal) {
-        if (isAdhesiveBlock(state) || lookup.hasGlueEntity(pos)) {
-            return new Result(1.0, TrueImpactConfig.SUBLEVEL_FRACTURE_STICKY_RESISTANCE.get(), 0.0);
+        if (StructuralStrengthAnalyzer.isAdhesiveBlock(state) || lookup.hasGlueEntity(pos)) {
+            return new Result(1.0, (Double)TrueImpactConfig.SUBLEVEL_FRACTURE_STICKY_RESISTANCE.get(), 0.0);
         }
-
         double seamWeakness = 0.0;
         double connectionStrength = 1.0;
         double weakPlaneSpread = 0.0;
         int faceConnections = 0;
         int mixedFaceSeams = 0;
         int sameFaceConnections = 0;
-        int beamNeighbors = isBeamLike(state) ? 2 : 0;
+        int beamNeighbors = StructuralStrengthAnalyzer.isBeamLike(state) ? 2 : 0;
         int adhesiveNeighbors = 0;
-
         Direction strongestWeakDirection = null;
         for (Direction direction : Direction.values()) {
+            boolean sameBlock;
             BlockPos neighborPos = pos.relative(direction);
             BlockState neighbor = lookup.getBlockState(neighborPos);
-            if (neighbor.isAir()) {
+            if (neighbor.isAir()) continue;
+            ++faceConnections;
+            if (StructuralStrengthAnalyzer.isAdhesiveBlock(neighbor) || lookup.hasGlueEntity(neighborPos)) {
+                ++adhesiveNeighbors;
                 continue;
             }
-            faceConnections++;
-            if (isAdhesiveBlock(neighbor) || lookup.hasGlueEntity(neighborPos)) {
-                adhesiveNeighbors++;
-                continue;
+            if (StructuralStrengthAnalyzer.isBeamLike(neighbor)) {
+                ++beamNeighbors;
             }
-            if (isBeamLike(neighbor)) {
-                beamNeighbors++;
-            }
-
-            boolean sameBlock = neighbor.getBlock() == state.getBlock();
+            boolean bl = sameBlock = neighbor.getBlock() == state.getBlock();
             if (sameBlock) {
-                sameFaceConnections++;
+                ++sameFaceConnections;
             } else {
-                mixedFaceSeams++;
+                ++mixedFaceSeams;
             }
-            Vector3d dir = new Vector3d(direction.getStepX(), direction.getStepY(), direction.getStepZ());
-            double planeFactor = 0.35 + Math.abs(dir.dot(impactNormal)) * 0.65;
-            double friction = Math.max(PhysicsBlockPropertyHelper.getFriction(state), PhysicsBlockPropertyHelper.getFriction(neighbor));
-            double frictionFactor = 1.0 / (1.0 + friction * TrueImpactConfig.SUBLEVEL_FRACTURE_FRICTION_RESISTANCE.get());
-            double materialFactor = sameBlock ? 1.0 / Math.max(TrueImpactConfig.SUBLEVEL_FRACTURE_SAME_BLOCK_RESISTANCE.get(), 1.0) : 1.0;
+            Vector3d dir = new Vector3d((double)direction.getStepX(), (double)direction.getStepY(), (double)direction.getStepZ());
+            double planeFactor = 0.35 + Math.abs(dir.dot((Vector3dc)impactNormal)) * 0.65;
+            double friction = Math.max(PhysicsBlockPropertyHelper.getFriction((BlockState)state), PhysicsBlockPropertyHelper.getFriction((BlockState)neighbor));
+            double frictionFactor = 1.0 / (1.0 + friction * (Double)TrueImpactConfig.SUBLEVEL_FRACTURE_FRICTION_RESISTANCE.get());
+            double materialFactor = sameBlock ? 1.0 / Math.max((Double)TrueImpactConfig.SUBLEVEL_FRACTURE_SAME_BLOCK_RESISTANCE.get(), 1.0) : 1.0;
             double seam = materialFactor * planeFactor * frictionFactor;
-
-            double continuity = continuousSeam(lookup, pos, state, direction);
-            double interlock = interlockAround(lookup, pos, state, direction);
-            seam *= (1.0 + continuity * TrueImpactConfig.SUBLEVEL_FRACTURE_CONTINUOUS_SEAM_WEAKNESS.get());
-            seam /= (1.0 + interlock * TrueImpactConfig.SUBLEVEL_FRACTURE_INTERLOCK_STRENGTH.get());
+            double continuity = StructuralStrengthAnalyzer.continuousSeam(lookup, pos, state, direction);
+            double interlock = StructuralStrengthAnalyzer.interlockAround(lookup, pos, state, direction);
+            seam *= 1.0 + continuity * (Double)TrueImpactConfig.SUBLEVEL_FRACTURE_CONTINUOUS_SEAM_WEAKNESS.get();
+            seam /= 1.0 + interlock * (Double)TrueImpactConfig.SUBLEVEL_FRACTURE_INTERLOCK_STRENGTH.get();
             if (seam > seamWeakness) {
                 seamWeakness = seam;
                 strongestWeakDirection = direction;
             }
             weakPlaneSpread = Math.max(weakPlaneSpread, continuity * seam);
         }
-
-        connectionStrength += faceConnections * 0.22;
-        connectionStrength += sameFaceConnections * 0.18;
-        connectionStrength += adhesiveNeighbors * TrueImpactConfig.SUBLEVEL_FRACTURE_STICKY_RESISTANCE.get();
-        connectionStrength += beamNeighbors * TrueImpactConfig.SUBLEVEL_FRACTURE_BEAM_STRENGTH.get();
-        connectionStrength += diagonalInterlock(lookup, pos, state) * TrueImpactConfig.SUBLEVEL_FRACTURE_INTERLOCK_STRENGTH.get();
-        connectionStrength += crossBracing(lookup, pos, state, strongestWeakDirection) * 0.75;
-
+        connectionStrength += (double)faceConnections * 0.22;
+        connectionStrength += (double)sameFaceConnections * 0.18;
+        connectionStrength += (double)adhesiveNeighbors * (Double)TrueImpactConfig.SUBLEVEL_FRACTURE_STICKY_RESISTANCE.get();
+        connectionStrength += (double)beamNeighbors * (Double)TrueImpactConfig.SUBLEVEL_FRACTURE_BEAM_STRENGTH.get();
+        connectionStrength += StructuralStrengthAnalyzer.diagonalInterlock(lookup, pos, state) * (Double)TrueImpactConfig.SUBLEVEL_FRACTURE_INTERLOCK_STRENGTH.get();
+        connectionStrength += StructuralStrengthAnalyzer.crossBracing(lookup, pos, state, strongestWeakDirection) * 0.75;
         if (mixedFaceSeams == 0 && sameFaceConnections > 0) {
             seamWeakness *= 0.6;
         }
-        if (isBeamLike(state)) {
+        if (StructuralStrengthAnalyzer.isBeamLike(state)) {
             seamWeakness *= 0.45;
         }
         return new Result(seamWeakness, Math.max(1.0, connectionStrength), weakPlaneSpread);
@@ -108,17 +114,12 @@ public final class StructuralStrengthAnalyzer {
         Direction.Axis axis = direction.getAxis();
         double score = 0.0;
         for (Direction tangent : Direction.values()) {
-            if (tangent.getAxis() == axis) {
-                continue;
-            }
+            if (tangent.getAxis() == axis) continue;
             BlockPos side = pos.relative(tangent);
             BlockState sideState = lookup.getBlockState(side);
             BlockState sideAcross = lookup.getBlockState(side.relative(direction));
-            if (!sideState.isAir() && !sideAcross.isAir()
-                    && sideState.getBlock() == state.getBlock()
-                    && sideAcross.getBlock() != state.getBlock()) {
-                score += 0.35;
-            }
+            if (sideState.isAir() || sideAcross.isAir() || sideState.getBlock() != state.getBlock() || sideAcross.getBlock() == state.getBlock()) continue;
+            score += 0.35;
         }
         return Math.min(1.5, score);
     }
@@ -127,33 +128,24 @@ public final class StructuralStrengthAnalyzer {
         Direction.Axis axis = direction.getAxis();
         double score = 0.0;
         for (Direction tangent : Direction.values()) {
-            if (tangent.getAxis() == axis) {
-                continue;
-            }
+            if (tangent.getAxis() == axis) continue;
             BlockState diagonalA = lookup.getBlockState(pos.relative(direction).relative(tangent));
             BlockState diagonalB = lookup.getBlockState(pos.relative(tangent.getOpposite()));
-            if (!diagonalA.isAir() && !diagonalB.isAir()
-                    && diagonalA.getBlock() == state.getBlock()
-                    && diagonalB.getBlock() != state.getBlock()) {
-                score += 0.4;
-            }
+            if (diagonalA.isAir() || diagonalB.isAir() || diagonalA.getBlock() != state.getBlock() || diagonalB.getBlock() == state.getBlock()) continue;
+            score += 0.4;
         }
         return Math.min(1.6, score);
     }
 
     private static double diagonalInterlock(BlockLookup lookup, BlockPos pos, BlockState state) {
         double score = 0.0;
-        for (int x = -1; x <= 1; x++) {
-            for (int y = -1; y <= 1; y++) {
-                for (int z = -1; z <= 1; z++) {
+        for (int x = -1; x <= 1; ++x) {
+            for (int y = -1; y <= 1; ++y) {
+                for (int z = -1; z <= 1; ++z) {
+                    BlockState diagonal;
                     int manhattan = Math.abs(x) + Math.abs(y) + Math.abs(z);
-                    if (manhattan < 2) {
-                        continue;
-                    }
-                    BlockState diagonal = lookup.getBlockState(pos.offset(x, y, z));
-                    if (!diagonal.isAir() && diagonal.getBlock() == state.getBlock()) {
-                        score += 0.08;
-                    }
+                    if (manhattan < 2 || (diagonal = lookup.getBlockState(pos.offset(x, y, z))).isAir() || diagonal.getBlock() != state.getBlock()) continue;
+                    score += 0.08;
                 }
             }
         }
@@ -166,13 +158,8 @@ public final class StructuralStrengthAnalyzer {
         }
         double score = 0.0;
         for (Direction direction : Direction.values()) {
-            if (direction.getAxis() == weakDirection.getAxis()) {
-                continue;
-            }
-            if (isBeamLike(lookup.getBlockState(pos.relative(direction)))
-                    || isBeamLike(lookup.getBlockState(pos.relative(direction).relative(weakDirection)))) {
-                score += 0.45;
-            }
+            if (direction.getAxis() == weakDirection.getAxis() || !StructuralStrengthAnalyzer.isBeamLike(lookup.getBlockState(pos.relative(direction))) && !StructuralStrengthAnalyzer.isBeamLike(lookup.getBlockState(pos.relative(direction).relative(weakDirection)))) continue;
+            score += 0.45;
         }
         return Math.min(2.0, score);
     }
@@ -184,11 +171,7 @@ public final class StructuralStrengthAnalyzer {
         ResourceLocation id = state.getBlock().builtInRegistryHolder().key().location();
         String namespace = id.getNamespace().toLowerCase(Locale.ROOT);
         String path = id.getPath().toLowerCase(Locale.ROOT);
-        return path.contains("glue")
-                || path.contains("sticky")
-                || path.contains("sticker")
-                || path.contains("honey")
-                || namespace.contains("aeronautics") && path.contains("adhesive");
+        return path.contains("glue") || path.contains("sticky") || path.contains("sticker") || path.contains("honey") || namespace.contains("aeronautics") && path.contains("adhesive");
     }
 
     public static boolean isBeamLike(BlockState state) {
@@ -196,36 +179,26 @@ public final class StructuralStrengthAnalyzer {
             return false;
         }
         String path = state.getBlock().builtInRegistryHolder().key().location().getPath().toLowerCase(Locale.ROOT);
-        return path.contains("girder")
-                || path.contains("beam")
-                || path.contains("brace")
-                || path.contains("strut")
-                || path.contains("support")
-                || path.contains("frame")
-                || path.contains("chassis");
+        return path.contains("girder") || path.contains("beam") || path.contains("brace") || path.contains("strut") || path.contains("support") || path.contains("frame") || path.contains("chassis");
     }
 
     public static boolean hasGlueEntity(ServerLevel level, BlockPos pos) {
-        resetGlueCacheIfNeeded(level);
+        StructuralStrengthAnalyzer.resetGlueCacheIfNeeded(level);
         long key = pos.asLong();
         Boolean cached = GLUE_ENTITY_CACHE.get(key);
         if (cached != null) {
             return cached;
         }
-
         boolean result = false;
         AABB box = new AABB(pos).inflate(0.08);
-        for (Entity entity : level.getEntities((Entity) null, box, entity -> true)) {
-            ResourceLocation id = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
-            if (id == null) {
-                continue;
-            }
+        for (Entity entity2 : level.getEntities((Entity)null, box, entity -> true)) {
+            ResourceLocation id = BuiltInRegistries.ENTITY_TYPE.getKey(entity2.getType());
+            if (id == null) continue;
             String path = id.getPath().toLowerCase(Locale.ROOT);
             String namespace = id.getNamespace().toLowerCase(Locale.ROOT);
-            if (path.contains("glue") || path.contains("adhesive") || namespace.contains("aeronautics") && path.contains("honey")) {
-                result = true;
-                break;
-            }
+            if (!path.contains("glue") && !path.contains("adhesive") && (!namespace.contains("aeronautics") || !path.contains("honey"))) continue;
+            result = true;
+            break;
         }
         GLUE_ENTITY_CACHE.put(key, result);
         return result;
@@ -242,18 +215,26 @@ public final class StructuralStrengthAnalyzer {
         GLUE_ENTITY_CACHE.clear();
     }
 
-    public record Result(double seamWeakness, double connectionStrength, double weakPlaneSpread) {
-    }
-
-    private record LevelBlockLookup(ServerLevel level) implements BlockLookup {
+    private record LevelBlockLookup(ServerLevel level) implements BlockLookup
+    {
         @Override
         public BlockState getBlockState(BlockPos pos) {
-            return level.getBlockState(pos);
+            return this.level.getBlockState(pos);
         }
 
         @Override
         public boolean hasGlueEntity(BlockPos pos) {
-            return StructuralStrengthAnalyzer.hasGlueEntity(level, pos);
+            return StructuralStrengthAnalyzer.hasGlueEntity(this.level, pos);
         }
     }
+
+    public static interface BlockLookup {
+        public BlockState getBlockState(BlockPos var1);
+
+        public boolean hasGlueEntity(BlockPos var1);
+    }
+
+    public record Result(double seamWeakness, double connectionStrength, double weakPlaneSpread) {
+    }
 }
+
