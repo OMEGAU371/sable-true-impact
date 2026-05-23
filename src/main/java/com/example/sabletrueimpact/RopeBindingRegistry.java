@@ -7,7 +7,11 @@ package com.example.sabletrueimpact;
 import dev.ryanhcode.sable.api.physics.object.rope.RopeHandle;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.block.state.BlockState;
 import org.apache.logging.log4j.LogManager;
 
 // 1.0.5-fork_1: rope-connected-structure DETECTOR.
@@ -34,6 +38,28 @@ public final class RopeBindingRegistry {
                            ServerSubLevel subLevel, double x, double y, double z) {}
 
     private static final Map<Key, Binding> BINDINGS = new ConcurrentHashMap<>();
+
+    // beta.5 — block IDs that act as rope ANCHORS. Per the user's empirical observation
+    // (2026-05-23): "only smashing the rope-binder block itself crashes; everything else is
+    // fine". The fix is to protect these specific block types from ANY destruction. Currently
+    // hard-coded to Create Simulated's rope_connector; if other mods add rope anchors, this
+    // could be promoted to a config list later.
+    private static final Set<ResourceLocation> ROPE_ANCHOR_BLOCK_IDS = Set.of(
+        ResourceLocation.fromNamespaceAndPath("simulated", "rope_connector")
+    );
+
+    // True if the block is one of the rope-anchor types we must never destroy.
+    public static boolean isRopeAnchorBlockType(BlockState state) {
+        if (state == null) {
+            return false;
+        }
+        try {
+            ResourceLocation id = BuiltInRegistries.BLOCK.getKey(state.getBlock());
+            return ROPE_ANCHOR_BLOCK_IDS.contains(id);
+        } catch (Throwable t) {
+            return false;
+        }
+    }
 
     private RopeBindingRegistry() {
     }

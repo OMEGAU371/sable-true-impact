@@ -102,6 +102,19 @@ public class TrueImpactPhysicsSolver {
                 if (state.isAir()) {
                     return BlockSubLevelCollisionCallback.CollisionResult.NONE;
                 }
+                // beta.5: rope-anchor block protection. Per user's 2026-05-23 empirical
+                // observation: smashing the rope_connector block specifically is the only
+                // thing that crashes — everything else (regular rope-structure blocks) is
+                // fine even when broken. Protect rope-anchor block TYPES from any destruction
+                // here; this short-circuits before the soil/crack/break ladder and the
+                // queryIntersecting dispatch, so no destruction path downstream gets a chance
+                // at it.
+                if (RopeBindingRegistry.isRopeAnchorBlockType(state)) {
+                    org.apache.logging.log4j.LogManager.getLogger("TIDetach").info(
+                        "[beta] protected rope-anchor block at {} ({}); skipping destruction",
+                        pos, state.getBlock());
+                    return BlockSubLevelCollisionCallback.CollisionResult.NONE;
+                }
                 float hardness = state.getDestroySpeed((BlockGetter)level, pos);
                 if (hardness < 0.0f) {
                     return BlockSubLevelCollisionCallback.CollisionResult.NONE;
