@@ -97,6 +97,21 @@ public class TrueImpactPhysicsSolver {
                 if (!((Boolean)TrueImpactConfig.ENABLE_TRUE_IMPACT.get()).booleanValue() || impactVelocity < (Double)TrueImpactConfig.MIN_EFFECT_VELOCITY.get()) {
                     return BlockSubLevelCollisionCallback.CollisionResult.NONE;
                 }
+                // beta.9.1 — B2 real real fix. The callback's bakery mixin attaches this
+                // callback to SUB-LEVEL voxel blocks (per RapierVoxelColliderBakery), so any
+                // time this callback fires, `pos` is on a sub-level block. Hence gating at the
+                // TOP is safe (and correct): when ENABLE_PHYSICAL_DESTRUCTION=false, no
+                // destruction path downstream (soil compact / crack / break / propagate /
+                // BlockDamageAccumulator) runs against sub-level blocks. The earlier
+                // queryIntersecting-based gate (added in beta.9) sometimes missed when the
+                // sub-level's bbox was stale mid-callback — accumulator then ran on lines
+                // 273+ and accumulated fatigue → cumulative crack break. The user observed
+                // exactly this ("还是会碎,都是累积裂纹碎的"). This top-level gate fixes it.
+                // Terrain destruction is not affected: it goes through ElasticPairReaction's
+                // applyPerContactTerrainHit, not this callback.
+                if (!((Boolean)TrueImpactConfig.ENABLE_PHYSICAL_DESTRUCTION.get()).booleanValue()) {
+                    return BlockSubLevelCollisionCallback.CollisionResult.NONE;
+                }
                 level = system.getLevel();
                 state = level.getBlockState(pos);
                 if (state.isAir()) {
@@ -161,17 +176,13 @@ public class TrueImpactPhysicsSolver {
                             // non-anchor parts (free fragments, no rope → safe). The rope-anchored
                             // portion stays alive because its anchor block can't be destroyed.
                             //
-                            // beta.8 — B2 fix (Discord John Aeronautics): respect
-                            // enablePhysicalDestruction here. The callback was the missing path —
-                            // user's `enablePhysicalDestruction=false` was correctly preventing
-                            // SubLevelFracture but the per-block callback destruction below was
-                            // bypassing it entirely. Now: when the hit block IS on a sub-level
-                            // AND user has disabled physical destruction, return NONE before any
-                            // of the destruction ladder runs (crack / break / propagate). Terrain
-                            // (no ssl) is unaffected — only sub-level block destruction is gated.
-                            if (!((Boolean) TrueImpactConfig.ENABLE_PHYSICAL_DESTRUCTION.get()).booleanValue()) {
-                                return BlockSubLevelCollisionCallback.CollisionResult.NONE;
-                            }
+                            // beta.9.1 — the redundant queryIntersecting-based ENABLE_PHYSICAL_-
+                            // DESTRUCTION gate from beta.9 has been REMOVED. It only fired when
+                            // queryIntersecting actually found `ssl`, which is unreliable
+                            // mid-callback (sub-level bbox can be stale). The new top-level gate
+                            // (around line ~98) catches the callback at entry regardless of
+                            // queryIntersecting's state. This block now only handles mass /
+                            // velocity collection for the destruction physics.
                             if (SUBLEVEL_GET_MASS_TRACKER != null && SUBLEVEL_MASS_DATA_GET_MASS != null) {
                                 Object tracker = SUBLEVEL_GET_MASS_TRACKER.invoke(ssl);
                                 mass = Math.max(((Number)SUBLEVEL_MASS_DATA_GET_MASS.invoke(tracker)).doubleValue(), 1.0E-6);
