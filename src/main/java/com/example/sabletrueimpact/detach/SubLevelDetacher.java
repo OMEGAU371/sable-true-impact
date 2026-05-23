@@ -121,17 +121,23 @@ public final class SubLevelDetacher {
                                         double kickX, double kickY, double kickZ,
                                         double approachSpeed,
                                         DetachParams params) {
+        org.apache.logging.log4j.Logger log = org.apache.logging.log4j.LogManager.getLogger("TIDetach");
         if (level == null || seed == null || params == null) {
+            log.info("[beta] detach skipped: null inputs");
             return null;
         }
         if (level.getServer() == null || !level.getServer().isRunning()) {
+            log.info("[beta] detach skipped: server not running");
             return null;
         }
         // Defensive mid-step gate. Caller should have ensured we're post-step, but the cost
         // of a stale check here is one nullcheck — the cost of being wrong is the crash.
         if (PhysicsStepGate.isMidStep()) {
+            log.info("[beta] detach skipped: mid-step at execution time (seed={})", seed);
             return null;
         }
+        log.info("[beta] detach starting: seed={} kick=({},{},{}) approach={}",
+            seed, kickX, kickY, kickZ, approachSpeed);
 
         // Step 1: plan the cluster.
         ClusterCarver.Plan plan;
@@ -143,9 +149,11 @@ public final class SubLevelDetacher {
             return null;
         }
         if (plan == null || plan.blocks().isEmpty()) {
+            log.info("[beta] detach: cluster plan empty (seed={})", seed);
             return null;
         }
         List<BlockPos> cluster = plan.blocks();
+        log.info("[beta] detach: planned cluster size={}", cluster.size());
 
         // Step 2: snapshot block states so we can roll back if assembleBlocks fails partway.
         // SubLevelAssemblyHelper internally sets the cluster blocks to AIR while transferring
@@ -183,9 +191,11 @@ public final class SubLevelDetacher {
             return null;
         }
         if (debris == null) {
+            log.info("[beta] detach: assembleBlocks returned null, rolling back {} blocks", cluster.size());
             rollback(level, cluster, snapshot);
             return null;
         }
+        log.info("[beta] detach: assembleBlocks SUCCESS debris-id={}", System.identityHashCode(debris));
 
         // Step 5: kick + spin the debris (capped magnitudes). This is what makes it look
         // "knocked off" rather than just appearing in place. Failures here are NOT fatal —

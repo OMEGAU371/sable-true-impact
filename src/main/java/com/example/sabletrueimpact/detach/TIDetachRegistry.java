@@ -17,6 +17,8 @@ import java.util.Deque;
 import java.util.Iterator;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 // 1.2.0 SD-port — registry of debris sub-levels True Impact itself creates via the detach
 // mechanism (carve a cluster + SubLevelAssemblyHelper.assembleBlocks, see SubLevelDetacher).
@@ -45,6 +47,7 @@ import net.minecraft.world.level.Level;
 // defense in depth on top of being driven by ServerTickEvent.Post (which is normally clear).
 public final class TIDetachRegistry {
 
+    private static final Logger LOG = LogManager.getLogger("TIDetach");
     private static final Deque<Entry> ACTIVE = new ArrayDeque<>();
     private static long tickCounter = 0L;
     private static final int MIN_LIFETIME_TICKS = 20;
@@ -61,17 +64,19 @@ public final class TIDetachRegistry {
             return;
         }
         int cap = Math.max(MIN_CAP, maxActive);
+        int evicted = 0;
         while (ACTIVE.size() >= cap) {
-            Entry evicted = ACTIVE.pollFirst();
-            if (evicted == null) {
-                break;
-            }
-            despawn(evicted);
+            Entry old = ACTIVE.pollFirst();
+            if (old == null) break;
+            ++evicted;
+            despawn(old, "cap-evict");
         }
         ACTIVE.addLast(new Entry(
             new WeakReference<>(debris),
             new WeakReference<>(level),
             tickCounter));
+        LOG.info("[beta] registered debris (active={}/{}, evicted={}, debris-id={})",
+            ACTIVE.size(), cap, evicted, System.identityHashCode(debris));
     }
 
     // Driven once per server tick from TrueImpactMod. Walks entries: drops anything whose weak
@@ -96,32 +101,33 @@ public final class TIDetachRegistry {
                 continue;
             }
             it.remove();
-            despawn(e);
+            despawn(e, "lifetime");
         }
     }
 
     // Resolve the level's physics system + pipeline at despawn time (no cached references that
     // could outlive the level). pipeline.remove() does the real work — the same primitive
     // Sable itself calls for clean sub-level disposal.
-    private static void despawn(Entry e) {
+    private static void despawn(Entry e, String reason) {
         try {
             ServerSubLevel sub = e.ref.get();
             ServerLevel lvl = e.levelRef.get();
             if (sub == null || lvl == null || sub.isRemoved()) {
+                LOG.info("[beta] despawn skipped (reason={}, sub-gone={}, removed={})",
+                    reason, sub == null, sub != null && sub.isRemoved());
                 return;
             }
             SubLevelPhysicsSystem sys = SubLevelPhysicsSystem.get((Level) lvl);
-            if (sys == null) {
-                return;
-            }
+            if (sys == null) return;
             PhysicsPipeline pipe = sys.getPipeline();
-            if (pipe == null) {
-                return;
-            }
+            if (pipe == null) return;
+            long age = tickCounter - e.spawnedAtTick;
+            LOG.info("[beta] despawn → pipe.remove (reason={}, age={}t, debris-id={})",
+                reason, age, System.identityHashCode(sub));
             pipe.remove(sub);
+            LOG.info("[beta] despawn done");
         } catch (Throwable t) {
-            // Failed despawn is non-fatal — the body simply lingers until GC clears the
-            // weak ref or the world unloads. Better to limp than to crash.
+            LOG.warn("[beta] despawn threw", t);
         }
     }
 

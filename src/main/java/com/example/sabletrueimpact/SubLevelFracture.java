@@ -100,6 +100,9 @@ public final class SubLevelFracture {
         // post-step execution. Free (unconstrained) structures continue through the existing
         // heatmap-split path below; it's been working fine for them and doesn't crash.
         if (RopeBindingRegistry.isRopeSubLevel(subLevel)) {
+            org.apache.logging.log4j.LogManager.getLogger("TIDetach").info(
+                "[beta] tryFracture rope-branch hit: world={} force={}",
+                worldPoint, forceAmount);
             SubLevelDetacher.requestDetach(level, worldPoint, normal, forceAmount);
             return;
         }
