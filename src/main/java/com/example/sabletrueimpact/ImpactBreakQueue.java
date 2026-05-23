@@ -47,13 +47,6 @@ public final class ImpactBreakQueue {
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
-        // fork_29: SD-pattern live gate. ServerTickEvent.Post is normally clear of the physics
-        // step, but never assume — if a step is somehow still in progress, freeing/rebaking a
-        // collider here would corrupt Rapier's narrow-phase (the narrow_phase.rs:1115 crash).
-        // Skip this drain entirely; the actions stay queued for the next, safe tick.
-        if (PhysicsStepGate.isMidStep()) {
-            return;
-        }
         Runnable r;
         int drained = 0;
         while (drained < DRAIN_BUDGET && (r = QUEUE.poll()) != null) {

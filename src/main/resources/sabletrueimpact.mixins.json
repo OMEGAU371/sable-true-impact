@@ -8,8 +8,7 @@
     "RapierVoxelColliderBakeryMixin",
     "RapierPhysicsPipelineMixin",
     "SubLevelPhysicsSystemMixin",
-    "RapierRopeHandleMixin",
-    "ServerSubLevelMixin"
+    "RapierRopeHandleMixin"
   ],
   "client": [
   ],

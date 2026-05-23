@@ -69,10 +69,6 @@ public final class ElasticPairReaction {
     private static final Method GET_CENTER_OF_MASS_METHOD = ElasticPairReaction.findMethod("dev.ryanhcode.sable.api.physics.mass.MassData", "getCenterOfMass");
     private static final Method LOGICAL_POSE_METHOD = ElasticPairReaction.findMethod("dev.ryanhcode.sable.sublevel.SubLevel", "logicalPose");
     private static final Method ROTATION_POINT_METHOD = ElasticPairReaction.findMethod("dev.ryanhcode.sable.companion.math.Pose3d", "rotationPoint");
-    // fork_28: Pose3d.position() — the body's transform origin (what RigidBodyHandle.teleport
-    // expects), distinct from rotationPoint() (the center-of-mass pivot). Used by the runaway
-    // rescue to read the current position before teleporting the body back into a sane Y range.
-    private static final Method POSITION_METHOD = ElasticPairReaction.findMethodSafe("dev.ryanhcode.sable.companion.math.Pose3d", "position");
     // Sublevel block storage: blocks are embedded in the world level at plotLocalPos + plotCenter.
     // rotationPoint tracks physics-world position and diverges from plotCenter when the structure moves.
     // Using plotCenter for block lookups gives the correct stored position regardless of motion.
@@ -272,83 +268,6 @@ public final class ElasticPairReaction {
             if (((Boolean)TrueImpactConfig.ENABLE_DEBUG_IMPACT_LOGGING.get()).booleanValue()) {
                 LogManager.getLogger().warn("[TrueImpact] Failed to clamp runaway sub-level velocity.", e);
             }
-        }
-    }
-
-    // fork_28: the real fix for the narrow_phase crash family. Sable's ServerSubLevel.tick()
-    // force-removes any sub-level whose bounding box leaves the Y range
-    // [SUB_LEVEL_REMOVE_MIN, SUB_LEVEL_REMOVE_MAX] (default [-10000, 100000]); that removal
-    // frees the Rapier collider while a stale narrow-phase contact pair still references it →
-    // narrow_phase.rs:1115 "No element at index" non-unwinding panic (uncatchable JVM abort,
-    // sable#950). The per-substep velocity clamp can NOT fully prevent the runaway: a violated
-    // rope joint can fling a body past the Y limit inside a SINGLE Rapier solver step, before
-    // any post-step clamp runs (every crash log shows "extreme Y coordinate range, removing"
-    // despite the clamp). So instead of preventing the runaway we make the removal never
-    // happen: ServerSubLevelMixin intercepts tick()'s removal branch and calls this. We
-    // TELEPORT the body back to a sane Y — Rapier's teleport repositions the EXISTING collider,
-    // it never frees it, so no stale contact is created — and zero its velocity. The body
-    // survives; Sable never removes it; the crash trigger is gone. Returns true if the rescue
-    // was performed (the mixin then cancels tick(), skipping the log + markRemoved()).
-    // Unconditional by design: a body at the removal threshold is always better teleported
-    // than freed, so this is never gated on config (and thus immune to the preset-reset gotcha).
-    public static boolean rescueRunawaySubLevel(ServerSubLevel subLevel) {
-        if (subLevel == null || subLevel.isRemoved()) {
-            return false;
-        }
-        RigidBodyHandle handle = RigidBodyHandle.of(subLevel);
-        if (handle == null || !handle.isValid()) {
-            return false;
-        }
-        try {
-            // Read the current transform via reflection — the companion-package Pose3d is not
-            // on the compile classpath. position() is the body origin; orientation() its
-            // rotation. Fall back to a fixed finite point / identity for any non-finite field.
-            double x = 0.0;
-            double y = 300.0;
-            double z = 0.0;
-            org.joml.Quaterniond ori = new org.joml.Quaterniond(); // identity
-            Object pose = (LOGICAL_POSE_METHOD != null) ? LOGICAL_POSE_METHOD.invoke(subLevel) : null;
-            if (pose != null && POSITION_METHOD != null) {
-                Object p = POSITION_METHOD.invoke(pose);
-                if (p instanceof Vector3dc v) {
-                    if (Double.isFinite(v.x())) x = v.x();
-                    if (Double.isFinite(v.y())) y = v.y();
-                    if (Double.isFinite(v.z())) z = v.z();
-                }
-            }
-            if (pose != null && ORIENTATION_METHOD != null) {
-                Object q = ORIENTATION_METHOD.invoke(pose);
-                if (q instanceof org.joml.Quaterniondc qd
-                        && Double.isFinite(qd.x()) && Double.isFinite(qd.y())
-                        && Double.isFinite(qd.z()) && Double.isFinite(qd.w())
-                        && (qd.x() != 0.0 || qd.y() != 0.0 || qd.z() != 0.0 || qd.w() != 0.0)) {
-                    ori = new org.joml.Quaterniond(qd);
-                }
-            }
-            // Only Y is ever out of range (Sable's check is Y-only): keep X/Z so the structure
-            // reappears where the player last saw it, and clamp Y well inside the removal window.
-            double safeY = Math.max(-5000.0, Math.min(50000.0, y));
-            handle.teleport(new Vector3d(x, safeY, z), ori);
-            // Kill the runaway velocity (add-delta API only: read, then add the negation).
-            Vector3d lin = new Vector3d();
-            Vector3d ang = new Vector3d();
-            handle.getLinearVelocity(lin);
-            handle.getAngularVelocity(ang);
-            if (ElasticPairReaction.isFinite(lin) && ElasticPairReaction.isFinite(ang)) {
-                handle.addLinearAndAngularVelocity(
-                    new Vector3d((Vector3dc) lin).negate(), new Vector3d((Vector3dc) ang).negate());
-            }
-            if (((Boolean) TrueImpactConfig.ENABLE_DEBUG_IMPACT_LOGGING.get()).booleanValue()) {
-                LogManager.getLogger().warn(
-                    "[TrueImpact] Rescued runaway sub-level {} (Y {} -> {}); narrow_phase crash averted.",
-                    subLevel, y, safeY);
-            }
-            return true;
-        }
-        catch (Exception | LinkageError e) {
-            LogManager.getLogger().warn(
-                "[TrueImpact] Could not rescue runaway sub-level; Sable removal will proceed.", e);
-            return false;
         }
     }
 
