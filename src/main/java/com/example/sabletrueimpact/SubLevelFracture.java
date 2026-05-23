@@ -219,9 +219,11 @@ public final class SubLevelFracture {
             if (removed >= maxBlocks) break;
             BlockState current = level.getBlockState(candidate.pos());
             if (current.isAir() || current.is(Blocks.BEDROCK) || current.getDestroySpeed((BlockGetter)level, candidate.pos()) < 0.0f || !MaterialImpactProperties.isDestructible(current, true)) continue;
-            // beta.6: rope-anchor blocks (rope_connector) must NEVER be destroyed by fracture
-            // either. Destroying one orphans Sable's rope joint → narrow_phase panic.
-            if (RopeBindingRegistry.isRopeAnchorBlockType(current)) continue;
+            // beta.6/7: anchor blocks (rope_connector + auto-detected constraint anchors)
+            // must NEVER be destroyed by fracture either. Two-leg protection: block-type
+            // match (static) + world-position match (auto-covers any Sable constraint mod).
+            if (RopeBindingRegistry.isRopeAnchorBlockType(current)
+                    || RopeBindingRegistry.isConstraintAnchorPosition(candidate.pos())) continue;
             boolean brokeFromFatigue = BlockDamageAccumulator.apply(level, candidate.pos(), candidate.fatigueDamage() * (Double)TrueImpactConfig.SUBLEVEL_FRACTURE_FATIGUE_SCALE.get(), candidate.breakThreshold(), candidate.pos().hashCode() * 23);
             if (brokeFromFatigue) {
                 SubLevelFracture.notifyRemoved(heatMapManager, candidate.pos());

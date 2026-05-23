@@ -39,16 +39,31 @@ public final class RopeBindingRegistry {
 
     private static final Map<Key, Binding> BINDINGS = new ConcurrentHashMap<>();
 
+    // beta.7 — generic constraint-anchor registry. Mirrors EVERY Sable constraint creation
+    // (Rotary, Fixed, Free, Generic) via the 4 Rapier*ConstraintHandle mixins. Key = (handle,
+    // slot) where slot=0 for pos1 / slot=1 for pos2. Value = world-space anchor position
+    // (Sable's `pos1()`/`pos2()` are passed straight to native; for Sable's plot-embedded
+    // sub-level blocks, these match the BLOCK's actual world coords, so a floor-compare
+    // against a broken block's BlockPos is a reliable "is this an anchor block?" test).
+    //
+    // This is the AUTOMATIC version of the anchor-protection: no block-ID list to maintain,
+    // any mod that creates a Sable constraint gets its anchors protected for free.
+    private record ConstraintAnchorKey(long handle, int slot) {}
+    private record ConstraintAnchor(int sceneId, long handle, int slot, double x, double y, double z) {}
+    private static final Map<ConstraintAnchorKey, ConstraintAnchor> CONSTRAINT_ANCHORS = new ConcurrentHashMap<>();
+
     // beta.5 — block IDs that act as rope ANCHORS. Per the user's empirical observation
     // (2026-05-23): "only smashing the rope-binder block itself crashes; everything else is
-    // fine". The fix is to protect these specific block types from ANY destruction. Currently
-    // hard-coded to Create Simulated's rope_connector; if other mods add rope anchors, this
-    // could be promoted to a config list later.
+    // fine". Belt-and-suspenders with the position-based protection added in beta.7 —
+    // catches anchor blocks regardless of whether the mod uses Sable's constraint API in a
+    // way our mixins see (and protects them even if a sub-level translates after attach time
+    // and the anchor position drifts).
     private static final Set<ResourceLocation> ROPE_ANCHOR_BLOCK_IDS = Set.of(
         ResourceLocation.fromNamespaceAndPath("simulated", "rope_connector")
     );
 
-    // True if the block is one of the rope-anchor types we must never destroy.
+    // True if the block is one of the known anchor block TYPES. Static check, immune to
+    // sub-level movement; complementary to isConstraintAnchorPosition.
     public static boolean isRopeAnchorBlockType(BlockState state) {
         if (state == null) {
             return false;
@@ -59,6 +74,69 @@ public final class RopeBindingRegistry {
         } catch (Throwable t) {
             return false;
         }
+    }
+
+    // beta.7 — AUTOMATIC anchor-position check. Returns true if `pos` contains the world
+    // position of any registered constraint anchor (rope or rotary/fixed/free/generic). This
+    // covers any mod that uses Sable's constraint API — Cardan shafts, hose connectors,
+    // linear motion, ballast, anything — without needing to know its block IDs.
+    public static boolean isConstraintAnchorPosition(net.minecraft.core.BlockPos pos) {
+        if (pos == null) {
+            return false;
+        }
+        int px = pos.getX(), py = pos.getY(), pz = pos.getZ();
+        // 1) rope bindings (RapierRopeHandle.setAttachment locations)
+        if (!BINDINGS.isEmpty()) {
+            for (Binding b : BINDINGS.values()) {
+                if (matchesBlock(b.x(), b.y(), b.z(), px, py, pz)) {
+                    return true;
+                }
+            }
+        }
+        // 2) rotary/fixed/free/generic constraint anchors (Rapier*ConstraintHandle.create)
+        if (!CONSTRAINT_ANCHORS.isEmpty()) {
+            for (ConstraintAnchor a : CONSTRAINT_ANCHORS.values()) {
+                if (matchesBlock(a.x(), a.y(), a.z(), px, py, pz)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean matchesBlock(double ax, double ay, double az, int px, int py, int pz) {
+        return Double.isFinite(ax) && Double.isFinite(ay) && Double.isFinite(az)
+            && (int) Math.floor(ax) == px
+            && (int) Math.floor(ay) == py
+            && (int) Math.floor(az) == pz;
+    }
+
+    // Mixin entry point for Rapier{Rotary,Fixed,Free,Generic}ConstraintHandle.create. Records
+    // both anchor positions in one call. Slot 0 = pos1, slot 1 = pos2. The handle ID is the
+    // value the native returned (long handle), so we wire that through too — RapierConstraint-
+    // HandleMixin uses it to clean up on remove().
+    public static void recordConstraint(int sceneId, long handle,
+                                        double x1, double y1, double z1,
+                                        double x2, double y2, double z2) {
+        CONSTRAINT_ANCHORS.put(
+            new ConstraintAnchorKey(handle, 0),
+            new ConstraintAnchor(sceneId, handle, 0, x1, y1, z1));
+        CONSTRAINT_ANCHORS.put(
+            new ConstraintAnchorKey(handle, 1),
+            new ConstraintAnchor(sceneId, handle, 1, x2, y2, z2));
+        if (debug()) {
+            LogManager.getLogger().info(
+                "[TrueImpact] ConstraintAnchor: recorded handle={} pos1=({},{},{}) pos2=({},{},{}) (total {})",
+                handle, x1, y1, z1, x2, y2, z2, CONSTRAINT_ANCHORS.size());
+        }
+    }
+
+    // Mixin entry point for RapierConstraintHandle.remove (the base class). Cleans up both
+    // slots for the given handle. Cheap (two map removes); the registry never grows
+    // unbounded.
+    public static void forgetConstraint(long handle) {
+        CONSTRAINT_ANCHORS.remove(new ConstraintAnchorKey(handle, 0));
+        CONSTRAINT_ANCHORS.remove(new ConstraintAnchorKey(handle, 1));
     }
 
     private RopeBindingRegistry() {

@@ -8,7 +8,12 @@
     "RapierVoxelColliderBakeryMixin",
     "RapierPhysicsPipelineMixin",
     "SubLevelPhysicsSystemMixin",
-    "RapierRopeHandleMixin"
+    "RapierRopeHandleMixin",
+    "RapierConstraintHandleMixin",
+    "RapierRotaryConstraintHandleMixin",
+    "RapierFixedConstraintHandleMixin",
+    "RapierFreeConstraintHandleMixin",
+    "RapierGenericConstraintHandleMixin"
   ],
   "client": [
   ],

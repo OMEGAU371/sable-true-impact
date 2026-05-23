@@ -102,16 +102,19 @@ public class TrueImpactPhysicsSolver {
                 if (state.isAir()) {
                     return BlockSubLevelCollisionCallback.CollisionResult.NONE;
                 }
-                // beta.5: rope-anchor block protection. Per user's 2026-05-23 empirical
-                // observation: smashing the rope_connector block specifically is the only
-                // thing that crashes — everything else (regular rope-structure blocks) is
-                // fine even when broken. Protect rope-anchor block TYPES from any destruction
-                // here; this short-circuits before the soil/crack/break ladder and the
-                // queryIntersecting dispatch, so no destruction path downstream gets a chance
-                // at it.
-                if (RopeBindingRegistry.isRopeAnchorBlockType(state)) {
+                // beta.5/7: constraint-anchor block protection. Empirically: destroying the
+                // block at a Sable constraint anchor (rope, rotary/cardan, fixed, free,
+                // generic) orphans the joint → narrow_phase panic. The protection has two
+                // legs, both belt-and-suspenders:
+                //   1. Block TYPE match — known anchor block IDs (rope_connector and friends).
+                //      Static, immune to sub-level movement.
+                //   2. Position match — any block at a world position registered by the
+                //      RapierRopeHandle / Rapier{Rotary,Fixed,Free,Generic}ConstraintHandle
+                //      mixins. AUTOMATIC for every mod that uses Sable's constraint API.
+                if (RopeBindingRegistry.isRopeAnchorBlockType(state)
+                        || RopeBindingRegistry.isConstraintAnchorPosition(pos)) {
                     org.apache.logging.log4j.LogManager.getLogger("TIDetach").info(
-                        "[beta] protected rope-anchor block at {} ({}); skipping destruction",
+                        "[beta] protected constraint-anchor block at {} ({}); skipping destruction",
                         pos, state.getBlock());
                     return BlockSubLevelCollisionCallback.CollisionResult.NONE;
                 }
