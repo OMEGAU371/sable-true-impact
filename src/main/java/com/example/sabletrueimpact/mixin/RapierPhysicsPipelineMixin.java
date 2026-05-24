@@ -36,6 +36,8 @@ public abstract class RapierPhysicsPipelineMixin {
     private void sabletrueimpact$flushPendingImpulses(CallbackInfo ci) {
         ElasticPairReaction.flushPendingImpulses(this.activeSubLevels);
         ElasticPairReaction.clampRunawaySubLevels(this.activeSubLevels);
+        // beta.14 Phase C: scan moving sub-levels for terrain penetration.
+        com.example.sabletrueimpact.ClippingDamageScanner.maybeScan(this.activeSubLevels);
     }
 
     @Redirect(method={"processCollisionEffects"}, at=@At(value="INVOKE", target="Ldev/ryanhcode/sable/physics/impl/rapier/Rapier3D;clearCollisions(I)[D"))

@@ -376,7 +376,8 @@ public final class ElasticPairReaction {
     // inverse of SubLevel.globalBoundsTransform (plot-local→world). Rotation-correct. Returns
     // null if the matrix is unavailable. The result is plot-LOCAL — callers add plotCenter (or
     // pass it to findNearestNonAirSubLevelState, which does that) to reach the embedded block.
-    private static Vector3d worldToPlotLocal(Object subLevel, double wx, double wy, double wz) {
+    // beta.14 — package-private for ClippingDamageScanner. Behavior unchanged.
+    static Vector3d worldToPlotLocal(Object subLevel, double wx, double wy, double wz) {
         if (GLOBAL_BOUNDS_TRANSFORM_FIELD == null || subLevel == null) {
             return null;
         }
@@ -418,7 +419,8 @@ public final class ElasticPairReaction {
     }
 
     // fork_7: read SubLevel.boundingBox() (world-space AABB) via cached reflection.
-    private static AABB worldBounds(Object subLevel) {
+    // beta.14 — package-private for ClippingDamageScanner. Behavior unchanged.
+    static AABB worldBounds(Object subLevel) {
         if (BOUNDING_BOX_METHOD == null || subLevel == null) return null;
         try {
             Object box = BOUNDING_BOX_METHOD.invoke(subLevel);
@@ -818,7 +820,8 @@ public final class ElasticPairReaction {
         }
     }
 
-    private static ServerLevel level(Object subLevel) {
+    // beta.14 — package-private for ClippingDamageScanner. Behavior unchanged.
+    static ServerLevel level(Object subLevel) {
         try {
             return (ServerLevel)GET_LEVEL_METHOD.invoke(subLevel, new Object[0]);
         }
@@ -886,7 +889,8 @@ public final class ElasticPairReaction {
         }
     }
 
-    private static BlockPos plotCenter(Object subLevel) {
+    // beta.14 — package-private for ClippingDamageScanner. Behavior unchanged.
+    static BlockPos plotCenter(Object subLevel) {
         if (GET_PLOT_METHOD == null || GET_CENTER_BLOCK_METHOD == null) return null;
         try {
             Object plot = GET_PLOT_METHOD.invoke(subLevel);

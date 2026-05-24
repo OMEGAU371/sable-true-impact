@@ -179,6 +179,14 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.BooleanValue ENABLE_PHYSICAL_DESTRUCTION;
     public static final ModConfigSpec.BooleanValue ENABLE_WORLD_DESTRUCTION;
     public static final ModConfigSpec.ConfigValue<List<? extends String>> DESTRUCTIBLE_OVERRIDES;
+    // beta.14 — Phase C: clipping/penetration damage (穿模硬度)
+    public static final ModConfigSpec.BooleanValue ENABLE_CLIPPING_DAMAGE;
+    public static final ModConfigSpec.IntValue CLIPPING_SCAN_PERIOD_TICKS;
+    public static final ModConfigSpec.DoubleValue CLIPPING_CRACK_DEPTH;
+    public static final ModConfigSpec.DoubleValue CLIPPING_BURST_DEPTH;
+    public static final ModConfigSpec.IntValue CLIPPING_MAX_BLOCKS_PER_SCAN;
+    public static final ModConfigSpec.DoubleValue CLIPPING_MIN_SUBLEVEL_VELOCITY;
+    public static final ModConfigSpec.DoubleValue CLIPPING_CRACK_ENERGY_PER_DEPTH;
     public static final ModConfigSpec SPEC;
 
     private TrueImpactConfig() {
@@ -388,6 +396,13 @@ public final class TrueImpactConfig {
         ENABLE_PHYSICAL_DESTRUCTION = BUILDER.comment("Master toggle for ALL True Impact destruction of physical-structure (sub-level) blocks. When false: sub-level blocks are never broken by collisions, fracture, or per-contact damage. Terrain destruction is unaffected (use enableWorldDestruction / enableTerrainImpactDamage for that).").define("enablePhysicalDestruction", true);
         ENABLE_WORLD_DESTRUCTION = BUILDER.comment("Global toggle for world block destruction (Terrain/Blocks hit by physical structures).").define("enableWorldDestruction", true);
         DESTRUCTIBLE_OVERRIDES = BUILDER.comment("Explicit list of block IDs or tags to mark as destructible (true) or indestructible (false). Format: 'modid:blockid,true' or 'tag:modid:tagname,false'. Overrides other settings.").defineListAllowEmpty(List.of("destructibleOverrides"), ArrayList::new, o -> o instanceof String);
+        ENABLE_CLIPPING_DAMAGE = BUILDER.comment("Phase C 穿模硬度: if true, periodically scan moving sub-levels for blocks that have penetrated into terrain (or other sub-levels). Accumulate cracks when shallow; burst-break the weaker block when penetration exceeds the burst threshold. Skips sub-levels that are barely moving so freshly-assembled structures don't self-destruct.").define("enableClippingDamage", true);
+        CLIPPING_SCAN_PERIOD_TICKS = BUILDER.comment("How often (in ticks) to run the clipping scan. 10 = 2 Hz at 20 TPS. Lower = more responsive, higher CPU.").defineInRange("clippingScanPeriodTicks", 10, 1, 200);
+        CLIPPING_CRACK_DEPTH = BUILDER.comment("Penetration depth (in blocks) at which clipping starts producing fatigue cracks. 0.3 = ~30% of a block has clipped through. Lower = more sensitive to grazes.").defineInRange("clippingCrackDepth", 0.3, 0.0, 1.0);
+        CLIPPING_BURST_DEPTH = BUILDER.comment("Penetration depth (in blocks) at which the WEAKER of the two clipping blocks instantly bursts (queued destroyBlock). 0.7 = the block has clipped 70%+ into another. Lower = ships explode on small overlaps; higher = ships pass through walls before reacting.").defineInRange("clippingBurstDepth", 0.7, 0.1, 1.0);
+        CLIPPING_MAX_BLOCKS_PER_SCAN = BUILDER.comment("Maximum sub-level blocks inspected per scan tick across ALL active sub-levels. Soft cap to bound CPU cost on dense scenes. When the cap is hit, remaining blocks are deferred to the next scan.").defineInRange("clippingMaxBlocksPerScan", 200, 8, 10000);
+        CLIPPING_MIN_SUBLEVEL_VELOCITY = BUILDER.comment("Sub-levels whose latest linear speed is below this (blocks/s) are skipped — keeps stationary structures and assembly-frozen sub-levels from self-destructing. Set to 0 to scan everything.").defineInRange("clippingMinSublevelVelocity", 0.05, 0.0, 100.0);
+        CLIPPING_CRACK_ENERGY_PER_DEPTH = BUILDER.comment("Energy fed into BlockDamageAccumulator per (depth - crackDepth) above the crack threshold. Higher = each shallow-clip tick cracks more. Reasonable range 5~50.").defineInRange("clippingCrackEnergyPerDepth", 15.0, 0.0, 1000.0);
         BUILDER.pop();
         BUILDER.push("createContraptionAnchors");
         ENABLE_CREATE_CONTRAPTION_ANCHOR_DAMAGE = BUILDER.comment("If true, impacts near Create contraption anchors transfer part of the load to bearings, pistons, pulleys, car assemblers, and nearby support blocks.").define("enableCreateContraptionAnchorDamage", true);
