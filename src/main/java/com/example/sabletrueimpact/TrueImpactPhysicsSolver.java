@@ -94,7 +94,16 @@ public class TrueImpactPhysicsSolver {
                 } catch (IllegalStateException notStepping) {
                     return BlockSubLevelCollisionCallback.CollisionResult.NONE;
                 }
+                // beta.11-diag entry probe — confirms callback reaches us for tracked blocks.
+                try {
+                    BlockState peekState = system.getLevel().getBlockState(pos);
+                    BeltDiag.logEntry(pos, peekState, impactVelocity);
+                } catch (Throwable ignored) {}
                 if (!((Boolean)TrueImpactConfig.ENABLE_TRUE_IMPACT.get()).booleanValue() || impactVelocity < (Double)TrueImpactConfig.MIN_EFFECT_VELOCITY.get()) {
+                    try {
+                        BlockState s = system.getLevel().getBlockState(pos);
+                        BeltDiag.logEarly(pos, s, "DISABLED_OR_V_BELOW_MIN", impactVelocity);
+                    } catch (Throwable ignored) {}
                     return BlockSubLevelCollisionCallback.CollisionResult.NONE;
                 }
                 // beta.9.1 — B2 real real fix. The callback's bakery mixin attaches this
@@ -110,11 +119,16 @@ public class TrueImpactPhysicsSolver {
                 // Terrain destruction is not affected: it goes through ElasticPairReaction's
                 // applyPerContactTerrainHit, not this callback.
                 if (!((Boolean)TrueImpactConfig.ENABLE_PHYSICAL_DESTRUCTION.get()).booleanValue()) {
+                    try {
+                        BlockState s = system.getLevel().getBlockState(pos);
+                        BeltDiag.logEarly(pos, s, "PHYS_DESTR_OFF", impactVelocity);
+                    } catch (Throwable ignored) {}
                     return BlockSubLevelCollisionCallback.CollisionResult.NONE;
                 }
                 level = system.getLevel();
                 state = level.getBlockState(pos);
                 if (state.isAir()) {
+                    BeltDiag.logEarly(pos, state, "IS_AIR(state.isAir==true!)", impactVelocity);
                     return BlockSubLevelCollisionCallback.CollisionResult.NONE;
                 }
                 // beta.5/7: constraint-anchor block protection. Empirically: destroying the
@@ -131,10 +145,12 @@ public class TrueImpactPhysicsSolver {
                     org.apache.logging.log4j.LogManager.getLogger("TIDetach").info(
                         "[beta] protected constraint-anchor block at {} ({}); skipping destruction",
                         pos, state.getBlock());
+                    BeltDiag.logEarly(pos, state, "ANCHOR_PROTECTED", impactVelocity);
                     return BlockSubLevelCollisionCallback.CollisionResult.NONE;
                 }
                 float hardness = state.getDestroySpeed((BlockGetter)level, pos);
                 if (hardness < 0.0f) {
+                    BeltDiag.logEarly(pos, state, "NEG_HARDNESS", impactVelocity);
                     return BlockSubLevelCollisionCallback.CollisionResult.NONE;
                 }
                 if (((Boolean)TrueImpactConfig.ENABLE_SOIL_COMPACTION.get()).booleanValue() && COMPACTABLE_SOIL.contains(state.getBlock()) && impactVelocity >= (Double)TrueImpactConfig.SOIL_COMPACTION_MIN_VELOCITY.get() && impactVelocity < (Double)TrueImpactConfig.SOIL_COMPACTION_MAX_VELOCITY.get()) {
@@ -201,6 +217,7 @@ public class TrueImpactPhysicsSolver {
             }
             if (Double.isFinite(actualSubLevelSpeed)) {
                 if (actualSubLevelSpeed < (Double)TrueImpactConfig.MIN_EFFECT_VELOCITY.get()) {
+                    BeltDiag.logEarly(pos, state, "SSL_VEL_BELOW_MIN(v=" + actualSubLevelSpeed + ")", impactVelocity);
                     return BlockSubLevelCollisionCallback.CollisionResult.NONE;
                 }
                 impactVelocity = Math.min(impactVelocity, actualSubLevelSpeed);
@@ -241,10 +258,14 @@ public class TrueImpactPhysicsSolver {
                 // Sable's recoverSubLevel() (remove + re-add) mid-tick. The remove freed Rapier collider
                 // handles while stale narrow-phase pairs still referenced them → narrow_phase.rs:1115
                 // "No element at index" panic. Returning NONE lets Rapier handle the bounce alone.
+                BeltDiag.log(pos, state, "ELASTIC_OR_PROTECTED(rest=" + String.format("%.2f", restitution) + ",elasticSub=" + elasticImpactingSubLevel + ")",
+                    impactVelocity, scaledKineticEnergy, materialStrength, yieldRatio, crackRatio, true, protectedSubLevelImpact);
                 return BlockSubLevelCollisionCallback.CollisionResult.NONE;
             }
             if (restitution >= (Double)TrueImpactConfig.BOUNCE_RESPONSE_THRESHOLD.get() && impactVelocity < (Double)TrueImpactConfig.ELASTIC_SHATTER_VELOCITY.get() && !fragile) {
                 // Same reason as above: Rapier's native elastic response handles this.
+                BeltDiag.log(pos, state, "ELASTIC_SHATTER_BELOW",
+                    impactVelocity, scaledKineticEnergy, materialStrength, yieldRatio, crackRatio, true, protectedSubLevelImpact);
                 return BlockSubLevelCollisionCallback.CollisionResult.NONE;
             }
             boolean bl2 = canBreakWorldBlocks = (Boolean)TrueImpactConfig.ENABLE_BLOCK_BREAKING.get() != false && (Boolean)TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.get() != false && (Boolean)TrueImpactConfig.ENABLE_WORLD_DESTRUCTION.get() != false && MaterialImpactProperties.isDestructible(state, true);
@@ -265,6 +286,8 @@ public class TrueImpactPhysicsSolver {
                 // removeCollision=false: let Sable/Rapier keep the voxel collider until destroyBlock fires
                 // next tick. Returning true here removes the collider mid-step → island state inconsistency
                 // → "island should be awake" panic in narrow_phase.rs.
+                BeltDiag.log(pos, state, "PROPAGATION_QUEUED(destroyBlock=false)",
+                    impactVelocity, scaledKineticEnergy, materialStrength, yieldRatio, crackRatio, canBreakWorldBlocks, protectedSubLevelImpact);
                 return BlockSubLevelCollisionCallback.CollisionResult.NONE;
             }
             if (canBreakWorldBlocks && impactVelocity >= elasticBreakVelocity && yieldRatio > (Double)TrueImpactConfig.HEAVY_BREAK_YIELD_THRESHOLD.get()) {
@@ -272,6 +295,11 @@ public class TrueImpactPhysicsSolver {
                     final ServerLevel destroyLevel = level;
                     final BlockPos destroyPos = pos;
                     ImpactBreakQueue.enqueue(() -> destroyLevel.destroyBlock(destroyPos, true));
+                    BeltDiag.log(pos, state, "HEAVY_BREAK_QUEUED(destroyBlock=true)",
+                        impactVelocity, scaledKineticEnergy, materialStrength, yieldRatio, crackRatio, canBreakWorldBlocks, protectedSubLevelImpact);
+                } else {
+                    BeltDiag.log(pos, state, "HEAVY_BREAK_GATE_BUT_NO_QUEUE(yr<REACTION_YIELD_LIMIT)",
+                        impactVelocity, scaledKineticEnergy, materialStrength, yieldRatio, crackRatio, canBreakWorldBlocks, protectedSubLevelImpact);
                 }
                 // removeCollision=false: same reason as propagation path above.
                 // tangentMotion=zero: Rapier already computes the elastic bounce; adding reactionMotion
@@ -282,17 +310,26 @@ public class TrueImpactPhysicsSolver {
             if (canBreakWorldBlocks && impactVelocity >= elasticBreakVelocity && yieldRatio > (Double)TrueImpactConfig.BREAK_YIELD_THRESHOLD.get() && impactVelocity * yieldRatio > elasticBreakVelocity * ((Double)TrueImpactConfig.BREAK_YIELD_THRESHOLD.get() + 1.5)) {
                 double overstress = Math.max(0.0, scaledKineticEnergy - materialStrength);
                 BlockDamageAccumulator.apply(level, pos, MaterialImpactProperties.fatigueDamage(state, overstress), materialToughness * (Double)TrueImpactConfig.BREAK_YIELD_THRESHOLD.get(), system.hashCode() + pos.hashCode());
+                BeltDiag.log(pos, state, "REG_BREAK_SPIKE_FATIGUE(over=" + String.format("%.1f", overstress) + ")",
+                    impactVelocity, scaledKineticEnergy, materialStrength, yieldRatio, crackRatio, canBreakWorldBlocks, protectedSubLevelImpact);
                 // Same reason: Rapier handles the elastic bounce; accumulating extra impulse causes crash.
                 return BlockSubLevelCollisionCallback.CollisionResult.NONE;
             }
             if (canBreakWorldBlocks && impactVelocity >= elasticBreakVelocity && yieldRatio > (Double)TrueImpactConfig.BREAK_YIELD_THRESHOLD.get()) {
                 double overstress = Math.max(0.0, scaledKineticEnergy - materialStrength);
                 BlockDamageAccumulator.apply(level, pos, MaterialImpactProperties.fatigueDamage(state, overstress * 0.65), materialToughness * (Double)TrueImpactConfig.BREAK_YIELD_THRESHOLD.get(), system.hashCode() + pos.hashCode());
+                BeltDiag.log(pos, state, "REG_BREAK_FATIGUE(over*0.65=" + String.format("%.1f", overstress * 0.65) + ")",
+                    impactVelocity, scaledKineticEnergy, materialStrength, yieldRatio, crackRatio, canBreakWorldBlocks, protectedSubLevelImpact);
                 return BlockSubLevelCollisionCallback.CollisionResult.NONE;
             }
             if (((Boolean)TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.get()).booleanValue() && ((Boolean)TrueImpactConfig.ENABLE_CRACKS.get()).booleanValue() && crackRatio > (Double)TrueImpactConfig.CRACK_YIELD_THRESHOLD.get()) {
                 double crackOverStress = Math.max(0.0, scaledKineticEnergy - crackResistance);
                 BlockDamageAccumulator.apply(level, pos, MaterialImpactProperties.fatigueDamage(state, crackOverStress), materialToughness * (Double)TrueImpactConfig.BREAK_YIELD_THRESHOLD.get(), system.hashCode() + pos.hashCode());
+                BeltDiag.log(pos, state, "CRACK_ONLY_FATIGUE(crackOver=" + String.format("%.1f", crackOverStress) + ")",
+                    impactVelocity, scaledKineticEnergy, materialStrength, yieldRatio, crackRatio, canBreakWorldBlocks, protectedSubLevelImpact);
+            } else {
+                BeltDiag.log(pos, state, "NO_DAMAGE(below_all_thresholds)",
+                    impactVelocity, scaledKineticEnergy, materialStrength, yieldRatio, crackRatio, canBreakWorldBlocks, protectedSubLevelImpact);
             }
             return BlockSubLevelCollisionCallback.CollisionResult.NONE;
         }
