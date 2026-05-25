@@ -69,7 +69,7 @@ public class TrueImpactPhysicsSolver {
     }
 
     private static final TagKey<Block> SABLE_FRAGILE = TagKey.create((ResourceKey)Registries.BLOCK, (ResourceLocation)ResourceLocation.fromNamespaceAndPath((String)"sable", (String)"fragile"));
-    private static final Set<Block> COMPACTABLE_SOIL = Set.of(Blocks.GRASS_BLOCK, Blocks.PODZOL, Blocks.MYCELIUM);
+    private static final Set<Block> COMPACTABLE_SOIL = Set.of(Blocks.GRASS_BLOCK, Blocks.PODZOL, Blocks.MYCELIUM, Blocks.FARMLAND);
 
     private static class HardnessFragileCallback
     implements BlockSubLevelCollisionCallback {
@@ -77,6 +77,7 @@ public class TrueImpactPhysicsSolver {
         }
 
         public BlockSubLevelCollisionCallback.CollisionResult sable$onCollision(BlockPos pos, Vector3d hitPos, double impactVelocity) {
+            try {
             boolean canBreakWorldBlocks;
             boolean protectedSubLevelImpact;
             boolean hasVelocity;
@@ -87,6 +88,9 @@ public class TrueImpactPhysicsSolver {
             BlockState state;
             ServerLevel level;
             SubLevelPhysicsSystem system;
+            // 1.1.2: track which sub-level this contact came from, so we can normalize
+            // per-tick kinetic energy by total contact count (tank treads → low per-cell pressure).
+            int matchedSslId = -1;
             block21: {
                 // Bug 4 fix: getCurrentlySteppingSystem() throws IllegalStateException in Sable 1.2.2 when null
                 try {
@@ -138,10 +142,34 @@ public class TrueImpactPhysicsSolver {
                     return BlockSubLevelCollisionCallback.CollisionResult.NONE;
                 }
                 if (((Boolean)TrueImpactConfig.ENABLE_SOIL_COMPACTION.get()).booleanValue() && COMPACTABLE_SOIL.contains(state.getBlock()) && impactVelocity >= (Double)TrueImpactConfig.SOIL_COMPACTION_MIN_VELOCITY.get() && impactVelocity < (Double)TrueImpactConfig.SOIL_COMPACTION_MAX_VELOCITY.get()) {
-                    final ServerLevel compactLevel = level;
-                    final BlockPos compactPos = pos;
-                    ImpactBreakQueue.enqueue(() -> compactLevel.setBlock(compactPos, Blocks.DIRT.defaultBlockState(), 3));
+                    // 1.1.2: probability gate. Without this, a tracked vehicle with ~20 simultaneous
+                    // contacts compacts every grass cell underneath on every tick. With the default
+                    // 0.05 chance, ~1 of every 20 contacts succeeds, leaving sparse footprints.
+                    double soilChance = ((Double)TrueImpactConfig.SOIL_COMPACTION_PER_CONTACT_CHANCE.get()).doubleValue();
+                    boolean compactFired = soilChance >= 1.0 || java.util.concurrent.ThreadLocalRandom.current().nextDouble() < soilChance;
+                    TIDiag.soil(pos, impactVelocity, soilChance, compactFired);
+                    if (compactFired) {
+                        final ServerLevel compactLevel = level;
+                        final BlockPos compactPos = pos;
+                        ImpactBreakQueue.enqueue(() -> compactLevel.setBlock(compactPos, Blocks.DIRT.defaultBlockState(), 3));
+                    }
                     return BlockSubLevelCollisionCallback.CollisionResult.NONE;
+                }
+                // Block transforms: user-defined block → block conversions (checked after soil compaction).
+                if (((Boolean)TrueImpactConfig.ENABLE_BLOCK_TRANSFORMS.get()).booleanValue()
+                    && impactVelocity >= (Double)TrueImpactConfig.BLOCK_TRANSFORM_MIN_VELOCITY.get()
+                    && impactVelocity < (Double)TrueImpactConfig.BLOCK_TRANSFORM_MAX_VELOCITY.get()) {
+                    BlockState transformed = BlockTransformRegistry.tryTransform(state);
+                    if (transformed != null) {
+                        double chance = (Double)TrueImpactConfig.BLOCK_TRANSFORM_PER_CONTACT_CHANCE.get();
+                        if (chance >= 1.0 || java.util.concurrent.ThreadLocalRandom.current().nextDouble() < chance) {
+                            final ServerLevel tl = level;
+                            final BlockPos tp = pos;
+                            final BlockState ts = transformed;
+                            ImpactBreakQueue.enqueue(() -> tl.setBlock(tp, ts, 3));
+                        }
+                        return BlockSubLevelCollisionCallback.CollisionResult.NONE;
+                    }
                 }
                 float blastResistance = state.getBlock().getExplosionResistance();
                 int solidNeighbors = 0;
@@ -167,6 +195,7 @@ public class TrueImpactPhysicsSolver {
                     );
                     for (SubLevel sl : system.queryIntersecting(queryBox)) {
                         if (sl instanceof ServerSubLevel ssl) {
+                            matchedSslId = ssl.getRuntimeId();
                             // beta.6: broad rope-sub-level exemption REMOVED. The crash was never
                             // about "rope-connected structures take damage" — it was specifically
                             // about the rope_connector block being destroyed (which orphans the
@@ -211,7 +240,10 @@ public class TrueImpactPhysicsSolver {
                 Vector3d blockCenter = new Vector3d((double)pos.getX() + 0.5, (double)pos.getY() + 0.5, (double)pos.getZ() + 0.5);
                 Vector3d normal = new Vector3d((Vector3dc)hitPos).sub((Vector3dc)blockCenter).normalize();
                 double dot = Math.abs(velocityVec.dot((Vector3dc)normal));
-                angleMultiplier = Math.max(0.1, dot);
+                // 1.1.3: floor lowered from hardcoded 0.1 to config (default 0.02). Tracked
+                // vehicles moving horizontally have dot≈0; with the old 0.1 floor each contact
+                // still applied 10% of full KE to the ground, enough to dig trenches at speed.
+                angleMultiplier = Math.max(((Double)TrueImpactConfig.IMPACT_ANGLE_FLOOR.get()).doubleValue(), dot);
             }
             double restitution = HardnessFragileCallback.clamp01(MaterialImpactProperties.getRestitution(state, PhysicsBlockPropertyHelper.getRestitution((BlockState)state)));
             double friction = Math.max(0.0, MaterialImpactProperties.getFriction(state, PhysicsBlockPropertyHelper.getFriction((BlockState)state)));
@@ -222,8 +254,29 @@ public class TrueImpactPhysicsSolver {
             double fragileFactor = fragile ? (Double)TrueImpactConfig.FRAGILE_DAMAGE_MULTIPLIER.get() : 1.0;
             double velocityEnergy = Math.pow(Math.max(impactVelocity, 0.0), (Double)TrueImpactConfig.IMPACT_VELOCITY_EXPONENT.get());
             double kineticEnergy = 0.5 * effectiveMass * velocityEnergy * angleMultiplier * reboundFactor * frictionFactor * fragileFactor * (Double)TrueImpactConfig.DAMAGE_SCALE.get() * (Double)TrueImpactConfig.GLOBAL_STRENGTH_SCALE.get();
+            // 1.1.2: pressure normalization. Divide by smoothed per-tick contact count so a wide
+            // flat sub-level (tank treads, ship hull) spreads its kinetic energy across all
+            // contacts instead of dumping the full sub-level KE into each terrain cell. Without
+            // this, tracked vehicles dig trenches just by moving across grass.
+            double kineticEnergyRaw = kineticEnergy;
+            int diagContactCount = 1;
+            if (matchedSslId != -1) {
+                try {
+                    double contactDivisor = ContactPressureTracker.recordAndGetDivisor(
+                        matchedSslId, level.getGameTime(),
+                        ((Double)TrueImpactConfig.CONTACT_PRESSURE_EXPONENT.get()).doubleValue());
+                    kineticEnergy /= contactDivisor;
+                    diagContactCount = (int) Math.round(Math.pow(contactDivisor,
+                        1.0 / Math.max(0.01, ((Double)TrueImpactConfig.CONTACT_PRESSURE_EXPONENT.get()).doubleValue())));
+                } catch (Throwable ignored) {
+                    // Normalization must never disturb the destruction path.
+                }
+            }
             double matchupScale = ImpactDamageContextCache.getNearby(level, pos, 2, 1.0);
             double scaledKineticEnergy = kineticEnergy * matchupScale;
+            // 1.1.4-diag: capture for outcome logging below.
+            final int DIAG_CONTACT_COUNT = diagContactCount;
+            final double DIAG_KE_RAW = kineticEnergyRaw;
             double materialStrength = Math.max(MaterialImpactProperties.displayStrength(state, structuralIntegrity), 1.0);
             double materialToughness = Math.max(MaterialImpactProperties.displayToughness(state, structuralIntegrity), materialStrength);
             double crackResistance = Math.sqrt(materialStrength * materialToughness);
@@ -241,10 +294,12 @@ public class TrueImpactPhysicsSolver {
                 // Sable's recoverSubLevel() (remove + re-add) mid-tick. The remove freed Rapier collider
                 // handles while stale narrow-phase pairs still referenced them → narrow_phase.rs:1115
                 // "No element at index" panic. Returning NONE lets Rapier handle the bounce alone.
+                TIDiag.hardness(pos, matchedSslId, impactVelocity, mass, DIAG_KE_RAW, kineticEnergy, materialStrength, yieldRatio, DIAG_CONTACT_COUNT, "ELASTIC_OR_PROTECTED");
                 return BlockSubLevelCollisionCallback.CollisionResult.NONE;
             }
             if (restitution >= (Double)TrueImpactConfig.BOUNCE_RESPONSE_THRESHOLD.get() && impactVelocity < (Double)TrueImpactConfig.ELASTIC_SHATTER_VELOCITY.get() && !fragile) {
                 // Same reason as above: Rapier's native elastic response handles this.
+                TIDiag.hardness(pos, matchedSslId, impactVelocity, mass, DIAG_KE_RAW, kineticEnergy, materialStrength, yieldRatio, DIAG_CONTACT_COUNT, "ELASTIC_SHATTER_BELOW");
                 return BlockSubLevelCollisionCallback.CollisionResult.NONE;
             }
             boolean bl2 = canBreakWorldBlocks = (Boolean)TrueImpactConfig.ENABLE_BLOCK_BREAKING.get() != false && (Boolean)TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.get() != false && (Boolean)TrueImpactConfig.ENABLE_WORLD_DESTRUCTION.get() != false && MaterialImpactProperties.isDestructible(state, true);
@@ -265,13 +320,15 @@ public class TrueImpactPhysicsSolver {
                 // removeCollision=false: let Sable/Rapier keep the voxel collider until destroyBlock fires
                 // next tick. Returning true here removes the collider mid-step → island state inconsistency
                 // → "island should be awake" panic in narrow_phase.rs.
+                TIDiag.hardness(pos, matchedSslId, impactVelocity, mass, DIAG_KE_RAW, kineticEnergy, materialStrength, yieldRatio, DIAG_CONTACT_COUNT, "PROPAGATION_QUEUED");
                 return BlockSubLevelCollisionCallback.CollisionResult.NONE;
             }
             if (canBreakWorldBlocks && impactVelocity >= elasticBreakVelocity && yieldRatio > (Double)TrueImpactConfig.HEAVY_BREAK_YIELD_THRESHOLD.get()) {
-                if (yieldRatio >= (Double)TrueImpactConfig.REACTION_YIELD_LIMIT.get()) {
+                {
                     final ServerLevel destroyLevel = level;
                     final BlockPos destroyPos = pos;
                     ImpactBreakQueue.enqueue(() -> destroyLevel.destroyBlock(destroyPos, true));
+                    TIDiag.hardness(pos, matchedSslId, impactVelocity, mass, DIAG_KE_RAW, kineticEnergy, materialStrength, yieldRatio, DIAG_CONTACT_COUNT, "HEAVY_BREAK_QUEUED");
                 }
                 // removeCollision=false: same reason as propagation path above.
                 // tangentMotion=zero: Rapier already computes the elastic bounce; adding reactionMotion
@@ -282,19 +339,30 @@ public class TrueImpactPhysicsSolver {
             if (canBreakWorldBlocks && impactVelocity >= elasticBreakVelocity && yieldRatio > (Double)TrueImpactConfig.BREAK_YIELD_THRESHOLD.get() && impactVelocity * yieldRatio > elasticBreakVelocity * ((Double)TrueImpactConfig.BREAK_YIELD_THRESHOLD.get() + 1.5)) {
                 double overstress = Math.max(0.0, scaledKineticEnergy - materialStrength);
                 BlockDamageAccumulator.apply(level, pos, MaterialImpactProperties.fatigueDamage(state, overstress), materialToughness * (Double)TrueImpactConfig.BREAK_YIELD_THRESHOLD.get(), system.hashCode() + pos.hashCode());
+                TIDiag.hardness(pos, matchedSslId, impactVelocity, mass, DIAG_KE_RAW, kineticEnergy, materialStrength, yieldRatio, DIAG_CONTACT_COUNT, "REG_BREAK_SPIKE_FATIGUE(over=" + String.format("%.1f", overstress) + ")");
                 // Same reason: Rapier handles the elastic bounce; accumulating extra impulse causes crash.
                 return BlockSubLevelCollisionCallback.CollisionResult.NONE;
             }
             if (canBreakWorldBlocks && impactVelocity >= elasticBreakVelocity && yieldRatio > (Double)TrueImpactConfig.BREAK_YIELD_THRESHOLD.get()) {
                 double overstress = Math.max(0.0, scaledKineticEnergy - materialStrength);
                 BlockDamageAccumulator.apply(level, pos, MaterialImpactProperties.fatigueDamage(state, overstress * 0.65), materialToughness * (Double)TrueImpactConfig.BREAK_YIELD_THRESHOLD.get(), system.hashCode() + pos.hashCode());
+                TIDiag.hardness(pos, matchedSslId, impactVelocity, mass, DIAG_KE_RAW, kineticEnergy, materialStrength, yieldRatio, DIAG_CONTACT_COUNT, "REG_BREAK_FATIGUE(over=" + String.format("%.1f", overstress * 0.65) + ")");
                 return BlockSubLevelCollisionCallback.CollisionResult.NONE;
             }
             if (((Boolean)TrueImpactConfig.MOVING_STRUCTURES_BREAK_BLOCKS.get()).booleanValue() && ((Boolean)TrueImpactConfig.ENABLE_CRACKS.get()).booleanValue() && crackRatio > (Double)TrueImpactConfig.CRACK_YIELD_THRESHOLD.get()) {
                 double crackOverStress = Math.max(0.0, scaledKineticEnergy - crackResistance);
                 BlockDamageAccumulator.apply(level, pos, MaterialImpactProperties.fatigueDamage(state, crackOverStress), materialToughness * (Double)TrueImpactConfig.BREAK_YIELD_THRESHOLD.get(), system.hashCode() + pos.hashCode());
+                TIDiag.hardness(pos, matchedSslId, impactVelocity, mass, DIAG_KE_RAW, kineticEnergy, materialStrength, yieldRatio, DIAG_CONTACT_COUNT, "CRACK_ONLY_FATIGUE(over=" + String.format("%.1f", crackOverStress) + ")");
+            } else {
+                TIDiag.hardness(pos, matchedSslId, impactVelocity, mass, DIAG_KE_RAW, kineticEnergy, materialStrength, yieldRatio, DIAG_CONTACT_COUNT, "NO_DAMAGE");
             }
             return BlockSubLevelCollisionCallback.CollisionResult.NONE;
+            } catch (Throwable __callbackEx) {
+                org.apache.logging.log4j.LogManager.getLogger("TrueImpact").error(
+                    "[TrueImpact] sable$onCollision threw unexpectedly at pos={} — returning NONE to prevent hooks.rs unwrap panic",
+                    pos, __callbackEx);
+                return BlockSubLevelCollisionCallback.CollisionResult.NONE;
+            }
         }
 
         private static double clamp01(double value) {

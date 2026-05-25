@@ -187,6 +187,21 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.IntValue CLIPPING_MAX_BLOCKS_PER_SCAN;
     public static final ModConfigSpec.DoubleValue CLIPPING_MIN_SUBLEVEL_VELOCITY;
     public static final ModConfigSpec.DoubleValue CLIPPING_CRACK_ENERGY_PER_DEPTH;
+    // 1.1.1 — pressure normalization: divide per-overlap energy by overlapCount^exponent.
+    public static final ModConfigSpec.DoubleValue CLIPPING_PRESSURE_EXPONENT;
+    // 1.1.2 — contact-area normalization for the per-contact destruction callback,
+    // and probability gate for soil compaction. Both prevent large-footprint sub-levels
+    // (tracked vehicles, wide hulls) from damaging terrain just by moving across it.
+    public static final ModConfigSpec.DoubleValue CONTACT_PRESSURE_EXPONENT;
+    public static final ModConfigSpec.DoubleValue SOIL_COMPACTION_PER_CONTACT_CHANCE;
+    // 1.1.3 — floor for angleMultiplier in the per-contact KE formula. Lowering this
+    // makes horizontal-only motion (tank rolling, ship side-shave) cause near-zero damage.
+    public static final ModConfigSpec.DoubleValue IMPACT_ANGLE_FLOOR;
+    public static final ModConfigSpec.BooleanValue ENABLE_BLOCK_TRANSFORMS;
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> BLOCK_TRANSFORM_RULES;
+    public static final ModConfigSpec.DoubleValue BLOCK_TRANSFORM_MIN_VELOCITY;
+    public static final ModConfigSpec.DoubleValue BLOCK_TRANSFORM_MAX_VELOCITY;
+    public static final ModConfigSpec.DoubleValue BLOCK_TRANSFORM_PER_CONTACT_CHANCE;
     public static final ModConfigSpec SPEC;
 
     private TrueImpactConfig() {
@@ -248,9 +263,6 @@ public final class TrueImpactConfig {
         BLAST_STRENGTH_EXPONENT = BUILDER.comment("Exponent applied to blast resistance before multiplying by blastStrengthFactor. 0.5 = sqrt (original). 0.6 makes netherite (blast 6000) roughly twice as strong as with sqrt while keeping stone (blast 6) at the same level.").defineInRange("blastStrengthExponent", 0.6, 0.1, 2.0);
         BLAST_TOUGHNESS_FACTOR = BUILDER.comment("How much a block's vanilla explosion resistance contributes to its physical toughness (impact absorption).").defineInRange("blastToughnessFactor", 0.65, 0.0, 1000.0);
         BUILDER.pop();
-        ENABLE_SOIL_COMPACTION = BUILDER.comment("If true, light impacts on grass/podzol/mycelium compress the soil into dirt instead of breaking or ignoring the block. Heavy impacts still break the block normally.").define("enableSoilCompaction", true);
-        SOIL_COMPACTION_MIN_VELOCITY = BUILDER.comment("Minimum impact velocity to trigger soil compaction (grass \u2192 dirt). Below this, impacts are too gentle to do anything.").defineInRange("soilCompactionMinVelocity", 3.0, 0.0, 1000.0);
-        SOIL_COMPACTION_MAX_VELOCITY = BUILDER.comment("Impact velocity above which soil compaction is skipped and the block is treated like any other (broken normally). Below this threshold, grass is pressed into dirt instead.").defineInRange("soilCompactionMaxVelocity", 14.0, 0.0, 1000.0);
         BUILDER.push("impact");
         MIN_EFFECT_VELOCITY = BUILDER.comment("Impacts below this speed do nothing. Raise this if tiny falls still leave marks.").defineInRange("minEffectVelocity", 3.0, 0.0, 1000.0);
         MIN_BREAK_VELOCITY = BUILDER.comment("Impacts below this speed cannot directly break the hit block.").defineInRange("minBreakVelocity", 12.0, 0.0, 1000.0);
@@ -403,6 +415,22 @@ public final class TrueImpactConfig {
         CLIPPING_MAX_BLOCKS_PER_SCAN = BUILDER.comment("Maximum sub-level blocks inspected per scan tick across ALL active sub-levels. Soft cap to bound CPU cost on dense scenes. When the cap is hit, remaining blocks are deferred to the next scan.").defineInRange("clippingMaxBlocksPerScan", 200, 8, 10000);
         CLIPPING_MIN_SUBLEVEL_VELOCITY = BUILDER.comment("Sub-levels whose latest linear speed is below this (blocks/s) are skipped — keeps stationary structures and assembly-frozen sub-levels from self-destructing. Set to 0 to scan everything.").defineInRange("clippingMinSublevelVelocity", 0.05, 0.0, 100.0);
         CLIPPING_CRACK_ENERGY_PER_DEPTH = BUILDER.comment("Energy fed into BlockDamageAccumulator per (depth - crackDepth) above the crack threshold. Higher = each shallow-clip tick cracks more. Reasonable range 5~50.").defineInRange("clippingCrackEnergyPerDepth", 15.0, 0.0, 1000.0);
+        CLIPPING_PRESSURE_EXPONENT = BUILDER.comment("1.1.1: Pressure normalization for clipping damage. Per-overlap energy is divided by max(1, overlapCellCount^exponent) before being applied. 1.0 = pure linear pressure model (force/area), so wide flat contacts like tank treads barely damage anything; 0.5 = sqrt softening (treads bite a little); 0.0 = legacy behavior (every overlap gets full energy, large flat sub-levels self-destruct on contact). Default 1.0 fixes the 'tracked vehicle crushes ground just by driving' problem reported after 1.1.0-gamma.").defineInRange("clippingPressureExponent", 1.0, 0.0, 4.0);
+        CONTACT_PRESSURE_EXPONENT = BUILDER.comment("1.1.2-3: Pressure normalization for the per-contact destruction callback. Kinetic energy is divided by max(1, smoothedContactsPerTick^exponent) before threshold checks. 1.5 (default) = super-linear softening (tank treads with 30+ contacts get ~5x less per-cell energy than linear); 1.0 = linear pressure model (some residual trenching); 0.5 = sqrt; 0.0 = legacy 1.1.1 behavior. 1.1.3 raised the default to 1.5 after reports of trenches persisting under fast tracked vehicles even with linear normalization.").defineInRange("contactPressureExponent", 1.5, 0.0, 4.0);
+        IMPACT_ANGLE_FLOOR = BUILDER.comment("1.1.3: Minimum value of the angle multiplier when an impact is purely tangential (velocity perpendicular to contact normal). Pre-1.1.3 this was hardcoded to 0.1, which meant a tracked vehicle rolling horizontally still applied 10% of its full kinetic energy to the ground per contact and could still dig trenches. 0.02 (default) reduces tangential damage by 5x while keeping vertical impacts unchanged. Set to 0 to make purely tangential motion deal zero damage; raise back to 0.1 for legacy behavior.").defineInRange("impactAngleFloor", 0.02, 0.0, 1.0);
+        BUILDER.pop();
+        BUILDER.push("soilCompaction");
+        ENABLE_SOIL_COMPACTION = BUILDER.comment("If true, light impacts on grass/podzol/mycelium/farmland compress the soil into dirt instead of breaking or ignoring the block. Heavy impacts still break normally.").define("enableSoilCompaction", true);
+        SOIL_COMPACTION_MIN_VELOCITY = BUILDER.comment("Minimum impact velocity to trigger soil compaction (grass/farmland → dirt). Below this, impacts are too gentle.").defineInRange("soilCompactionMinVelocity", 3.0, 0.0, 1000.0);
+        SOIL_COMPACTION_MAX_VELOCITY = BUILDER.comment("Impact velocity above which soil compaction is skipped and the block is treated normally (broken instead of converted).").defineInRange("soilCompactionMaxVelocity", 14.0, 0.0, 1000.0);
+        SOIL_COMPACTION_PER_CONTACT_CHANCE = BUILDER.comment("Probability that any one qualifying contact compacts the block. 0.01 = sparse footprints; 1.0 = every qualifying contact converts.").defineInRange("soilCompactionPerContactChance", 0.01, 0.0, 1.0);
+        BUILDER.pop();
+        BUILDER.push("blockTransforms");
+        ENABLE_BLOCK_TRANSFORMS = BUILDER.comment("If true, physics impacts can transform blocks into other blocks per blockTransformRules. Checked after soil compaction.").define("enableBlockTransforms", true);
+        BLOCK_TRANSFORM_RULES = BUILDER.comment("Block transform rules. Format: 'source:block -> target:block' (100%) or 'source:block -> target1:block,weight1;target2:block,weight2' (weighted random). Example: 'minecraft:gravel -> minecraft:sand,0.7;minecraft:flint,0.3'").defineListAllowEmpty(List.of("blockTransformRules"), ArrayList::new, o -> o instanceof String);
+        BLOCK_TRANSFORM_MIN_VELOCITY = BUILDER.comment("Minimum impact speed (blocks/s) to trigger a block transform.").defineInRange("blockTransformMinVelocity", 3.0, 0.0, 1000.0);
+        BLOCK_TRANSFORM_MAX_VELOCITY = BUILDER.comment("Impact speed above which block transforms are skipped (block is broken instead). Set very high to allow transforms at any speed.").defineInRange("blockTransformMaxVelocity", 14.0, 0.0, 1000.0);
+        BLOCK_TRANSFORM_PER_CONTACT_CHANCE = BUILDER.comment("Probability per qualifying contact that a block transform fires. 0.01 = sparse; 1.0 = every qualifying contact transforms.").defineInRange("blockTransformPerContactChance", 0.01, 0.0, 1.0);
         BUILDER.pop();
         BUILDER.push("createContraptionAnchors");
         ENABLE_CREATE_CONTRAPTION_ANCHOR_DAMAGE = BUILDER.comment("If true, impacts near Create contraption anchors transfer part of the load to bearings, pistons, pulleys, car assemblers, and nearby support blocks.").define("enableCreateContraptionAnchorDamage", true);

@@ -94,7 +94,7 @@ public final class ElasticPairReaction {
     private static final int MAX_PENDING_IMPULSES = 512;
     // fork_9: ported from TrueImpactPhysicsSolver. Light impacts on these blocks compact to dirt
     // instead of breaking. Used by applyPerContactTerrainHit before the destruction ladder.
-    private static final Set<Block> COMPACTABLE_SOIL = Set.of(Blocks.GRASS_BLOCK, Blocks.PODZOL, Blocks.MYCELIUM);
+    private static final Set<Block> COMPACTABLE_SOIL = Set.of(Blocks.GRASS_BLOCK, Blocks.PODZOL, Blocks.MYCELIUM, Blocks.FARMLAND);
 
     private ElasticPairReaction() {
     }
@@ -820,6 +820,16 @@ public final class ElasticPairReaction {
         }
     }
 
+    // 1.1.5 — extract runtime id from an Object sub-level via cast; -1 on failure.
+    static int runtimeIdOf(Object subLevel) {
+        try {
+            if (subLevel instanceof dev.ryanhcode.sable.sublevel.ServerSubLevel ssl) {
+                return ssl.getRuntimeId();
+            }
+        } catch (Throwable ignored) {}
+        return -1;
+    }
+
     // beta.14 — package-private for ClippingDamageScanner. Behavior unchanged.
     static ServerLevel level(Object subLevel) {
         try {
@@ -1052,18 +1062,34 @@ public final class ElasticPairReaction {
         if (destroySpeed < 0.0f) {
             return;
         }
-        // fork_9: soil compaction. Ported from the old HardnessFragileCallback that we lost when
-        // the bakery mixin was disabled. Light impacts (within [min, max] velocity) on grass /
-        // podzol / mycelium press them down to dirt instead of breaking. Heavier impacts skip
-        // this branch and fall through to the normal destruction ladder.
+        // Soil compaction: light impacts on grass/podzol/mycelium/farmland convert to dirt.
         if (((Boolean) TrueImpactConfig.ENABLE_SOIL_COMPACTION.get()).booleanValue()
             && COMPACTABLE_SOIL.contains(state.getBlock())
             && speed >= (Double) TrueImpactConfig.SOIL_COMPACTION_MIN_VELOCITY.get()
             && speed < (Double) TrueImpactConfig.SOIL_COMPACTION_MAX_VELOCITY.get()) {
-            final ServerLevel compactLevel = level;
-            final BlockPos compactPos = pos;
-            level.getServer().execute(() -> compactLevel.setBlock(compactPos, Blocks.DIRT.defaultBlockState(), 3));
+            double soilChance = ((Double) TrueImpactConfig.SOIL_COMPACTION_PER_CONTACT_CHANCE.get()).doubleValue();
+            if (soilChance >= 1.0 || java.util.concurrent.ThreadLocalRandom.current().nextDouble() < soilChance) {
+                final ServerLevel compactLevel = level;
+                final BlockPos compactPos = pos;
+                ImpactBreakQueue.enqueue(() -> compactLevel.setBlock(compactPos, Blocks.DIRT.defaultBlockState(), 3));
+            }
             return;
+        }
+        // Block transforms: user-defined block → block conversions (checked after soil compaction).
+        if (((Boolean) TrueImpactConfig.ENABLE_BLOCK_TRANSFORMS.get()).booleanValue()
+            && speed >= (Double) TrueImpactConfig.BLOCK_TRANSFORM_MIN_VELOCITY.get()
+            && speed < (Double) TrueImpactConfig.BLOCK_TRANSFORM_MAX_VELOCITY.get()) {
+            BlockState transformed = BlockTransformRegistry.tryTransform(state);
+            if (transformed != null) {
+                double chance = ((Double) TrueImpactConfig.BLOCK_TRANSFORM_PER_CONTACT_CHANCE.get()).doubleValue();
+                if (chance >= 1.0 || java.util.concurrent.ThreadLocalRandom.current().nextDouble() < chance) {
+                    final ServerLevel tl = level;
+                    final BlockPos tp = pos;
+                    final BlockState ts = transformed;
+                    ImpactBreakQueue.enqueue(() -> tl.setBlock(tp, ts, 3));
+                }
+                return;
+            }
         }
         double structuralIntegrity = MaterialImpactProperties.baseStrength((BlockGetter) level, pos, state);
         double materialStrength = Math.max(MaterialImpactProperties.displayStrength(state, structuralIntegrity), 1.0);
@@ -1073,11 +1099,34 @@ public final class ElasticPairReaction {
         double effectiveMass = Math.min((Double) TrueImpactConfig.MAX_EFFECTIVE_MASS.get(),
             Math.pow(mass, (Double) TrueImpactConfig.MASS_EXPONENT.get()));
         double velocityEnergy = Math.pow(speed, (Double) TrueImpactConfig.IMPACT_VELOCITY_EXPONENT.get());
+        double verticalAngleProxy = Math.max(
+            ((Double) TrueImpactConfig.IMPACT_ANGLE_FLOOR.get()).doubleValue(),
+            speed > 1e-6 ? Math.abs(vel.y) / speed : 1.0);
         double kineticEnergy = 0.5 * effectiveMass * velocityEnergy
+            * verticalAngleProxy
             * (Double) TrueImpactConfig.DAMAGE_SCALE.get()
             * (Double) TrueImpactConfig.GLOBAL_STRENGTH_SCALE.get();
+        // 1.1.5: contact-count normalization. Same as 1.1.2 HardnessFragileCallback fix.
+        // The applyPerContactTerrainHit path was previously unnormalized — each tread contact
+        // got the full sub-level KE attributed, so 30 treads × full-KE = 30 destroyBlocks
+        // per tick on grass = trenches. Now we divide by smoothed contact count^exponent.
+        double kineticEnergyPreNorm = kineticEnergy;
+        double contactDivisor = 1.0;
+        try {
+            int sslId = ElasticPairReaction.runtimeIdOf(subLevel);
+            if (sslId != -1) {
+                contactDivisor = ContactPressureTracker.recordAndGetDivisor(
+                    sslId, level.getGameTime(),
+                    ((Double) TrueImpactConfig.CONTACT_PRESSURE_EXPONENT.get()).doubleValue());
+                kineticEnergy /= contactDivisor;
+            }
+        } catch (Throwable ignored) {
+            // Normalization must never disturb the destruction path.
+        }
         double yieldRatio = kineticEnergy / materialStrength;
         double crackRatio = kineticEnergy / Math.max(crackResistance, 1.0);
+        // 1.1.5 diag: per-(pos, second) rate-limited.
+        TIDiag.terrainContact(hitPos, 0, 0, kineticEnergyPreNorm, kineticEnergy, contactDivisor);
         if (ElasticPairReaction.perContactDbg()) {
             LogManager.getLogger().warn("[TrueImpact] perContact WORLD: block={} speed={} KE={} yield={} (brkThr={}) crack={} (crackThr={})",
                 state.getBlock(), String.format("%.2f", speed), String.format("%.1f", kineticEnergy),
@@ -1439,18 +1488,30 @@ public final class ElasticPairReaction {
                 return;
             }
             this.points.sort((a, b) -> Double.compare(b.force, a.force));
+            int validContactCount = 0;
+            for (PointData p : this.points) {
+                if (p.force > 0.0 && Double.isFinite(p.force)) validContactCount++;
+            }
+            double terrainContactDivisor = Math.max(1.0, Math.pow(
+                Math.max(1, validContactCount),
+                ((Double)TrueImpactConfig.CONTACT_PRESSURE_EXPONENT.get()).doubleValue()));
             // Per-contact loop: each Rapier contact point independently targets the terrain-side world coord.
             // Static bodies (terrain) have body frame = world frame, so localB (slA = structure) is world space.
             double representativeEnergy = -1;
             Vector3d representativeNormal = this.points.get(0).normal;
+            int diagContactIdx = 0;
             for (PointData p : this.points) {
                 if (p.force <= 0.0 || !Double.isFinite(p.force)) continue;
+                diagContactIdx++;
                 Vector3d terrainWorldPoint = (p.slA != null) ? p.localB : p.localA;
                 TerrainImpactSeed seed = ElasticPairReaction.buildTerrainImpactSeed(
                     this.subLevel, p.local, terrainWorldPoint, p.normal, p.force, explosions);
                 if (seed != null) {
-                    if (representativeEnergy < 0) representativeEnergy = seed.energy();
-                    ElasticPairReaction.damageTerrain(seed.level(), seed.pos(), seed.normal(), seed.energy());
+                    double normalizedEnergy = seed.energy() / terrainContactDivisor;
+                    if (representativeEnergy < 0) representativeEnergy = normalizedEnergy;
+                    TIDiag.terrainContact(seed.pos(), diagContactIdx, validContactCount,
+                        seed.energy(), normalizedEnergy, terrainContactDivisor);
+                    ElasticPairReaction.damageTerrain(seed.level(), seed.pos(), seed.normal(), normalizedEnergy);
                 }
             }
             // Supplemental grid scan in body-local space.
@@ -1512,13 +1573,11 @@ public final class ElasticPairReaction {
                 int bodyArea = (lxMax - lxMin + 1) * (lzMax - lzMin + 1);
                 if (bodyArea > 0 && bodyArea <= 4096) {
                     HashSet<BlockPos> seen = new HashSet<>();
-                    ArrayList<TerrainImpactSeed> gridSeeds = new ArrayList<>();
+                    ArrayList<BlockPos> validPositions = new ArrayList<>();
                     for (int lx = lxMin; lx <= lxMax; lx++) {
                         for (int lz = lzMin; lz <= lzMax; lz++) {
                             double wx = cosTheta * (lx + 0.5) - sinTheta * (lz + 0.5) + transX;
                             double wz = sinTheta * (lx + 0.5) + cosTheta * (lz + 0.5) + transZ;
-                            // fork_19: reject cells outside the structure's real world AABB
-                            // (±1 block margin) — kills reconstruction-misfire 隔山打牛.
                             if (gridGuardAABB != null
                                     && (wx < gridGuardAABB.minX - 1.0 || wx > gridGuardAABB.maxX + 1.0
                                      || wz < gridGuardAABB.minZ - 1.0 || wz > gridGuardAABB.maxZ + 1.0)) {
@@ -1534,12 +1593,21 @@ public final class ElasticPairReaction {
                                     && gs.getDestroySpeed((BlockGetter)level, gp) >= 0f) {
                                 BlockPos imm = gp.immutable();
                                 if (seen.add(imm)) {
-                                    gridSeeds.add(new TerrainImpactSeed(level, imm, representativeNormal, representativeEnergy));
+                                    validPositions.add(imm);
                                 }
                             }
                         }
                     }
-                    if (!gridSeeds.isEmpty()) {
+                    if (!validPositions.isEmpty()) {
+                        double gridDivisor = Math.max(1.0, Math.pow(validPositions.size(),
+                            ((Double)TrueImpactConfig.CONTACT_PRESSURE_EXPONENT.get()).doubleValue()));
+                        double gridEnergy = representativeEnergy / gridDivisor;
+                        ArrayList<TerrainImpactSeed> gridSeeds = new ArrayList<>();
+                        for (BlockPos gp : validPositions) {
+                            gridSeeds.add(new TerrainImpactSeed(level, gp, representativeNormal, gridEnergy));
+                        }
+                        TIDiag.gridScan(gridSeeds.get(0).pos(), gridSeeds.size(),
+                            representativeEnergy, gridEnergy, gridDivisor);
                         ElasticPairReaction.damageTerrain(level, gridSeeds,
                             Math.max((Integer)TrueImpactConfig.TERRAIN_IMPACT_MAX_BLOCKS.get(), gridSeeds.size()));
                     }
