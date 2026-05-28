@@ -32,6 +32,15 @@ public final class TIDiag {
 
     private TIDiag() {}
 
+    private static boolean enabled() {
+        try {
+            return ((Boolean) TrueImpactConfig.ENABLE_DIAGNOSTIC_LOGGING.get()).booleanValue();
+        } catch (Throwable t) {
+            // Config not yet loaded (early init) — disable to avoid spam.
+            return false;
+        }
+    }
+
     private static boolean shouldLog(String key) {
         long now = System.currentTimeMillis();
         Long prev = LAST_LOG_AT.get(key);
@@ -45,7 +54,7 @@ public final class TIDiag {
                                 double mass, double kineticEnergyRaw, double kineticEnergyNorm,
                                 double materialStrength, double yieldRatio,
                                 int contactCount, String outcome) {
-        if (pos == null) return;
+        if (!enabled() || pos == null) return;
         String key = "H:" + pos.asLong();
         if (!shouldLog(key)) return;
         try {
@@ -58,7 +67,7 @@ public final class TIDiag {
 
     /** Soil compaction probability gate. */
     public static void soil(BlockPos pos, double impactVelocity, double chance, boolean fired) {
-        if (pos == null) return;
+        if (!enabled() || pos == null) return;
         String key = "S:" + pos.asLong();
         if (!shouldLog(key)) return;
         try {
@@ -71,7 +80,7 @@ public final class TIDiag {
     /** ElasticPairReaction.processTerrainImpact per-contact seed damageTerrain call. */
     public static void terrainContact(BlockPos pos, int contactIdx, int contactCount,
                                        double energyRaw, double energyNorm, double divisor) {
-        if (pos == null) return;
+        if (!enabled() || pos == null) return;
         String key = "T:" + pos.asLong();
         if (!shouldLog(key)) return;
         try {
@@ -84,7 +93,7 @@ public final class TIDiag {
     /** Grid scan summary — one line per scan invocation (not per cell). */
     public static void gridScan(BlockPos approxPos, int cellCount, double representativeEnergyRaw,
                                 double representativeEnergyNorm, double divisor) {
-        if (approxPos == null) return;
+        if (!enabled() || approxPos == null) return;
         String key = "G:" + approxPos.asLong();
         if (!shouldLog(key)) return;
         try {
@@ -98,7 +107,7 @@ public final class TIDiag {
     /** ClippingDamageScanner per-overlap damage application — one line per scan per ssl. */
     public static void clip(BlockPos approxPos, int sslId, int overlapCount,
                             double crackEnergyBase, double perOverlapEnergy, double divisor) {
-        if (approxPos == null) return;
+        if (!enabled() || approxPos == null) return;
         String key = "C:" + sslId;
         if (!shouldLog(key)) return;
         try {

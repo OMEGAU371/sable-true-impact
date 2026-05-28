@@ -162,6 +162,7 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.IntValue CUMULATIVE_BLOCK_DAMAGE_MAX_ENTRIES;
     public static final ModConfigSpec.IntValue PERFORMANCE_LOG_INTERVAL_TICKS;
     public static final ModConfigSpec.BooleanValue ENABLE_PERFORMANCE_LOGGING;
+    public static final ModConfigSpec.BooleanValue ENABLE_DIAGNOSTIC_LOGGING;
     public static final ModConfigSpec.BooleanValue ENABLE_UNIVERSAL_IMPACT_CALLBACK;
     public static final ModConfigSpec.ConfigValue<String> IMPACT_CALLBACK_MODE;
     public static final ModConfigSpec.ConfigValue<List<? extends String>> IMPACT_CALLBACK_BLOCKS;
@@ -390,6 +391,7 @@ public final class TrueImpactConfig {
         PERFORMANCE_PRESET = BUILDER.comment("Performance budget preset. Applied on config load when presetMode is auto. This has priority over destructionPreset when both affect cost.").defineEnum("performancePreset", PerformancePreset.medium);
         DESTRUCTION_PRESET = BUILDER.comment("Destruction detail preset. Applied on config load when presetMode is auto. Higher values enable more detailed cracks, fracture, explosions, and material response.").defineEnum("destructionPreset", DestructionPreset.medium);
         ENABLE_PERFORMANCE_LOGGING = BUILDER.comment("If true, logs periodic Sable True Impact performance counters. Keep false for normal gameplay.").define("enablePerformanceLogging", false);
+        ENABLE_DIAGNOSTIC_LOGGING = BUILDER.comment("If true, enables verbose per-contact TIDiag tracing (hardness/soil/terrain/grid/clip events). Used for dev debugging only; significantly impacts TPS on contraptions with many contacts (e.g. tank treads). Keep false for normal gameplay.").define("enableDiagnosticLogging", false);
         PERFORMANCE_LOG_INTERVAL_TICKS = BUILDER.comment("How often performance counters are logged when enablePerformanceLogging is true.").defineInRange("performanceLogIntervalTicks", 200, 20, 72000);
         BUILDER.push("limits");
         SUBLEVEL_FRACTURE_COOLDOWN_TICKS = BUILDER.comment("Minimum ticks between expensive fracture scans for the same Sable physical structure. Raise this for large-structure performance.").defineInRange("subLevelFractureCooldownTicks", 4, 0, 200);
