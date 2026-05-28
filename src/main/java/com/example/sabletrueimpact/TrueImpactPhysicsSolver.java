@@ -91,6 +91,9 @@ public class TrueImpactPhysicsSolver {
             // 1.1.2: track which sub-level this contact came from, so we can normalize
             // per-tick kinetic energy by total contact count (tank treads → low per-cell pressure).
             int matchedSslId = -1;
+            // 1.1.11-gamma-diag: capture our sub-level's linear velocity VECTOR (not just length)
+            // so we can compute relative velocity vs another sub-level at the contact target.
+            Vector3d ourLinVel = null;
             block21: {
                 // Bug 4 fix: getCurrentlySteppingSystem() throws IllegalStateException in Sable 1.2.2 when null
                 try {
@@ -217,6 +220,7 @@ public class TrueImpactPhysicsSolver {
                                 mass = Math.max(((Number)SUBLEVEL_MASS_DATA_GET_MASS.invoke(tracker)).doubleValue(), 1.0E-6);
                                 Vector3d linVel = ssl.latestLinearVelocity;
                                 actualSubLevelSpeed = linVel.length();
+                                ourLinVel = new Vector3d((Vector3dc)linVel);
                                 if (actualSubLevelSpeed > 0.001) {
                                     velocityVec = new Vector3d((Vector3dc)linVel).normalize();
                                     hasVelocity = true;
@@ -322,15 +326,45 @@ public class TrueImpactPhysicsSolver {
                 }
                 if (targetState != null) {
                     matchupScale = ImpactDamageAllocator.damageScaleForSelf(level, pos, state, targetPos, targetState);
+                    // 1.1.11-gamma-diag: relative-velocity check for sub-level-vs-sub-level resting
+                    // contact. Nianor (Discord) reported that 1.1.10's absolute-velocity floor only
+                    // worked while the host aircraft was below 8 m/s; once it accelerated past the
+                    // floor, doors started chewing again — because absolute velocity is the WRONG
+                    // metric for paired-motion contacts. The physical truth: two doors constrained
+                    // to a flying aircraft share its velocity vector, so RELATIVE velocity at the
+                    // door-door contact is ~0 regardless of how fast the aircraft is going. Query
+                    // for another sub-level at the target position and skip damage when the
+                    // relative speed is below MIN_EFFECT_VELOCITY. Real collisions (two airships
+                    // ramming at different velocities, breakup fragments hitting hull) still pass.
+                    if (matchupScale > 0.9 && ourLinVel != null && system != null) {
+                        try {
+                            BoundingBox3d targetBox = new BoundingBox3d(
+                                targetPos.getX() - 0.1, targetPos.getY() - 0.1, targetPos.getZ() - 0.1,
+                                targetPos.getX() + 1.1, targetPos.getY() + 1.1, targetPos.getZ() + 1.1);
+                            for (SubLevel otherSL : system.queryIntersecting(targetBox)) {
+                                if (otherSL instanceof ServerSubLevel otherSsl
+                                        && otherSsl.getRuntimeId() != matchedSslId) {
+                                    Vector3d otherVel = otherSsl.latestLinearVelocity;
+                                    if (otherVel != null) {
+                                        double relativeSpeed = new Vector3d((Vector3dc)ourLinVel)
+                                            .sub((Vector3dc)otherVel).length();
+                                        if (relativeSpeed < ((Double)TrueImpactConfig.MIN_EFFECT_VELOCITY.get()).doubleValue()) {
+                                            return BlockSubLevelCollisionCallback.CollisionResult.NONE;
+                                        }
+                                        // Cap impactVelocity by relative speed so KE downstream
+                                        // reflects the actual collision energy, not the host
+                                        // aircraft's cruise speed.
+                                        impactVelocity = Math.min(impactVelocity, relativeSpeed);
+                                    }
+                                    break;
+                                }
+                            }
+                        } catch (Throwable ignored) {}
+                    }
                 }
             } catch (Throwable ignored) {}
-            // 1.1.10-gamma-diag: resting-contact filter for same-material contacts.
-            // Two doors closed at 90° on a flying aircraft sit at ~0 relative velocity, but our
-            // impactVelocity is derived from the SUBLEVEL's absolute linear velocity (= aircraft's
-            // flight speed), so it passes the MIN_EFFECT_VELOCITY gate even when the actual contact
-            // has no relative motion. With same-material contacts (matchupScale ≈ 1.0), the immunity
-            // mechanism cannot help. Skip damage entirely below the floor; real collisions still get
-            // through.
+            // 1.1.10-gamma-diag fallback: floor on absolute velocity for same-material contacts
+            // where we couldn't find another sub-level above (rare edge case — kept as safety net).
             try {
                 if (matchupScale > 0.9
                         && impactVelocity < ((Double) TrueImpactConfig.SIMILAR_MATERIAL_CONTACT_VELOCITY_FLOOR.get()).doubleValue()) {
