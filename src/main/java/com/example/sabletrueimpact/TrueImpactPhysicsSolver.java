@@ -272,7 +272,58 @@ public class TrueImpactPhysicsSolver {
                     // Normalization must never disturb the destruction path.
                 }
             }
-            double matchupScale = ImpactDamageContextCache.getNearby(level, pos, 2, 1.0);
+            // 1.1.9-gamma-diag: strong-material immunity fix. Previously this read from
+            // ImpactDamageContextCache, but the cache is only populated post-step by
+            // ElasticPairReaction.apply, so during the in-step callback it was ALWAYS empty →
+            // matchupScale always defaulted to 1.0 and the immunity mechanism never fired.
+            // Symptom: a netherite block (sublevel) impacting grass took the same KE as the grass
+            // got, and if KE was huge enough to break grass several blocks deep, it also broke the
+            // netherite itself — "mutual destruction" complaint. Fix: look up the terrain block at
+            // hitPos directly and call ImpactDamageAllocator.damageScaleForSelf here in-line.
+            //
+            // 1.1.9-gamma-diag refinement: original push-by-0.6 failed for corner contacts (e.g.
+            // a meteor's pointy bottom corner hitting ground), because a unit-direction × 0.6 from
+            // the block center stays inside the same cell on diagonal normals. Fixed by pushing by
+            // 1.0 (guarantees a cell change) and adding a multi-step ray scan fallback when the
+            // immediate cell is air (deep impacts where surrounding blocks were already destroyed).
+            double matchupScale = 1.0;
+            try {
+                BlockPos targetPos = null;
+                BlockState targetState = null;
+                // Step 1: direct BlockPos.containing(hitPos) — works when hitPos is clearly inside the target cell.
+                BlockPos guess = BlockPos.containing(hitPos.x, hitPos.y, hitPos.z);
+                if (!guess.equals(pos)) {
+                    BlockState ts = level.getBlockState(guess);
+                    if (!ts.isAir()) {
+                        targetPos = guess;
+                        targetState = ts;
+                    }
+                }
+                // Step 2: cast outward from block center along the contact normal.
+                if (targetState == null) {
+                    Vector3d outward = new Vector3d((Vector3dc)hitPos)
+                        .sub((double)pos.getX() + 0.5, (double)pos.getY() + 0.5, (double)pos.getZ() + 0.5);
+                    if (outward.lengthSquared() > 1.0E-6) {
+                        outward.normalize();
+                        for (double d = 1.0; d <= 2.5; d += 0.5) {
+                            BlockPos try_ = BlockPos.containing(
+                                (double)pos.getX() + 0.5 + outward.x * d,
+                                (double)pos.getY() + 0.5 + outward.y * d,
+                                (double)pos.getZ() + 0.5 + outward.z * d);
+                            if (try_.equals(pos)) continue;
+                            BlockState ts = level.getBlockState(try_);
+                            if (!ts.isAir()) {
+                                targetPos = try_;
+                                targetState = ts;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (targetState != null) {
+                    matchupScale = ImpactDamageAllocator.damageScaleForSelf(level, pos, state, targetPos, targetState);
+                }
+            } catch (Throwable ignored) {}
             double scaledKineticEnergy = kineticEnergy * matchupScale;
             // 1.1.4-diag: capture for outcome logging below.
             final int DIAG_CONTACT_COUNT = diagContactCount;

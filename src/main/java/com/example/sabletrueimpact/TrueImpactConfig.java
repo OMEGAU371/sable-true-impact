@@ -324,7 +324,7 @@ public final class TrueImpactConfig {
         TERRAIN_STEP_CONTACT_FORGIVENESS = BUILDER.comment("Horizontal impacts within this distance below a block top are treated as step-up contact, not terrain damage.").defineInRange("terrainStepContactForgiveness", 0.22, 0.0, 1.0);
         TERRAIN_STEP_SIDE_NORMAL_THRESHOLD = BUILDER.comment("Contacts with vertical normal component below this are considered side contacts for step forgiveness.").defineInRange("terrainStepSideNormalThreshold", 0.35, 0.0, 1.0);
         TERRAIN_IMPACT_BREAK_YIELD = BUILDER.defineInRange("terrainImpactBreakYield", 3.0, 0.0, 1000.0);
-        TERRAIN_IMPACT_MAX_BLOCKS = BUILDER.comment("Maximum terrain blocks broken by one terrain impact collision. (fork_4: raised 4 → 12 to make medium impacts crater meaningfully without the HARDNESS_CALLBACK per-block path.)").defineInRange("terrainImpactMaxBlocks", 12, 0, 10000);
+        TERRAIN_IMPACT_MAX_BLOCKS = BUILDER.comment("Maximum terrain blocks broken by one terrain impact event. fork_4 raised 4 → 12 for medium impacts. 1.1.9-gamma-diag raised 12 → 256 so high-energy 'meteor' strikes can crater meaningfully (large KE propagates through the BFS but was capped at 12 blocks). Lower this if light impacts crater too much for your taste.").defineInRange("terrainImpactMaxBlocks", 256, 0, 10000);
         TERRAIN_IMPACT_CONTACT_SAMPLES = BUILDER.comment("Maximum contact points sampled for a flat terrain impact. Higher values reduce corner-only craters at higher CPU cost.").defineInRange("terrainImpactContactSamples", 24, 1, 10000);
         BUILDER.pop();
         BUILDER.push("subLevelFracture");
