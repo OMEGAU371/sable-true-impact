@@ -205,6 +205,7 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.DoubleValue BLOCK_TRANSFORM_PER_CONTACT_CHANCE;
     public static final ModConfigSpec.BooleanValue ENABLE_PHYSICS_BREAK_DROPS;
     public static final ModConfigSpec.ConfigValue<List<? extends String>> NO_DROP_BLOCKS;
+    public static final ModConfigSpec.DoubleValue SIMILAR_MATERIAL_CONTACT_VELOCITY_FLOOR;
     public static final ModConfigSpec SPEC;
 
     private TrueImpactConfig() {
@@ -441,6 +442,9 @@ public final class TrueImpactConfig {
         NO_DROP_BLOCKS = BUILDER.comment("Per-block drop blacklist. Blocks in this list NEVER drop their items when broken by physics, even if enablePhysicsBreakDrops=true. Useful for 'fodder' terrain that just clutters inventory. Format: ['minecraft:dirt', 'minecraft:cobblestone']").defineListAllowEmpty(List.of("noDropBlocks"),
             () -> List.of("minecraft:dirt", "minecraft:cobblestone", "minecraft:sand", "minecraft:gravel", "minecraft:netherrack"),
             o -> o instanceof String);
+        BUILDER.pop();
+        BUILDER.push("restingContact");
+        SIMILAR_MATERIAL_CONTACT_VELOCITY_FLOOR = BUILDER.comment("Resting-contact filter for same-material sub-level-vs-sub-level collisions (e.g. closed double doors on a flying aircraft, two stone hulls touching). When the matchup ratio is near 1.0 (target similar strength to self) AND impactVelocity is below this floor, the per-contact callback returns NONE — no damage, no fatigue accumulation. Without this, the aircraft's absolute linear velocity gets used as impactVelocity and slowly chews through any same-material contact even though the actual relative velocity at the contact is ~0. Raise to also filter higher-velocity 'gliding' contacts; lower (or set to 0) to disable the filter and accept the old behavior.").defineInRange("similarMaterialContactVelocityFloor", 8.0, 0.0, 1000.0);
         BUILDER.pop();
         BUILDER.push("createContraptionAnchors");
         ENABLE_CREATE_CONTRAPTION_ANCHOR_DAMAGE = BUILDER.comment("If true, impacts near Create contraption anchors transfer part of the load to bearings, pistons, pulleys, car assemblers, and nearby support blocks.").define("enableCreateContraptionAnchorDamage", true);

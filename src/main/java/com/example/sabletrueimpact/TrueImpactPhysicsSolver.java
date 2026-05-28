@@ -324,6 +324,19 @@ public class TrueImpactPhysicsSolver {
                     matchupScale = ImpactDamageAllocator.damageScaleForSelf(level, pos, state, targetPos, targetState);
                 }
             } catch (Throwable ignored) {}
+            // 1.1.10-gamma-diag: resting-contact filter for same-material contacts.
+            // Two doors closed at 90° on a flying aircraft sit at ~0 relative velocity, but our
+            // impactVelocity is derived from the SUBLEVEL's absolute linear velocity (= aircraft's
+            // flight speed), so it passes the MIN_EFFECT_VELOCITY gate even when the actual contact
+            // has no relative motion. With same-material contacts (matchupScale ≈ 1.0), the immunity
+            // mechanism cannot help. Skip damage entirely below the floor; real collisions still get
+            // through.
+            try {
+                if (matchupScale > 0.9
+                        && impactVelocity < ((Double) TrueImpactConfig.SIMILAR_MATERIAL_CONTACT_VELOCITY_FLOOR.get()).doubleValue()) {
+                    return BlockSubLevelCollisionCallback.CollisionResult.NONE;
+                }
+            } catch (Throwable ignored) {}
             double scaledKineticEnergy = kineticEnergy * matchupScale;
             // 1.1.4-diag: capture for outcome logging below.
             final int DIAG_CONTACT_COUNT = diagContactCount;
