@@ -231,7 +231,7 @@ public final class SubLevelFracture {
                 continue;
             }
             if (!SubLevelFracture.passesFractureChance(level, candidate)) continue;
-            level.destroyBlock(candidate.pos(), true);
+            level.destroyBlock(candidate.pos(), PhysicsBreakPolicy.shouldDrop(level.getBlockState(candidate.pos()), true));
             SubLevelFracture.notifyRemoved(heatMapManager, candidate.pos());
             ++removed;
         }

@@ -48,7 +48,7 @@ public final class BlockDamageAccumulator {
             DAMAGE.remove(key);
             final ServerLevel destroyLevel = level;
             final BlockPos destroyPos = pos.immutable();
-            level.getServer().execute(() -> destroyLevel.destroyBlock(destroyPos, true));
+            level.getServer().execute(() -> destroyLevel.destroyBlock(destroyPos, PhysicsBreakPolicy.shouldDrop(destroyLevel.getBlockState(destroyPos), true)));
             return true;
         }
         if (((Boolean)TrueImpactConfig.ENABLE_CRACKS.get()).booleanValue()) {

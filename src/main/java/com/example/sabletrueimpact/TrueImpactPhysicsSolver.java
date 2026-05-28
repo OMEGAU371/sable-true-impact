@@ -327,7 +327,7 @@ public class TrueImpactPhysicsSolver {
                 {
                     final ServerLevel destroyLevel = level;
                     final BlockPos destroyPos = pos;
-                    ImpactBreakQueue.enqueue(() -> destroyLevel.destroyBlock(destroyPos, true));
+                    ImpactBreakQueue.enqueue(() -> destroyLevel.destroyBlock(destroyPos, PhysicsBreakPolicy.shouldDrop(destroyLevel.getBlockState(destroyPos), true)));
                     TIDiag.hardness(pos, matchedSslId, impactVelocity, mass, DIAG_KE_RAW, kineticEnergy, materialStrength, yieldRatio, DIAG_CONTACT_COUNT, "HEAVY_BREAK_QUEUED");
                 }
                 // removeCollision=false: same reason as propagation path above.

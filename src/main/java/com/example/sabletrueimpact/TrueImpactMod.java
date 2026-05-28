@@ -63,6 +63,7 @@ public class TrueImpactMod {
         MaterialImpactProperties.reload();
         ImpactCallbackDecider.reload();
         BlockTransformRegistry.reload();
+        PhysicsBreakPolicy.reload();
     }
 
     private void onConfigReload(ModConfigEvent.Reloading event) {
@@ -73,5 +74,6 @@ public class TrueImpactMod {
         MaterialImpactProperties.reload();
         ImpactCallbackDecider.reload();
         BlockTransformRegistry.reload();
+        PhysicsBreakPolicy.reload();
     }
 }

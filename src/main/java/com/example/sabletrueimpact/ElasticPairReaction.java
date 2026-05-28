@@ -362,7 +362,7 @@ public final class ElasticPairReaction {
                         if (yieldRatio > breakYield) {
                             final ServerLevel destroyLevel = level;
                             final BlockPos destroyPos = cursor.immutable();
-                            level.getServer().execute(() -> destroyLevel.destroyBlock(destroyPos, true));
+                            level.getServer().execute(() -> destroyLevel.destroyBlock(destroyPos, PhysicsBreakPolicy.shouldDrop(destroyLevel.getBlockState(destroyPos), true)));
                             perSubLevelBudget--;
                             totalBudget--;
                         }
@@ -655,7 +655,7 @@ public final class ElasticPairReaction {
                 double materialThreshold = Math.max(MaterialImpactProperties.breakThreshold(state, strength), 1.0);
                 double yield = node.energy() / materialThreshold;
                 if (yield >= (Double)TrueImpactConfig.TERRAIN_IMPACT_BREAK_YIELD.get()) {
-                    level.destroyBlock(pos, true);
+                    level.destroyBlock(pos, PhysicsBreakPolicy.shouldDrop(state, true));
                     ++broken;
                     double remaining = (node.energy() - materialThreshold) * 0.55;
                     if (!(remaining > materialThreshold * 0.2)) continue;
@@ -1154,7 +1154,7 @@ public final class ElasticPairReaction {
             return;
         }
         if (yieldRatio > (Double) TrueImpactConfig.HEAVY_BREAK_YIELD_THRESHOLD.get()) {
-            level.getServer().execute(() -> destroyLevel.destroyBlock(destroyPos, true));
+            level.getServer().execute(() -> destroyLevel.destroyBlock(destroyPos, PhysicsBreakPolicy.shouldDrop(destroyLevel.getBlockState(destroyPos), true)));
             return;
         }
         if (yieldRatio > (Double) TrueImpactConfig.BREAK_YIELD_THRESHOLD.get()) {
@@ -1374,7 +1374,7 @@ public final class ElasticPairReaction {
         if (slYield > (Double) TrueImpactConfig.HEAVY_BREAK_YIELD_THRESHOLD.get()) {
             final ServerLevel slDestroyLevel = level;
             final BlockPos slDestroyPos = slCheckPos.immutable();
-            level.getServer().execute(() -> slDestroyLevel.destroyBlock(slDestroyPos, true));
+            level.getServer().execute(() -> slDestroyLevel.destroyBlock(slDestroyPos, PhysicsBreakPolicy.shouldDrop(slDestroyLevel.getBlockState(slDestroyPos), true)));
             return;
         }
         // Break: fatigue accumulation (eventually breaks under repeated hits).

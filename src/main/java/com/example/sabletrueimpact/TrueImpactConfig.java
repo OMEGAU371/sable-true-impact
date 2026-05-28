@@ -203,6 +203,8 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.DoubleValue BLOCK_TRANSFORM_MIN_VELOCITY;
     public static final ModConfigSpec.DoubleValue BLOCK_TRANSFORM_MAX_VELOCITY;
     public static final ModConfigSpec.DoubleValue BLOCK_TRANSFORM_PER_CONTACT_CHANCE;
+    public static final ModConfigSpec.BooleanValue ENABLE_PHYSICS_BREAK_DROPS;
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> NO_DROP_BLOCKS;
     public static final ModConfigSpec SPEC;
 
     private TrueImpactConfig() {
@@ -433,6 +435,12 @@ public final class TrueImpactConfig {
         BLOCK_TRANSFORM_MIN_VELOCITY = BUILDER.comment("Minimum impact speed (blocks/s) to trigger a block transform.").defineInRange("blockTransformMinVelocity", 3.0, 0.0, 1000.0);
         BLOCK_TRANSFORM_MAX_VELOCITY = BUILDER.comment("Impact speed above which block transforms are skipped (block is broken instead). Set very high to allow transforms at any speed.").defineInRange("blockTransformMaxVelocity", 14.0, 0.0, 1000.0);
         BLOCK_TRANSFORM_PER_CONTACT_CHANCE = BUILDER.comment("Probability per qualifying contact that a block transform fires. 0.01 = sparse; 1.0 = every qualifying contact transforms.").defineInRange("blockTransformPerContactChance", 0.01, 0.0, 1.0);
+        BUILDER.pop();
+        BUILDER.push("itemDrops");
+        ENABLE_PHYSICS_BREAK_DROPS = BUILDER.comment("If false, blocks broken by physics impacts (heavy break, cumulative crack, sub-level fracture) do NOT drop their items. Helps with lag from large structure crashes (e.g. 400-block ship shattering thousands of blocks). Propagation/chain-reaction breaks already never drop, regardless of this setting.").define("enablePhysicsBreakDrops", true);
+        NO_DROP_BLOCKS = BUILDER.comment("Per-block drop blacklist. Blocks in this list NEVER drop their items when broken by physics, even if enablePhysicsBreakDrops=true. Useful for 'fodder' terrain that just clutters inventory. Format: ['minecraft:dirt', 'minecraft:cobblestone']").defineListAllowEmpty(List.of("noDropBlocks"),
+            () -> List.of("minecraft:dirt", "minecraft:cobblestone", "minecraft:sand", "minecraft:gravel", "minecraft:netherrack"),
+            o -> o instanceof String);
         BUILDER.pop();
         BUILDER.push("createContraptionAnchors");
         ENABLE_CREATE_CONTRAPTION_ANCHOR_DAMAGE = BUILDER.comment("If true, impacts near Create contraption anchors transfer part of the load to bearings, pistons, pulleys, car assemblers, and nearby support blocks.").define("enableCreateContraptionAnchorDamage", true);
