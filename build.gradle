@@ -1,0 +1,216 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+    id 'net.neoforged.moddev' version '2.0.141'
+    id 'idea'
+}
+
+tasks.named('wrapper', Wrapper).configure {
+    distributionType = Wrapper.DistributionType.BIN
+}
+
+version = mod_version
+group = mod_group_id
+
+repositories {
+    mavenCentral()
+    flatDir { dirs 'libs' }
+}
+
+base {
+    archivesName = mod_id
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(21)
+    withSourcesJar()
+}
+
+neoForge {
+    version = project.neo_version
+
+    parchment {
+        mappingsVersion = project.parchment_mappings_version
+        minecraftVersion = project.parchment_minecraft_version
+    }
+
+    runs {
+        client {
+            client()
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+        server {
+            server()
+            programArgument '--nogui'
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+        configureEach {
+            systemProperty 'forge.logging.markers', 'REGISTRIES'
+            logLevel = org.slf4j.event.Level.DEBUG
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet(sourceSets.main)
+        }
+    }
+}
+
+configurations {
+    runtimeClasspath.extendsFrom localRuntime
+}
+
+dependencies {
+    testImplementation platform("org.junit:junit-bom:5.11.0")
+    testImplementation "org.junit.jupiter:junit-jupiter"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+    testImplementation "com.tngtech.archunit:archunit-junit5:1.3.0"
+}
+
+tasks.named('test', Test) {
+    useJUnitPlatform()
+}
+
+// ── Version class generation ──────────────────────────────────────────────────
+// Single source of truth: gradle.properties  mod_version / mod_id
+// Output: build/generated/sources/version/.../TrueImpactVersion.java
+// Do NOT edit the generated file — edit the template or gradle.properties.
+def generatedVersionDir = layout.buildDirectory.dir('generated/sources/version')
+
+def generateVersionClass = tasks.register('generateVersionClass', ProcessResources) {
+    def replaceProperties = [mod_id: mod_id, mod_version: mod_version]
+    inputs.properties replaceProperties
+    expand replaceProperties
+    from 'src/main/templates-java'
+    into generatedVersionDir
+}
+
+sourceSets.main.java.srcDir(generatedVersionDir)
+tasks.named('compileJava').configure { dependsOn generateVersionClass }
+// sourcesJar also includes the generated directory — must depend on the generator
+tasks.named('sourcesJar').configure { dependsOn generateVersionClass }
+neoForge.ideSyncTask generateVersionClass
+
+// ── Template-driven mod metadata ─────────────────────────────────────────────
+def generateModMetadata = tasks.register('generateModMetadata', ProcessResources) {
+    def replaceProperties = [
+            minecraft_version      : minecraft_version,
+            minecraft_version_range: minecraft_version_range,
+            neo_version            : neo_version,
+            loader_version_range   : loader_version_range,
+            mod_id                 : mod_id,
+            mod_name               : mod_name,
+            mod_license            : mod_license,
+            mod_version            : mod_version,
+    ]
+    inputs.properties replaceProperties
+    expand replaceProperties
+    from 'src/main/templates'
+    into layout.buildDirectory.dir('generated/sources/modMetadata')
+}
+sourceSets.main.resources.srcDir generateModMetadata
+neoForge.ideSyncTask generateModMetadata
+
+// ── JAR manifest — embed TI-Project-Line for deploy safety ───────────────────
+// The deploy task reads this attribute to identify JARs from THIS project line.
+// Legacy v1.x JARs lack this attribute and are never deleted.
+tasks.named('jar') {
+    manifest {
+        attributes([
+                'Implementation-Title'  : mod_name,
+                'Implementation-Version': mod_version,
+                'TI-Project-Line'       : 'rewrite2',
+        ])
+    }
+}
+
+// ── Deploy task ───────────────────────────────────────────────────────────────
+// Safety rules:
+//   isOwnJar  — JAR has TI-Project-Line=rewrite2 in MANIFEST.MF (and is a main JAR)
+//   isMainJar — not a -sources or -javadoc JAR
+//
+// Only isOwnJar files are deleted from targets.
+// Only the main JAR (exact name: ${mod_id}-${mod_version}.jar) is deployed.
+// Sources/javadoc JARs are NEVER copied to mods directories.
+def deployTargets = [
+    file("D:\\.minecraft\\versions\\1.21.1-NeoForge_21.1.228\\mods"),
+    file("C:\\Users\\l\\Desktop"),
+]
+
+// The isOwnJar closure mirrors the logic tested in DeployFilterTest.java.
+def isOwnJar = { File f ->
+    if (!f.name.startsWith('true_impact-') || !f.name.endsWith('.jar')) return false
+    if (f.name.contains('-sources') || f.name.contains('-javadoc')) return false
+    try {
+        def jf = new java.util.jar.JarFile(f)
+        try {
+            def attr = jf.manifest?.mainAttributes?.getValue('TI-Project-Line')
+            return 'rewrite2' == attr
+        } finally {
+            jf.close()
+        }
+    } catch (Exception ignored) {
+        return false
+    }
+}
+
+tasks.register('deploy') {
+    group = 'true impact'
+    description = 'Build and deploy main JAR to mods dirs and desktop (sources JAR excluded)'
+    dependsOn build
+    notCompatibleWithConfigurationCache('Uses raw File/jar API at execution time')
+
+    doLast {
+        def libsDir = new File(rootDir, 'build/libs')
+        // Explicit JAR name — no ambiguity, no listFiles()[0] guessing
+        def mainJarName = "${mod_id}-${mod_version}.jar"
+        def builtJar = new File(libsDir, mainJarName)
+        if (!builtJar.exists()) {
+            throw new GradleException("Expected main JAR not found: ${mainJarName}\n" +
+                "Available: ${libsDir.listFiles()*.name}")
+        }
+
+        deployTargets.each { dir ->
+            if (!dir.exists()) {
+                logger.warn("Deploy target missing, skipping: ${dir}")
+                return
+            }
+            // Delete only JARs that carry our TI-Project-Line=rewrite2 marker
+            dir.listFiles()?.findAll { isOwnJar(it) }?.each {
+                logger.lifecycle("Removing old: ${it.name}")
+                it.delete()
+            }
+            def target = new File(dir, builtJar.name)
+            java.nio.file.Files.copy(
+                builtJar.toPath(),
+                target.toPath(),
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING
+            )
+            logger.lifecycle("Deployed ${builtJar.name} → ${dir}")
+        }
+    }
+}
+
+// ── Publishing ────────────────────────────────────────────────────────────────
+publishing {
+    publications {
+        register('mavenJava', MavenPublication) {
+            from components.java
+        }
+    }
+    repositories {
+        maven { url "file://${project.projectDir}/repo" }
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+idea {
+    module {
+        downloadSources = true
+        downloadJavadoc = true
+    }
+}

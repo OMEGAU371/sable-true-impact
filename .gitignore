@@ -1,0 +1,25 @@
+# Build output
+/build/
+/repo/
+
+# Gradle caches
+/.gradle/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+/.idea/
+*.iml
+/.vscode/
+out/
+
+# Generated
+/src/generated/
+
+# Logs
+*.log
+
+# Dev run directories (server world, client saves, logs)
+/run/
+
+# Local flat-dir JARs (not redistributed)
+/libs/*.jar
