@@ -8,16 +8,11 @@ import com.tngtech.archunit.lang.ArchRule;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 /**
- * Mechanically enforces the foundation-phase architecture rules.
- * Build fails on any violation — add a rule here before adding code that would violate it.
+ * Architecture guards for all phases.
+ * Build fails on any violation.
  *
- * Layer model (lowest → highest dependency direction):
- *   platform  ←  command  ←  TrueImpactMod
- *
- * Rules:
- *   R1  platform must not depend on command (no upward dependency)
- *   R2  command must not import Minecraft client-only classes
- *   R3  platform must not import Minecraft client-only classes
+ * Phase 0 rules (R1-R4): layer boundaries and no-client-class constraints.
+ * Phase 1A rules (R5-R8): observation/diagnostic must not depend on future damage layer.
  */
 @AnalyzeClasses(
         packages = "io.github.omegau371.trueimpact",
@@ -25,32 +20,58 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 )
 public class FoundationArchTest {
 
-    // R1 — platform is the lowest layer; it must not depend on command
+    // ── Phase 0 rules ─────────────────────────────────────────────────────────
+
     @ArchTest
     static final ArchRule platform_must_not_depend_on_command =
             noClasses().that().resideInAPackage("..platform..")
                     .should().dependOnClassesThat()
                     .resideInAPackage("..command..");
 
-    // R2 — command layer must never reference client-only Minecraft classes
     @ArchTest
     static final ArchRule command_must_not_use_client_classes =
             noClasses().that().resideInAPackage("..command..")
                     .should().dependOnClassesThat()
                     .resideInAPackage("net.minecraft.client..");
 
-    // R3 — platform layer must never reference client-only Minecraft classes
     @ArchTest
     static final ArchRule platform_must_not_use_client_classes =
             noClasses().that().resideInAPackage("..platform..")
                     .should().dependOnClassesThat()
                     .resideInAPackage("net.minecraft.client..");
 
-    // R4 — mod entry point must not bypass layers and directly reference client classes
     @ArchTest
     static final ArchRule mod_root_must_not_use_client_classes =
             noClasses().that().resideInAPackage("io.github.omegau371.trueimpact")
                     .and().areNotAnnotatedWith("net.neoforged.api.distmarker.OnlyIn")
+                    .should().dependOnClassesThat()
+                    .resideInAPackage("net.minecraft.client..");
+
+    // ── Phase 1A rules ────────────────────────────────────────────────────────
+    // Decree: observation and diagnostic layers must not depend on the future damage layer.
+    // Production logic must not read diagnostic state to influence game behavior.
+
+    @ArchTest
+    static final ArchRule observation_must_not_depend_on_damage =
+            noClasses().that().resideInAPackage("..observation..")
+                    .should().dependOnClassesThat()
+                    .resideInAPackage("..damage..");
+
+    @ArchTest
+    static final ArchRule diagnostic_must_not_depend_on_damage =
+            noClasses().that().resideInAPackage("..diagnostic..")
+                    .should().dependOnClassesThat()
+                    .resideInAPackage("..damage..");
+
+    @ArchTest
+    static final ArchRule observation_must_not_use_client_classes =
+            noClasses().that().resideInAPackage("..observation..")
+                    .should().dependOnClassesThat()
+                    .resideInAPackage("net.minecraft.client..");
+
+    @ArchTest
+    static final ArchRule diagnostic_must_not_use_client_classes =
+            noClasses().that().resideInAPackage("..diagnostic..")
                     .should().dependOnClassesThat()
                     .resideInAPackage("net.minecraft.client..");
 }

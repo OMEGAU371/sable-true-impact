@@ -12,6 +12,9 @@ True Impact — physics-based impact damage for Sable physical structures.
 This is an unofficial add-on for Sable and is not affiliated with or endorsed by Sable's original author.
 '''
 
+[[mixins]]
+config="${mod_id}.mixins.json"
+
 [[dependencies.${mod_id}]]
     modId="neoforge"
     type="required"

@@ -19,9 +19,13 @@ class TrueImpactVersionTest {
     }
 
     @Test
-    void version_contains_foundation_phase_marker() {
-        assertTrue(TrueImpactVersion.VERSION.contains("foundation"),
-                "Phase-0 version must contain 'foundation'");
+    void version_contains_phase_marker() {
+        assertTrue(
+                TrueImpactVersion.VERSION.contains("foundation")
+                || TrueImpactVersion.VERSION.contains("sable-study")
+                || TrueImpactVersion.VERSION.contains("alpha")
+                || TrueImpactVersion.VERSION.contains("beta"),
+                "Version must contain a phase marker (foundation, sable-study, alpha, beta, ...)");
     }
 
     @Test
