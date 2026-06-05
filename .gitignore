@@ -15,8 +15,11 @@ out/
 # Generated
 /src/generated/
 
-# Logs
+# Logs and run artifacts
 *.log
+*.log.err
+server-run.log
+client-run.log
 
 # Dev run directories (server world, client saves, logs)
 /run/

@@ -2,7 +2,7 @@
 
 Each phase must pass its gate before phase N+1 work begins.
 
-## Gate 0 — Foundation  ✅ PASSED 2026-06-05
+## Gate 0 — Foundation — AUTOMATED PASSED / MANUAL PENDING (2026-06-05)
 
 **Automated (CI / local build):**
 
