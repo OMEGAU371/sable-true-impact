@@ -80,16 +80,26 @@ Dropped events increment `droppedThisTick` counter; reported at end of tick if >
 - Manual: correlate with body masses and pre/post velocities from BodySnapshots
 
 ### T-4: applyForce semantics (admin-only, manual execution only)
-Command: `/trueimpact experiment t4 apply <runtimeId> <fx> <fy> <fz>`
-- Requires op level 4; hard input ceiling MAX_INPUT_MAGNITUDE=200
-- Rejects if pre-velocity |v| > MAX_PRE_VELOCITY_THRESHOLD=2.0
-- Issues ISOLATION WARNING (cannot programmatically confirm no contacts)
-- Pending is per-level+runtimeId (ConcurrentHashMap); no global volatile override
-- Independent of LOG_BODY_SNAPSHOTS — onPostStep() always checks pending map
-- Records: M, inputRaw, dt, vBefore, vAfter, Δv, **deltaVAlongInput**, **measuredMomentumAlongInput**,
-  input/(M·deltaVAlongInput), gravityErrorEst
-- [NOT AUTO-CONCLUDED] ratio annotated with gravity/contact error sources; human analysis required
-- **Implementation status: IMPLEMENTED, not yet executed — awaits project-manager manual run**
+Command: `/trueimpact experiment t4 apply <runtimeId> <fx> <fy> <fz>`  
+**MANUALLY PASSED — 2026-06-06**
+
+Confirmed results (M=1 kpg, isolated structure, dedicated server):
+
+| variant | input | ratio = |F|/(M·Δv) | angVelAfter | conclusion |
+|---|---|---|---|---|
+| `linear-only` | (10,0,0) | 1.0166 | ≈0.0003 | Direct impulse |
+| `com-current` | (10,0,0) | 1.0165 | ≈0.0011 | COM application safe |
+| `at-pose-pos` | (10,0,0) | N/A (explosion) | ≈3.61e9 | Permanently removed |
+
+**Impulse semantics confirmed.** ratio ≈ 1.0, no dt factor.
+**COM application is safe** for future force-transfer foundation.
+**at-pose-pos permanently removed** — logicalPose().position() as applyImpulse point
+causes astronomical lever arm in plot-space coordinates.
+
+Safety rule added to code and docs: |application_point − COM| ≪ 1e3 or reject.
+
+Implementation: `SableT4Command.java`, `T4ApplyForceExperiment.java`, `SableEventBridge.java`.
+Available commands: `t4 bodies`, `t4 inspect <id>`, `t4 apply <id> fx fy fz`, `t4 apply-linear <id> fx fy fz`.
 
 ### T-5: clearCollisions substep attribution
 - `ContactLogger` logs contact count and `substepCount` per `clearCollisions` call

@@ -120,15 +120,23 @@ double[] onCollision(int x, int y, int z, double x1, double y1, double z1, doubl
 
 ---
 
-## 5. applyForce naming analysis **[SP + IT; native unconfirmed T-4]**
+## 5. applyForce naming analysis **[SP; RUNTIME CONFIRMED T-4 2026-06-06]**
 
 **Upper API contract = impulse [SP]:**  
 `PhysicsPipeline.applyImpulse` → `Rapier3D.applyForce` [RapierPhysicsPipeline.java:447].  
 `SablePreSolverDamage` uses `J = m * Δv` formula with no `dt` [SablePreSolverDamage.java:118–120].  
 `ServerboundPunchSubLevelPacket` uses `strengthScalar ∝ punchCurve(mass)` with no `dt` [line 190–196].
 
-**Native semantics: UNCONFIRMED [T-4].**  
-Rapier distinguishes `apply_force` (F·dt) from `apply_impulse` (direct Δp). JNI bridge uses `applyForce` naming; actual native call unknown without Rust source.
+**Runtime confirmed (T-4, 2026-06-06):** Both `applyLinearAndAngularImpulse` (variant=linear-only)
+and `applyImpulse(body, COM, vector)` (variant=com-current) produce ratio = |input|/(M·Δv) ≈ 1.016
+on an isolated structure (M=1 kpg). **Direct velocity change (impulse) semantics — no dt factor.**
+
+**Safety finding (at-pose-pos, PERMANENTLY REMOVED):**  
+Passing `logicalPose().position()` as the application point produced |Δv| ≈ 2.15×10⁹ and |ω| ≈ 3.61×10⁹,
+crashing the physics simulation. Root cause: `logicalPose().position()` is in embedded/plot space (~204810xx).
+`applyImpulse` internally computes `(position − COM)`; with both in plot space, the lever arm is astronomically large.
+**Rule: any point argument to applyImpulse must be in the same space as `getCenterOfMass()`,
+with |point − COM| ≪ 1e3. Unknown coordinate space → reject at the guard layer.**
 
 ---
 
@@ -159,14 +167,14 @@ Whether the array contains per-substep metadata is UNKNOWN [T-5].
 
 ---
 
-## 9. Pending experiments
+## 9. Experiment status
 
-| ID | Question | Method |
+| ID | Question | Status |
 |---|---|---|
-| T-1 | Callback thread = server thread? | `Thread.currentThread()` in callback |
-| T-2 | (x,y,z) in callback: which space? | Print raw + candidate transforms |
-| T-3 | `forceAmountRaw` dimension? | Known-mass collision; compare to mv, ½mv², etc. |
-| T-4 | `applyForce` = force or impulse? | Apply known vector; measure Δv; compute ratio |
-| T-5 | clearCollisions substep attribution? | Run substeps=1,2,4; compare record counts |
-| T-6 | normalA direction convention? | dot(normalWorld, pointB−pointA); dot(normal, relVel) |
-| T-7 | linVel unit? | Compare getLinearVelocity() to pos delta/dt |
+| T-1 | Callback thread = server thread? | PENDING |
+| T-2 | (x,y,z) in callback: which space? | PENDING |
+| T-3 | `forceAmountRaw` dimension? | **NEXT TARGET** — protocol designed in `acceptance-gates.md §Gate 1A` |
+| T-4 | `applyForce` = force or impulse? | **CONFIRMED: direct impulse** (ratio ≈ 1.016, 2026-06-06) |
+| T-5 | clearCollisions substep attribution? | PENDING — use substeps=1 during T-3 to eliminate ambiguity |
+| T-6 | normalA direction convention? | PENDING — will be needed alongside T-3 for vector projection |
+| T-7 | linVel unit? | PENDING |
