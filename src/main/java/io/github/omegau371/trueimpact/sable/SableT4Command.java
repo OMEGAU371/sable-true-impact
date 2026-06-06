@@ -376,26 +376,13 @@ public final class SableT4Command {
         return 1;
     }
 
-    // ── Variant C: at-pose-pos (logicalPose().position() as application point) ─
-
-    /**
-     * T-4 variant C: applies at logicalPose().position() (the body's pivot in plot space).
-     * Rapier receives (pose_pos - COM) as body-local point → typically off-COM → generates torque.
-     * Useful as a sanity-check: if ratio and angular velocity change vs com-current,
-     * it proves the application point does affect the result (coordinate space is correct).
-     */
-    public static int applyAtPoseExperiment(CommandSourceStack src,
-                                             int runtimeId, double fx, double fy, double fz) {
-        ValidatedT4 v = validate(src, runtimeId, fx, fy, fz);
-        if (v == null) return 0;
-        sendIsolationWarning(src, runtimeId, v.system(), v.target());
-        // Apply at logicalPose().position() (body pivot in plot space)
-        var posePos = v.target().logicalPose().position();
-        v.system().getPipeline().applyImpulse(v.target(),
-                new Vector3d(posePos.x(), posePos.y(), posePos.z()), new Vector3d(fx, fy, fz));
-        storePendingAndConfirm(src, v, runtimeId, fx, fy, fz,
-                "at-pose-pos",
-                String.format("PLOT_POSE_POS(%.2f,%.2f,%.2f)", posePos.x(), posePos.y(), posePos.z()));
-        return 1;
-    }
+    // [PERMANENTLY REMOVED] applyAtPoseExperiment (variant C: at-pose-pos)
+    // Live test result: M=1 kpg, input=(100,0,0) → vAfter=(189579408,1912031232,960901312),
+    // |Δv|≈2.15e9, |ω|≈3.61e9; server ran 21 753 ms / 435 ticks behind; Sable emergency-removed sub-level.
+    // Root cause: logicalPose().position() is in embedded/plot space (≈204810xx).
+    // applyImpulse internally computes (position - COM). Both are in plot space, so the lever arm
+    // is (pose_pos - COM) in plot-space units — astronomically large for any structure
+    // whose pose_pos differs from COM by even a few plot-space blocks.
+    // logicalPose().position() is NEVER a valid application point for applyImpulse.
+    // Do NOT re-add without a full coordinate-space audit of what logicalPose returns.
 }

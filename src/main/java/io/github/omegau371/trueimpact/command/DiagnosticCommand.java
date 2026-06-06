@@ -17,13 +17,20 @@ import net.minecraft.network.chat.Component;
  * All debug commands require operator permission (level 2).
  * T-4 experiment commands require operator permission (level 4).
  *
- *   /trueimpact debug contacts [on|off]   — T-3/T-5/T-6 raw contact logging
- *   /trueimpact debug callbacks [on|off]  — T-1/T-2 callback logging
- *   /trueimpact debug bodies [on|off]     — body snapshot + T-7 logging
- *   /trueimpact debug status              — print all current flags
- *   /trueimpact debug all off             — disable everything + clear state (op 2)
- *   /trueimpact experiment t4 bodies      — list sub-levels (op 4, Sable only)
- *   /trueimpact experiment t4 apply <id> <fx> <fy> <fz>  — T-4 command (op 4, Sable only)
+ *   /trueimpact debug contacts [on|off]              — T-3/T-5/T-6 raw contact logging
+ *   /trueimpact debug callbacks [on|off]             — T-1/T-2 callback logging
+ *   /trueimpact debug bodies [on|off]                — body snapshot + T-7 logging
+ *   /trueimpact debug status                         — print all current flags
+ *   /trueimpact debug all off                        — disable everything + clear state (op 2)
+ *   /trueimpact experiment t4 bodies                 — list sub-levels (op 4, Sable only)
+ *   /trueimpact experiment t4 inspect <id>           — detailed body readout (op 4, Sable only)
+ *   /trueimpact experiment t4 apply <id> fx fy fz    — T-4 com-current variant (op 4, Sable only)
+ *   /trueimpact experiment t4 apply-linear <id> ...  — T-4 linear-only variant (op 4, Sable only)
+ *
+ * [PERMANENTLY REMOVED] apply-at-pose: produced |Δv|≈2.15e9 and |ω|≈3.61e9 in live test,
+ *   causing server 21 s behind and Sable emergency sub-level removal.
+ *   logicalPose().position() is not a valid application point for applyImpulse — coordinate
+ *   space mismatch yields astronomical lever arm. Do NOT re-add without full coordinate-space audit.
  */
 public final class DiagnosticCommand {
 
@@ -64,13 +71,10 @@ public final class DiagnosticCommand {
                                             .then(Commands.argument("fx", DoubleArgumentType.doubleArg())
                                                     .then(Commands.argument("fy", DoubleArgumentType.doubleArg())
                                                             .then(Commands.argument("fz", DoubleArgumentType.doubleArg())
-                                                                    .executes(DiagnosticCommand::t4ApplyLinear))))))
-                            .then(Commands.literal("apply-at-pose")
-                                    .then(Commands.argument("runtimeId", IntegerArgumentType.integer(0))
-                                            .then(Commands.argument("fx", DoubleArgumentType.doubleArg())
-                                                    .then(Commands.argument("fy", DoubleArgumentType.doubleArg())
-                                                            .then(Commands.argument("fz", DoubleArgumentType.doubleArg())
-                                                                    .executes(DiagnosticCommand::t4ApplyAtPose)))))));
+                                                                    .executes(DiagnosticCommand::t4ApplyLinear)))))));
+                            // apply-at-pose PERMANENTLY REMOVED: live test caused |Δv|≈2.15e9, |ω|≈3.61e9,
+                            // server 21 s behind, Sable emergency sub-level removal.
+                            // logicalPose().position() yields astronomical lever arm — unsafe application point.
         }
 
         dispatcher.register(
@@ -141,15 +145,6 @@ public final class DiagnosticCommand {
         double fy = DoubleArgumentType.getDouble(ctx, "fy");
         double fz = DoubleArgumentType.getDouble(ctx, "fz");
         return io.github.omegau371.trueimpact.sable.SableT4Command.applyLinearExperiment(
-                ctx.getSource(), id, fx, fy, fz);
-    }
-
-    private static int t4ApplyAtPose(CommandContext<CommandSourceStack> ctx) {
-        int id = IntegerArgumentType.getInteger(ctx, "runtimeId");
-        double fx = DoubleArgumentType.getDouble(ctx, "fx");
-        double fy = DoubleArgumentType.getDouble(ctx, "fy");
-        double fz = DoubleArgumentType.getDouble(ctx, "fz");
-        return io.github.omegau371.trueimpact.sable.SableT4Command.applyAtPoseExperiment(
                 ctx.getSource(), id, fx, fy, fz);
     }
 
