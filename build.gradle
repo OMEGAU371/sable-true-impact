@@ -211,6 +211,42 @@ tasks.register('deploy') {
     }
 }
 
+// ── with-Sable dev-server helper ──────────────────────────────────────────────
+// Copies the Sable NeoForge JAR into run/mods/ so that `runServer` loads it.
+// run/ is git-ignored — this task does NOT affect deploy or production.
+//
+// Usage:
+//   .\gradlew.bat copySableToRunMods runServer
+//
+// After server starts, verify in logs:
+//   - "[Sable] ..." lines appear (Sable detected)
+//   - "[TI MixinPlugin] Sable 1.2.x detected — applying Sable mixins" or similar
+//   - NO "target class ... is not loaded" WARNs from Mixin
+//   - /trueimpact experiment t4 bodies → responds (not "unknown command")
+//
+// Do NOT commit run/mods/ contents.
+tasks.register('copySableToRunMods') {
+    group = 'true impact'
+    description = 'Copy Sable NeoForge JAR to run/mods/ for with-Sable runServer verification. run/ is git-ignored.'
+    notCompatibleWithConfigurationCache('Accesses file system at execution time for dev-only helper')
+    doLast {
+        def sableJar = file('D:\\.minecraft\\versions\\1.21.1-NeoForge_21.1.228\\mods\\sable-neoforge-1.21.1-1.2.2.jar')
+        if (!sableJar.exists()) {
+            throw new GradleException(
+                "Sable JAR not found at expected path: ${sableJar}\n" +
+                "Adjust the path in build.gradle copySableToRunMods if your Sable install differs.")
+        }
+        def runMods = file('run/mods')
+        runMods.mkdirs()
+        java.nio.file.Files.copy(
+            sableJar.toPath(),
+            new File(runMods, sableJar.name).toPath(),
+            java.nio.file.StandardCopyOption.REPLACE_EXISTING
+        )
+        logger.lifecycle("Copied ${sableJar.name} → ${runMods}")
+    }
+}
+
 // ── Publishing ────────────────────────────────────────────────────────────────
 publishing {
     publications {

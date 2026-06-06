@@ -60,16 +60,24 @@ class GlobalRateLimiterTest {
     }
 
     @Test
-    void dropped_summary_also_subject_to_limit() {
-        // [C9-codex] summary itself goes through tryLog()
+    void dropped_summary_returns_zero_when_budget_exhausted() {
+        // [P1-1] When per-tick budget is gone, tryLogDroppedSummary() must return 0
+        // so ExperimentLog never bypasses the hard limit via a direct LOG.info call.
         GlobalRateLimiter lim = new GlobalRateLimiter();
-        // Exhaust the budget
+        // Exhaust the budget and generate 10 drops
         for (int i = 0; i < GlobalRateLimiter.MAX_LOGS_PER_TICK + 10; i++) lim.tryLog();
-        // Summary should fail too (budget exhausted)
+        assertTrue(lim.droppedThisTick() > 0, "precondition: drops must have been recorded");
         int result = lim.tryLogDroppedSummary();
-        // result > 0 means something was dropped AND the summary call consumed a slot
-        // but since budget is gone, tryLog() returns false so no slot consumed
-        // The key is: tryLogDroppedSummary() itself uses tryLog() — can return 0 if at limit
-        assertTrue(result >= 0, "tryLogDroppedSummary must not throw");
+        assertEquals(0, result,
+                "[P1-1] summary must return 0 when budget is exhausted — caller must not log");
+    }
+
+    @Test
+    void dropped_summary_returns_zero_when_no_drops() {
+        GlobalRateLimiter lim = new GlobalRateLimiter();
+        // Log once — no drops
+        lim.tryLog();
+        assertEquals(0, lim.tryLogDroppedSummary(),
+                "summary must return 0 when droppedThisTick == 0");
     }
 }

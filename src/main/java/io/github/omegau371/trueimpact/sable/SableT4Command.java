@@ -63,6 +63,13 @@ public final class SableT4Command {
                                           int runtimeId, double fx, double fy, double fz) {
         ServerLevel level = src.getLevel();
 
+        // ── 0. Finite input guard — must precede any arithmetic ──────────────
+        if (!InputVectorGuard.isFiniteInput(fx, fy, fz)) {
+            src.sendFailure(Component.literal(
+                    "[T-4] Input contains NaN or Infinity — rejected."));
+            return 0;
+        }
+
         // ── 1. Input magnitude check ─────────────────────────────────────────
         double inputMag = Math.sqrt(fx*fx + fy*fy + fz*fz);
         if (inputMag > T4ApplyForceExperiment.MAX_INPUT_MAGNITUDE) {

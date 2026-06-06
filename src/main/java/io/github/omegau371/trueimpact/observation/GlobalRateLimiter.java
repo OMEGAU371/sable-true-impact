@@ -45,7 +45,7 @@ public final class GlobalRateLimiter {
     public int tryLogDroppedSummary() {
         int dropped = droppedThisTick.get();
         if (dropped == 0) return 0;
-        if (!tryLog()) return dropped; // Even summary can be dropped
+        if (!tryLog()) return 0; // summary itself dropped — caller must not log
         return dropped;
     }
 
