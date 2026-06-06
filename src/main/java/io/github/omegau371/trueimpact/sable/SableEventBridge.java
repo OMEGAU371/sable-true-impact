@@ -274,9 +274,11 @@ public final class SableEventBridge {
         String comStr = s.comValid() ? fmt(s.comX())+","+fmt(s.comY())+","+fmt(s.comZ()) : "invalid";
         String velStr = s.velocityReadValid()
                 ? fmt(s.linVelX())+","+fmt(s.linVelY())+","+fmt(s.linVelZ()) : "invalid";
-        ExperimentLog.info("[SNAP] tick={} sub={} phase={} id={} mass={}kpg pos=({},{},{}) com=({}) linVel=({})",
+        // ori=(x,y,z,w) is required by T-3: rotate localNormalA from BODY_COM_LOCAL to WORLD
+        ExperimentLog.info("[SNAP] tick={} sub={} phase={} id={} mass={}kpg pos=({},{},{}) com=({}) linVel=({}) ori=({},{},{},{})",
                 s.serverTick(), s.substepIndex(), s.phase(), s.runtimeId(), fmt(s.massKpg()),
-                fmt(s.posX()), fmt(s.posY()), fmt(s.posZ()), comStr, velStr);
+                fmt(s.posX()), fmt(s.posY()), fmt(s.posZ()), comStr, velStr,
+                fmt(s.oriX()), fmt(s.oriY()), fmt(s.oriZ()), fmt(s.oriW()));
     }
 
     // ── format helpers ───────────────────────────────────────────────────────
