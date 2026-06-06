@@ -83,18 +83,27 @@ Dropped events increment `droppedThisTick` counter; reported at end of tick if >
 Command: `/trueimpact experiment t4 apply <runtimeId> <fx> <fy> <fz>`  
 **MANUALLY PASSED — 2026-06-06**
 
-Confirmed results (M=1 kpg, isolated structure, dedicated server):
+Tested in-game with Sable loaded, M=1 kpg isolated free-floating structure.
+(Log source consistent with integrated server / live game; dedicated server not separately confirmed.)
 
-| variant | input | ratio = |F|/(M·Δv) | angVelAfter | conclusion |
+Two separate test runs:
+
+**Run 1 — at-pose-pos explosion (pre-0.2.1):**
+
+| variant | input | outcome |
+|---|---|---|
+| `at-pose-pos` | (100, 0, 0) | |Δv|≈2.15×10⁹, |ω|≈3.61×10⁹ — server 21 s behind, Sable emergency removal |
+
+**Run 2 — safety verification (0.2.1):**
+
+| variant | input | ratio = \|F\|/(M·Δv) | angVelAfter | conclusion |
 |---|---|---|---|---|
-| `linear-only` | (10,0,0) | 1.0166 | ≈0.0003 | Direct impulse |
-| `com-current` | (10,0,0) | 1.0165 | ≈0.0011 | COM application safe |
-| `at-pose-pos` | (10,0,0) | N/A (explosion) | ≈3.61e9 | Permanently removed |
+| `linear-only` | (10, 0, 0) | 1.0166 | ≈ 0.0003 | Direct impulse confirmed |
+| `com-current` | (10, 0, 0) | 1.0165 | ≈ 0.0011 | COM application safe |
 
 **Impulse semantics confirmed.** ratio ≈ 1.0, no dt factor.
 **COM application is safe** for future force-transfer foundation.
-**at-pose-pos permanently removed** — logicalPose().position() as applyImpulse point
-causes astronomical lever arm in plot-space coordinates.
+**at-pose-pos permanently removed** — logicalPose().position() yields astronomical lever arm in plot-space.
 
 Safety rule added to code and docs: |application_point − COM| ≪ 1e3 or reject.
 
