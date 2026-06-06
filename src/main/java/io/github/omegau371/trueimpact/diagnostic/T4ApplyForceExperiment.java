@@ -1,23 +1,48 @@
 package io.github.omegau371.trueimpact.diagnostic;
 
+import java.util.concurrent.ConcurrentHashMap;
+
 /**
- * State holder for T-4: applyForce semantics experiment.
+ * State for T-4: applyForce semantics experiment.
  *
- * Flow (see docs/phase-1-observation-proposal.md §T-4):
- *   1. Admin runs: /trueimpact experiment t4 <runtimeId> <fx> <fy> <fz>
- *   2. Command reads vBefore, applies impulse at COM, stores Pending.
- *   3. SableEventBridge.onPostStep() finds the matching runtimeId and reads vAfter.
- *   4. Computes and logs: M, inputRaw, dt, vBefore, vAfter, Δv, M·Δv, input/(M·Δv).
- *   5. Clears Pending.
+ * [C1-audit] pending is per-level + per-runtimeId, NOT a single global volatile.
+ *   Key = "dimension:runtimeId", e.g. "minecraft:overworld:42"
+ *   Prevents a second command from silently overwriting the first.
  *
- * [safety] Only set via explicit admin command — never auto-triggered.
- * [safety] Measurement is ONE-SHOT: cleared immediately after first matching POST_STEP.
+ * [safety] Only populated by explicit admin command (/trueimpact experiment t4 apply).
+ *   Never auto-triggered.
+ * [safety] ONE-SHOT: cleared on first POST_STEP match for that key.
+ *
+ * T-4 measurement is INDEPENDENT of LOG_BODY_SNAPSHOTS.
+ * SableEventBridge.onPostStep() checks pendingByKey regardless of snapshot logging flags.
+ *
+ * Input hard limit: MAX_INPUT_MAGNITUDE_KPG_BLOCK_S
+ *   Conservative ceiling — researcher must stay well below to avoid corrupting the run.
+ *
+ * Recorded quantities:
+ *   - M (kpg), inputRaw vector, dt (substep seconds), vBefore, vAfter
+ *   - Δv = vAfter − vBefore (full vector)
+ *   - deltaVAlongInput = Δv · normalize(input)       [projection onto input direction]
+ *   - measuredMomentumAlongInput = M * deltaVAlongInput
+ *   - input/(M * deltaVAlongInput) ratio             [NOT auto-interpreted as conclusion]
+ *
+ * Error sources explicitly recorded in log:
+ *   - gravity impulse during substep (≈ M * g * dt)
+ *   - possible contact during experiment (cannot be excluded without isolation proof)
+ *   - velocity measurement precision (getLinearVelocity vs latestLinearVelocity difference)
  */
 public final class T4ApplyForceExperiment {
 
     private T4ApplyForceExperiment() {}
 
+    /** Conservative hard ceiling on input vector magnitude (kpg·block/s equivalent). */
+    public static final double MAX_INPUT_MAGNITUDE = 200.0;
+
+    /** Reject experiment if pre-experiment |v| exceeds this threshold. */
+    public static final double MAX_PRE_VELOCITY_THRESHOLD = 2.0;
+
     public record Pending(
+            String levelKey,
             int runtimeId,
             double fx, double fy, double fz,
             double vbx, double vby, double vbz,
@@ -26,10 +51,17 @@ public final class T4ApplyForceExperiment {
             long tickApplied
     ) {}
 
-    /** Volatile — written by server-thread command, read by server-thread physics observer. */
-    public static volatile Pending pending = null;
+    /**
+     * All active T-4 experiments, keyed by levelKey + ":" + runtimeId.
+     * Thread-safe: written by server-thread command, read by server-thread physics.
+     */
+    public static final ConcurrentHashMap<String, Pending> pendingByKey = new ConcurrentHashMap<>();
 
-    public static void clear() {
-        pending = null;
+    public static String key(String levelDimension, int runtimeId) {
+        return levelDimension + ":" + runtimeId;
+    }
+
+    public static void clearAll() {
+        pendingByKey.clear();
     }
 }

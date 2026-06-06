@@ -4,6 +4,7 @@ import dev.ryanhcode.sable.api.block.BlockWithSubLevelCollisionCallback;
 import dev.ryanhcode.sable.api.physics.callback.BlockSubLevelCollisionCallback;
 import io.github.omegau371.trueimpact.diagnostic.ExperimentLog;
 import io.github.omegau371.trueimpact.observation.DiagnosticConfig;
+import io.github.omegau371.trueimpact.sable.SableEventBridge;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
 import org.joml.Vector3d;
@@ -12,11 +13,20 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
 /**
- * Wraps the BlockSubLevelCollisionCallback returned by RapierVoxelColliderBakery
- * to support T-1 (callback thread identity) and T-2 (callback coordinate identification).
+ * Wraps non-null BlockSubLevelCollisionCallbacks to support T-1 and T-2.
  *
- * Observation-only: returns the original CollisionResult unchanged.
- * [safety] No block modifications, no impulse applications inside this wrapper.
+ * Transparency rules:
+ *   - The wrapper is applied at bake time UNCONDITIONALLY for non-null callbacks.
+ *     Runtime flags (LOG_T1_CALLBACK_THREAD, LOG_T2_CALLBACK_COORD) only control logging.
+ *     This avoids needing re-bake when diagnostics are enabled after startup.
+ *   - When original callback is null → return null (preserve Rapier's null = no-callback behavior).
+ *     [C2-audit] MUST NOT replace null with a NONE-returning wrapper.
+ *   - The wrapper always returns the original callback's result unchanged.
+ *
+ * T-1 records: callbackThread name/id, captured server thread name/id, sameThread boolean.
+ * T-2 records: raw pos(x,y,z), hitPos(x,y,z); coordinate space transformations
+ *              to WORLD/PLOT_RELATIVE/BODY_COM_LOCAL candidates where context available,
+ *              otherwise labeled "unavailable".
  */
 @Mixin(targets = "dev.ryanhcode.sable.physics.impl.rapier.collider.RapierVoxelColliderBakery",
        remap = false)
@@ -31,19 +41,14 @@ public abstract class DiagnosticCallbackWrapperMixin {
                      remap = false),
             remap = false
     )
-    private BlockSubLevelCollisionCallback wrapCallbackForDiagnostics(BlockState state) {
+    private BlockSubLevelCollisionCallback wrapNonNullCallback(BlockState state) {
         BlockSubLevelCollisionCallback original = BlockWithSubLevelCollisionCallback.sable$getCallback(state);
-        if (!DiagnosticConfig.is(DiagnosticConfig.LOG_T1_CALLBACK_THREAD)
-                && !DiagnosticConfig.is(DiagnosticConfig.LOG_T2_CALLBACK_COORD)) {
-            return original;
-        }
+        // [C2-audit] KEEP null as null — do not substitute NONE-returning wrapper
+        if (original == null) return null;
+        // Always wrap non-null; runtime flags only control logging inside the wrapper
         return new DiagnosticCallbackWrapper(original, state);
     }
 
-    /**
-     * Inner wrapper: logs T-1/T-2 data before delegating to original.
-     * Thread identity recorded here — matches the thread on which Rapier3D.step() fires callbacks.
-     */
     private static final class DiagnosticCallbackWrapper implements BlockSubLevelCollisionCallback {
 
         private final BlockSubLevelCollisionCallback delegate;
@@ -56,36 +61,46 @@ public abstract class DiagnosticCallbackWrapperMixin {
 
         @Override
         public CollisionResult sable$onCollision(BlockPos pos, Vector3d hitPos, double impactVelocity) {
-            // T-1: record callback thread identity
-            // [C10-inferred] expected to be server thread; needs runtime verification
+            // T-1: callback thread vs captured server thread
+            // Logging gate: LOG_T1_CALLBACK_THREAD; wrapper presence is unconditional
             if (DiagnosticConfig.is(DiagnosticConfig.LOG_T1_CALLBACK_THREAD)) {
-                Thread current = Thread.currentThread();
-                ExperimentLog.info("[T-1] callbackThread=\"{}\" id={} isDaemon={} " +
-                                   "impactVelocity={} pos=({},{},{}) hitPos=({},{},{})",
-                        current.getName(), current.getId(), current.isDaemon(),
-                        String.format("%.4f", impactVelocity),
-                        pos.getX(), pos.getY(), pos.getZ(),
-                        String.format("%.3f", hitPos.x),
-                        String.format("%.3f", hitPos.y),
-                        String.format("%.3f", hitPos.z));
+                Thread cb = Thread.currentThread();
+                Thread srv = SableEventBridge.capturedServerThread;
+                boolean same = (srv != null) && (cb == srv);
+                ExperimentLog.info("[T-1] callbackThread=\"{}\" id={} isDaemon={}" +
+                        " serverThread=\"{}\" sameThread={}" +
+                        " impactVelocity={} [note: Sable 1.2.2 passes 0.0]",
+                        cb.getName(), cb.getId(), cb.isDaemon(),
+                        srv != null ? srv.getName() : "unknown(not_yet_captured)",
+                        same,
+                        String.format("%.4f", impactVelocity));
             }
 
-            // T-2: log raw (x,y,z) for coordinate space identification
-            // [C5][T-2 pending] space of (pos) is UNCONFIRMED — could be plot-local, world, or embedded
+            // T-2: raw callback coordinates for coordinate space identification
+            // [C5][T-2 pending] space of pos is UNCONFIRMED — candidates below
             if (DiagnosticConfig.is(DiagnosticConfig.LOG_T2_CALLBACK_COORD)) {
-                ExperimentLog.info("[T-2] pos_raw=({},{},{}) hitPos_raw=({},{},{}) " +
-                                   "impactVelocity={} blockState={}",
+                // Candidate transforms:
+                // WORLD candidate: raw pos.x/y/z directly — only valid if coords are world-scale
+                // PLOT_RELATIVE candidate: unavailable without SubLevel context mid-callback
+                // BODY_COM_LOCAL candidate: unavailable without SubLevel pose mid-callback
+                // EMBEDDED_LEVEL: would be ~4e7 range — checkable from raw value
+                boolean mayBeEmbedded = Math.abs(pos.getX()) > 1_000_000
+                        || Math.abs(pos.getZ()) > 1_000_000;
+                ExperimentLog.info("[T-2] pos_raw=({},{},{}) hitPos_raw=({},{},{})" +
+                        " mayBeEmbedded={} impactVelocity={}" +
+                        " WORLD_candidate=pos_raw PLOT_RELATIVE_candidate=unavailable" +
+                        " BODY_COM_LOCAL_candidate=unavailable blockState={}",
                         pos.getX(), pos.getY(), pos.getZ(),
                         String.format("%.3f", hitPos.x),
                         String.format("%.3f", hitPos.y),
                         String.format("%.3f", hitPos.z),
+                        mayBeEmbedded,
                         String.format("%.4f", impactVelocity),
                         state);
             }
 
-            // Delegate to original — observation only
-            if (delegate != null) return delegate.sable$onCollision(pos, hitPos, impactVelocity);
-            return CollisionResult.NONE;
+            // Observation-only: delegate and return original result unchanged
+            return delegate.sable$onCollision(pos, hitPos, impactVelocity);
         }
     }
 }

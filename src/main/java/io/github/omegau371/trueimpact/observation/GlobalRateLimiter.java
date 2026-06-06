@@ -5,10 +5,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * Global hard limits on diagnostic log output.
  * [C9-codex] All limits apply unconditionally — high-energy events are NOT exempt.
+ * [C9-codex] Dropped-count summary itself also goes through tryLog().
  *
- * Usage: call tryLog() before any diagnostic LOGGER call.
- * Call resetTick() at the start of each server tick.
- * Call resetSecond() every 20 ticks (once per second at 20 TPS).
+ * All callers MUST use ExperimentLog.info() which calls tryLog() internally.
+ * Direct access to ExperimentLog's underlying Logger is forbidden outside ExperimentLog.
  */
 public final class GlobalRateLimiter {
 
@@ -21,18 +21,32 @@ public final class GlobalRateLimiter {
 
     /** @return true if the caller may log; false if the hard limit has been reached. */
     public boolean tryLog() {
-        if (logsThisTick.incrementAndGet() > MAX_LOGS_PER_TICK) {
+        int newTick = logsThisTick.incrementAndGet();
+        if (newTick > MAX_LOGS_PER_TICK) {
+            logsThisTick.decrementAndGet();
             droppedThisTick.incrementAndGet();
-            logsThisTick.decrementAndGet(); // keep counter at MAX so next call still bounces
             return false;
         }
-        if (logsThisSecond.incrementAndGet() > MAX_LOGS_PER_SECOND) {
-            droppedThisTick.incrementAndGet();
+        int newSec = logsThisSecond.incrementAndGet();
+        if (newSec > MAX_LOGS_PER_SECOND) {
             logsThisSecond.decrementAndGet();
             logsThisTick.decrementAndGet();
+            droppedThisTick.incrementAndGet();
             return false;
         }
         return true;
+    }
+
+    /**
+     * Try to log a dropped-count summary.
+     * [C9-codex] Summary itself is also subject to the hard limit.
+     * @return number dropped this tick, or 0 if nothing to report or limit hit
+     */
+    public int tryLogDroppedSummary() {
+        int dropped = droppedThisTick.get();
+        if (dropped == 0) return 0;
+        if (!tryLog()) return dropped; // Even summary can be dropped
+        return dropped;
     }
 
     public int droppedThisTick() {

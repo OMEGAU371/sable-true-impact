@@ -148,7 +148,18 @@ Whether the array contains per-substep metadata is UNKNOWN [T-5].
 
 ---
 
-## 8. Pending experiments
+## 8. Corrections from Codex audit
+
+- **Rapier double-application:** [C3-codex] Still **[IT]** — has not been proven from native source
+  that Rapier already applies full bilateral reaction. Do NOT cite as fact without T-3/T-4 evidence.
+- **NON_ACTIVE_SUBLEVEL_BODY:** [C2-codex] A body ID not in activeSubLevels is
+  `NON_ACTIVE_SUBLEVEL_BODY`. It is NOT labeled "terrain" — that is an unproven assumption.
+- **Experiment status:** All experiments are IMPLEMENTED (code exists) but not yet EXECUTED
+  (no data collected). Status per experiment is tracked in docs/phase-1-observation-proposal.md.
+
+---
+
+## 9. Pending experiments
 
 | ID | Question | Method |
 |---|---|---|

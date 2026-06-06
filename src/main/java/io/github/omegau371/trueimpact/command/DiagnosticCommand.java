@@ -4,50 +4,52 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.context.CommandContext;
+import io.github.omegau371.trueimpact.diagnostic.T4ApplyForceExperiment;
 import io.github.omegau371.trueimpact.observation.DiagnosticConfig;
+import io.github.omegau371.trueimpact.observation.DiagnosticStateManager;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 
 /**
- * Extends /trueimpact with debug and experiment sub-commands.
+ * Diagnostic sub-commands under /trueimpact.
  *
- * Structure:
+ * All debug commands require operator permission (level 2).
+ * T-4 experiment commands require operator permission (level 4).
+ *
  *   /trueimpact debug contacts [on|off]   — T-3/T-5/T-6 raw contact logging
  *   /trueimpact debug callbacks [on|off]  — T-1/T-2 callback logging
- *   /trueimpact debug bodies [on|off]     — body snapshot logging (T-7 included)
- *   /trueimpact debug status              — print current flags
- *   /trueimpact experiment t4 bodies      — list sub-levels with runtimeIds (Sable only, op 4)
- *   /trueimpact experiment t4 apply <id> <fx> <fy> <fz>  — T-4 impulse experiment (op 4)
- *
- * All diagnostics default to OFF. Production logic MUST NOT read diagnostic state.
+ *   /trueimpact debug bodies [on|off]     — body snapshot + T-7 logging
+ *   /trueimpact debug status              — print all current flags
+ *   /trueimpact debug all off             — disable everything + clear state (op 2)
+ *   /trueimpact experiment t4 bodies      — list sub-levels (op 4, Sable only)
+ *   /trueimpact experiment t4 apply <id> <fx> <fy> <fz>  — T-4 command (op 4, Sable only)
  */
 public final class DiagnosticCommand {
 
     private DiagnosticCommand() {}
 
-    /**
-     * @param sableLoaded whether Sable is present at runtime; if false, T-4 nodes are omitted
-     */
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher, boolean sableLoaded) {
         var debug = Commands.literal("debug")
+                .requires(src -> src.hasPermission(2))
                 .then(Commands.literal("contacts")
-                        .then(Commands.literal("on").executes(ctx -> setContactLog(ctx, true)))
-                        .then(Commands.literal("off").executes(ctx -> setContactLog(ctx, false))))
+                        .then(Commands.literal("on").executes(ctx -> setContacts(ctx, true)))
+                        .then(Commands.literal("off").executes(ctx -> setContacts(ctx, false))))
                 .then(Commands.literal("callbacks")
-                        .then(Commands.literal("on").executes(ctx -> setCallbackLog(ctx, true)))
-                        .then(Commands.literal("off").executes(ctx -> setCallbackLog(ctx, false))))
+                        .then(Commands.literal("on").executes(ctx -> setCallbacks(ctx, true)))
+                        .then(Commands.literal("off").executes(ctx -> setCallbacks(ctx, false))))
                 .then(Commands.literal("bodies")
-                        .then(Commands.literal("on").executes(ctx -> setBodyLog(ctx, true)))
-                        .then(Commands.literal("off").executes(ctx -> setBodyLog(ctx, false))))
-                .then(Commands.literal("status").executes(DiagnosticCommand::printStatus));
+                        .then(Commands.literal("on").executes(ctx -> setBodies(ctx, true)))
+                        .then(Commands.literal("off").executes(ctx -> setBodies(ctx, false))))
+                .then(Commands.literal("status").executes(DiagnosticCommand::status))
+                .then(Commands.literal("all")
+                        .then(Commands.literal("off").executes(DiagnosticCommand::allOff)));
 
         var experiment = Commands.literal("experiment").requires(src -> src.hasPermission(4));
-
         if (sableLoaded) {
-            experiment = experiment
-                    .then(Commands.literal("t4")
-                            .then(Commands.literal("bodies").executes(DiagnosticCommand::t4ListBodies))
+            experiment = experiment.then(
+                    Commands.literal("t4")
+                            .then(Commands.literal("bodies").executes(DiagnosticCommand::t4Bodies))
                             .then(Commands.literal("apply")
                                     .then(Commands.argument("runtimeId", IntegerArgumentType.integer(0))
                                             .then(Commands.argument("fx", DoubleArgumentType.doubleArg())
@@ -63,46 +65,53 @@ public final class DiagnosticCommand {
         );
     }
 
-    private static int setContactLog(CommandContext<CommandSourceStack> ctx, boolean on) {
-        DiagnosticConfig.ENABLED = true;
+    // ── debug subcommands ────────────────────────────────────────────────────
+
+    private static int setContacts(CommandContext<CommandSourceStack> ctx, boolean on) {
+        DiagnosticConfig.ENABLED = on || DiagnosticConfig.ENABLED;
         DiagnosticConfig.LOG_RAW_CONTACTS = on;
-        ctx.getSource().sendSuccess(() -> Component.literal(
-                "[TI diag] raw contacts logging: " + (on ? "ON" : "OFF")), false);
+        ctx.getSource().sendSuccess(() -> Component.literal("[TI diag] contacts (T-3/T-5/T-6): " + (on ? "ON" : "OFF")), false);
         return 1;
     }
 
-    private static int setCallbackLog(CommandContext<CommandSourceStack> ctx, boolean on) {
-        DiagnosticConfig.ENABLED = true;
+    private static int setCallbacks(CommandContext<CommandSourceStack> ctx, boolean on) {
+        DiagnosticConfig.ENABLED = on || DiagnosticConfig.ENABLED;
         DiagnosticConfig.LOG_T1_CALLBACK_THREAD = on;
         DiagnosticConfig.LOG_T2_CALLBACK_COORD = on;
-        ctx.getSource().sendSuccess(() -> Component.literal(
-                "[TI diag] callback logging (T-1/T-2): " + (on ? "ON" : "OFF")), false);
+        ctx.getSource().sendSuccess(() -> Component.literal("[TI diag] callbacks (T-1/T-2): " + (on ? "ON" : "OFF")), false);
         return 1;
     }
 
-    private static int setBodyLog(CommandContext<CommandSourceStack> ctx, boolean on) {
-        DiagnosticConfig.ENABLED = true;
+    private static int setBodies(CommandContext<CommandSourceStack> ctx, boolean on) {
+        DiagnosticConfig.ENABLED = on || DiagnosticConfig.ENABLED;
         DiagnosticConfig.LOG_BODY_SNAPSHOTS = on;
         DiagnosticConfig.LOG_T7_VELOCITY_RATIO = on;
-        ctx.getSource().sendSuccess(() -> Component.literal(
-                "[TI diag] body snapshots (T-7 included): " + (on ? "ON" : "OFF")), false);
+        ctx.getSource().sendSuccess(() -> Component.literal("[TI diag] bodies + T-7: " + (on ? "ON" : "OFF")), false);
         return 1;
     }
 
-    private static int printStatus(CommandContext<CommandSourceStack> ctx) {
+    private static int status(CommandContext<CommandSourceStack> ctx) {
+        int t4Pending = T4ApplyForceExperiment.pendingByKey.size();
         ctx.getSource().sendSuccess(() -> Component.literal(
                 "[TI diag] enabled=" + DiagnosticConfig.ENABLED
                 + " bodies=" + DiagnosticConfig.LOG_BODY_SNAPSHOTS
                 + " contacts=" + DiagnosticConfig.LOG_RAW_CONTACTS
-                + " callbacks=" + DiagnosticConfig.LOG_T1_CALLBACK_THREAD
+                + " callbacks_t1t2=" + DiagnosticConfig.LOG_T1_CALLBACK_THREAD
                 + " t7=" + DiagnosticConfig.LOG_T7_VELOCITY_RATIO
-        ), false);
+                + " t4Pending=" + t4Pending), false);
         return 1;
     }
 
-    // T-4 methods — only registered when Sable is loaded
+    private static int allOff(CommandContext<CommandSourceStack> ctx) {
+        DiagnosticStateManager.clearAll();
+        ctx.getSource().sendSuccess(() -> Component.literal(
+                "[TI diag] ALL diagnostics OFF. State cleared (prevPrePos, T-4 pending, snapshots)."), false);
+        return 1;
+    }
 
-    private static int t4ListBodies(CommandContext<CommandSourceStack> ctx) {
+    // ── T-4 (Sable-only) ─────────────────────────────────────────────────────
+
+    private static int t4Bodies(CommandContext<CommandSourceStack> ctx) {
         return io.github.omegau371.trueimpact.sable.SableT4Command.listBodies(ctx.getSource());
     }
 

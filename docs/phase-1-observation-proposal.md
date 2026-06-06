@@ -79,13 +79,17 @@ Dropped events increment `droppedThisTick` counter; reported at end of tick if >
 - Logs `idA`, `idB`, `forceAmountRaw` per contact record
 - Manual: correlate with body masses and pre/post velocities from BodySnapshots
 
-### T-4: applyForce semantics (admin-only)
+### T-4: applyForce semantics (admin-only, manual execution only)
 Command: `/trueimpact experiment t4 apply <runtimeId> <fx> <fy> <fz>`
-- Requires op level 4; prints WARNING before applying
-- Records vBefore at command time, applies impulse at COM, stores Pending
-- Next POST_STEP for matching runtimeId: reads vAfter, computes M, Δv, M·Δv, input/(M·Δv)
-- **If ratio ≈ 1.0** → impulse semantics confirmed; **If ratio ≈ 1/dt** → force semantics
-- Must be manually executed; never auto-triggered
+- Requires op level 4; hard input ceiling MAX_INPUT_MAGNITUDE=200
+- Rejects if pre-velocity |v| > MAX_PRE_VELOCITY_THRESHOLD=2.0
+- Issues ISOLATION WARNING (cannot programmatically confirm no contacts)
+- Pending is per-level+runtimeId (ConcurrentHashMap); no global volatile override
+- Independent of LOG_BODY_SNAPSHOTS — onPostStep() always checks pending map
+- Records: M, inputRaw, dt, vBefore, vAfter, Δv, **deltaVAlongInput**, **measuredMomentumAlongInput**,
+  input/(M·deltaVAlongInput), gravityErrorEst
+- [NOT AUTO-CONCLUDED] ratio annotated with gravity/contact error sources; human analysis required
+- **Implementation status: IMPLEMENTED, not yet executed — awaits project-manager manual run**
 
 ### T-5: clearCollisions substep attribution
 - `ContactLogger` logs contact count and `substepCount` per `clearCollisions` call

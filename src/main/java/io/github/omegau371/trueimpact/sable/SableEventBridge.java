@@ -1,5 +1,6 @@
 package io.github.omegau371.trueimpact.sable;
 
+import dev.ryanhcode.sable.api.physics.handle.RigidBodyHandle;
 import dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
@@ -8,26 +9,59 @@ import io.github.omegau371.trueimpact.diagnostic.ExperimentLog;
 import io.github.omegau371.trueimpact.diagnostic.T4ApplyForceExperiment;
 import io.github.omegau371.trueimpact.observation.BodySnapshot;
 import io.github.omegau371.trueimpact.observation.DiagnosticConfig;
+import io.github.omegau371.trueimpact.observation.DiagnosticStateManager;
 import io.github.omegau371.trueimpact.observation.SnapshotPhase;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
- * Static handler for PRE/POST body snapshot logic.
- * Called from DiagnosticPhysicsStepMixin (replaces NeoForge event listeners).
+ * Static handler for PRE/POST body snapshot logic and T-4 post-step measurement.
+ * Called from DiagnosticPhysicsStepMixin (mixin-based hooks, no NeoForge Sable events needed).
  *
- * This class references Sable API directly — only loaded when Sable is present.
- * No NeoForge Sable events used (those are in sable-neoforge, not sable-common).
+ * [C10-inferred] Called on server thread. T-1 experiment verifies.
  *
- * [C10-inferred] Called from server thread; verified by T-1.
+ * T-4 is INDEPENDENT of LOG_BODY_SNAPSHOTS — onPostStep() always checks T-4 pending map.
  */
 public final class SableEventBridge {
 
-    // Store previous PRE positions for T-7 velocity unit comparison
+    /** Previous PRE_STEP positions for T-7 comparison. Cleared by clearState(). */
     private static final Map<Integer, double[]> prevPrePos = new HashMap<>();
 
+    /** Most recent POST_STEP snapshots, keyed by runtimeId, used by T-3/T-6 in ContactLogger. */
+    private static final Map<Integer, BodySnapshot> lastPostSnaps = new HashMap<>();
+
+    /** Returns an unmodifiable view of the last POST_STEP snapshots for contact correlation. */
+    public static Map<Integer, BodySnapshot> getLastPostSnapshots() {
+        return java.util.Collections.unmodifiableMap(lastPostSnaps);
+    }
+
+    /** Captured server thread identity (set on first server tick, used by T-1). */
+    public static volatile Thread capturedServerThread = null;
+
     private SableEventBridge() {}
+
+    static {
+        // Register cleanup hook so DiagnosticStateManager.clearAll() flushes our state
+        DiagnosticStateManager.registerFlushHook(SableEventBridge::clearState);
+        DiagnosticStateManager.registerFlushHook(T4ApplyForceExperiment::clearAll);
+    }
+
+    public static void clearState() {
+        prevPrePos.clear();
+        lastPostSnaps.clear();
+        capturedServerThread = null;
+    }
+
+    /** Called from TrueImpactMod.onServerTick to capture server thread identity for T-1. */
+    public static void captureServerThread() {
+        if (capturedServerThread == null) {
+            capturedServerThread = Thread.currentThread();
+        }
+    }
+
+    // ── PRE_STEP ────────────────────────────────────────────────────────────
 
     /**
      * Called from DiagnosticPhysicsStepMixin before Rapier3D.step().
@@ -38,20 +72,23 @@ public final class SableEventBridge {
 
         long tick = system.getLevel().getGameTime();
         int substep = SableBodyReader.substepIndex(system);
-
         ServerSubLevelContainer container = SubLevelContainer.getContainer(system.getLevel());
         if (container == null) return;
 
-        for (ServerSubLevel sl : container.getAllSubLevels()) {
+        List<ServerSubLevel> subLevels = container.getAllSubLevels();
+        for (ServerSubLevel sl : subLevels) {
             if (sl.isRemoved()) continue;
             BodySnapshot snap = SableBodyReader.snapshot(sl, system, tick, substep, SnapshotPhase.PRE_STEP);
             prevPrePos.put(sl.getRuntimeId(), new double[]{snap.posX(), snap.posY(), snap.posZ()});
-            logBodySnapshot(snap);
+            logSnap(snap);
         }
     }
 
+    // ── POST_STEP ───────────────────────────────────────────────────────────
+
     /**
      * Called from DiagnosticPhysicsStepMixin after Rapier3D.step() + updateAllPoses().
+     * T-4 check is ALWAYS performed regardless of LOG_BODY_SNAPSHOTS.
      */
     public static void onPostStep(SubLevelPhysicsSystem system) {
         if (!DiagnosticConfig.ENABLED) return;
@@ -60,76 +97,137 @@ public final class SableEventBridge {
         int substep = SableBodyReader.substepIndex(system);
         double dt = SableBodyReader.substepDt(system);
         int substepCount = system.getConfig().substepsPerTick;
+        String levelKey = system.getLevel().dimension().location().toString();
 
         ServerSubLevelContainer container = SubLevelContainer.getContainer(system.getLevel());
         if (container == null) return;
 
-        for (ServerSubLevel sl : container.getAllSubLevels()) {
+        List<ServerSubLevel> subLevels = container.getAllSubLevels();
+        for (ServerSubLevel sl : subLevels) {
             if (sl.isRemoved()) continue;
+            String t4Key = T4ApplyForceExperiment.key(levelKey, sl.getRuntimeId());
+            T4ApplyForceExperiment.Pending t4 = T4ApplyForceExperiment.pendingByKey.get(t4Key);
 
+            // T-4: independent of LOG_BODY_SNAPSHOTS
+            if (t4 != null) {
+                handleT4PostStep(sl, system, t4, t4Key, dt, tick);
+            }
+
+            // Body snapshots (T-7 included)
             if (DiagnosticConfig.LOG_BODY_SNAPSHOTS) {
                 BodySnapshot snap = SableBodyReader.snapshot(sl, system, tick, substep, SnapshotPhase.POST_STEP);
-                logBodySnapshot(snap);
-
+                lastPostSnaps.put(sl.getRuntimeId(), snap);
+                logSnap(snap);
                 if (DiagnosticConfig.LOG_T7_VELOCITY_RATIO) {
                     logT7(sl.getRuntimeId(), snap, dt, tick, substep, substepCount);
-                }
-
-                // T-4 result capture
-                T4ApplyForceExperiment.Pending p = T4ApplyForceExperiment.pending;
-                if (p != null && p.runtimeId() == sl.getRuntimeId()) {
-                    logT4Result(p, snap, dt);
-                    T4ApplyForceExperiment.clear();
                 }
             }
         }
     }
 
-    private static void logBodySnapshot(BodySnapshot s) {
-        ExperimentLog.info(
-                "[SNAP] tick={} sub={} phase={} id={} mass={} " +
-                "pos=({},{},{}) linVel=({},{},{}) angVel=({},{},{})",
-                s.serverTick(), s.substepIndex(), s.phase(), s.runtimeId(),
-                String.format("%.3f", s.massKpg()),
-                String.format("%.3f", s.posX()), String.format("%.3f", s.posY()), String.format("%.3f", s.posZ()),
-                String.format("%.4f", s.linVelX()), String.format("%.4f", s.linVelY()), String.format("%.4f", s.linVelZ()),
-                String.format("%.4f", s.angVelX()), String.format("%.4f", s.angVelY()), String.format("%.4f", s.angVelZ())
-        );
+    // ── T-4 post-step measurement ────────────────────────────────────────
+
+    private static void handleT4PostStep(
+            ServerSubLevel sl, SubLevelPhysicsSystem system,
+            T4ApplyForceExperiment.Pending p, String t4Key,
+            double dt, long tick
+    ) {
+        // Independently read vAfter — does NOT depend on LOG_BODY_SNAPSHOTS
+        double vax = 0, vay = 0, vaz = 0;
+        boolean velValid = false;
+        try {
+            RigidBodyHandle handle = system.getPhysicsHandle(sl);
+            if (handle != null && handle.isValid()) {
+                var lv = handle.getLinearVelocity(new org.joml.Vector3d());
+                vax = lv.x; vay = lv.y; vaz = lv.z;
+                velValid = true;
+            }
+        } catch (Exception ignored) {}
+
+        // Clear BEFORE logging (one-shot)
+        T4ApplyForceExperiment.pendingByKey.remove(t4Key);
+
+        if (!velValid) {
+            ExperimentLog.warn("[T-4] id={} tick={} ABORTED: vAfter read failed (velocityReadValid=false)",
+                    p.runtimeId(), tick);
+            return;
+        }
+
+        double dvx = vax - p.vbx(), dvy = vay - p.vby(), dvz = vaz - p.vbz();
+        double dvMag = Math.sqrt(dvx*dvx + dvy*dvy + dvz*dvz);
+
+        // Normalize input for projection
+        double inMag = Math.sqrt(p.fx()*p.fx() + p.fy()*p.fy() + p.fz()*p.fz());
+        double nx = p.fx()/inMag, ny = p.fy()/inMag, nz = p.fz()/inMag;
+
+        // [C1-audit] Vector projection: deltaVAlongInput = Δv · normalize(input)
+        double deltaVAlongInput = dvx*nx + dvy*ny + dvz*nz;
+        double measuredMomentumAlongInput = p.massKpg() * deltaVAlongInput;
+
+        // ratio = inMag / (M * deltaVAlongInput); ~1.0 if impulse, ~1/dt if force
+        double ratio = (Math.abs(measuredMomentumAlongInput) > 1e-12)
+                ? inMag / measuredMomentumAlongInput : Double.NaN;
+
+        // Gravity error estimate (kpg·block/s per substep, g ≈ 0.08 block/s² default)
+        double gravityErrorEst = p.massKpg() * 0.08 * dt;
+
+        ExperimentLog.info("[T-4] RESULT id={} M={}kpg input=({},{},{}) |input|={} dt={}s" +
+                " vBefore=({},{},{}) vAfter=({},{},{})" +
+                " Δv=({},{},{}) |Δv|={}" +
+                " deltaVAlongInput={} measuredMomentumAlongInput={}" +
+                " input/(M·deltaVAlongInput)={}" +
+                " [~1=impulse, ~1/dt=force — NOT AUTO-CONCLUDED]" +
+                " gravityErrorEst={}kpg·block/s [contact/isolation NOT confirmed]",
+                p.runtimeId(),
+                fmt(p.massKpg()),
+                fmt(p.fx()), fmt(p.fy()), fmt(p.fz()), fmt(inMag),
+                fmt5(dt),
+                fmt(p.vbx()), fmt(p.vby()), fmt(p.vbz()),
+                fmt(vax), fmt(vay), fmt(vaz),
+                fmt(dvx), fmt(dvy), fmt(dvz), fmt(dvMag),
+                fmt(deltaVAlongInput), fmt(measuredMomentumAlongInput),
+                Double.isNaN(ratio) ? "NaN(~0)" : fmt(ratio),
+                fmt(gravityErrorEst));
     }
 
-    private static void logT7(int runtimeId, BodySnapshot post, double dt,
+    // ── T-7 ─────────────────────────────────────────────────────────────────
+
+    private static void logT7(int id, BodySnapshot post, double dt,
                                long tick, int substep, int substepCount) {
-        double[] prev = prevPrePos.get(runtimeId);
+        double[] prev = prevPrePos.get(id);
         if (prev == null) return;
-        double dx = post.posX() - prev[0], dy = post.posY() - prev[1], dz = post.posZ() - prev[2];
+        if (!post.velocityReadValid()) {
+            ExperimentLog.info("[T-7] tick={} sub={} id={} SKIPPED: velocityReadValid=false",
+                    tick, substep, id);
+            return;
+        }
+        double dx = post.posX()-prev[0], dy = post.posY()-prev[1], dz = post.posZ()-prev[2];
         double posDelta = Math.sqrt(dx*dx + dy*dy + dz*dz);
         double linMag = Math.sqrt(post.linVelX()*post.linVelX()
                 + post.linVelY()*post.linVelY() + post.linVelZ()*post.linVelZ());
         double ratio = (linMag > 1e-9) ? posDelta / (linMag * dt) : Double.NaN;
-        ExperimentLog.info("[T-7] tick={} sub={} id={} substeps={} dt={} " +
-                "posDelta={} linVelMag={} ratio=posDelta/(linVelMag*dt)={} [unit UNCONFIRMED]",
-                tick, substep, runtimeId, substepCount,
-                String.format("%.5f", dt), String.format("%.6f", posDelta),
-                String.format("%.6f", linMag),
-                Double.isNaN(ratio) ? "NaN(vel~0)" : String.format("%.4f", ratio));
+        ExperimentLog.info("[T-7] tick={} sub={} id={} substeps={} dt={}" +
+                " posDelta={} linVelMag={} ratio=posDelta/(linVelMag·dt)={} [unit UNCONFIRMED]",
+                tick, substep, id, substepCount,
+                fmt5(dt), fmt6(posDelta), fmt6(linMag),
+                Double.isNaN(ratio) ? "NaN(vel~0)" : fmt4(ratio));
     }
 
-    private static void logT4Result(T4ApplyForceExperiment.Pending p, BodySnapshot post, double dt) {
-        double dvx = post.linVelX() - p.vbx(), dvy = post.linVelY() - p.vby(), dvz = post.linVelZ() - p.vbz();
-        double dvMag = Math.sqrt(dvx*dvx + dvy*dvy + dvz*dvz);
-        double inputMag = Math.sqrt(p.fx()*p.fx() + p.fy()*p.fy() + p.fz()*p.fz());
-        double mDv = p.massKpg() * dvMag;
-        double ratio = (mDv > 1e-12) ? inputMag / mDv : Double.NaN;
-        ExperimentLog.LOG.info("[T-4] RESULT id={} M={} input=({},{},{}) inputMag={} dt={} " +
-                "vBefore=({},{},{}) vAfter=({},{},{}) Δv=({},{},{}) |Δv|={} M·|Δv|={} " +
-                "input/(M·|Δv|)={} [~1=impulse, ~1/dt=force, UNCONFIRMED]",
-                p.runtimeId(), String.format("%.4f", p.massKpg()),
-                String.format("%.4f", p.fx()), String.format("%.4f", p.fy()), String.format("%.4f", p.fz()),
-                String.format("%.6f", inputMag), String.format("%.5f", dt),
-                String.format("%.4f", p.vbx()), String.format("%.4f", p.vby()), String.format("%.4f", p.vbz()),
-                String.format("%.4f", post.linVelX()), String.format("%.4f", post.linVelY()), String.format("%.4f", post.linVelZ()),
-                String.format("%.4f", dvx), String.format("%.4f", dvy), String.format("%.4f", dvz),
-                String.format("%.6f", dvMag), String.format("%.6f", mDv),
-                Double.isNaN(ratio) ? "NaN(Δv~0)" : String.format("%.4f", ratio));
+    // ── snapshot log ─────────────────────────────────────────────────────────
+
+    private static void logSnap(BodySnapshot s) {
+        String comStr = s.comValid() ? fmt(s.comX())+","+fmt(s.comY())+","+fmt(s.comZ()) : "invalid";
+        String velStr = s.velocityReadValid()
+                ? fmt(s.linVelX())+","+fmt(s.linVelY())+","+fmt(s.linVelZ()) : "invalid";
+        ExperimentLog.info("[SNAP] tick={} sub={} phase={} id={} mass={}kpg pos=({},{},{}) com=({}) linVel=({})",
+                s.serverTick(), s.substepIndex(), s.phase(), s.runtimeId(), fmt(s.massKpg()),
+                fmt(s.posX()), fmt(s.posY()), fmt(s.posZ()), comStr, velStr);
     }
+
+    // ── format helpers ───────────────────────────────────────────────────────
+
+    private static String fmt(double v)  { return String.format("%.4f", v); }
+    private static String fmt4(double v) { return String.format("%.4f", v); }
+    private static String fmt5(double v) { return String.format("%.5f", v); }
+    private static String fmt6(double v) { return String.format("%.6f", v); }
 }

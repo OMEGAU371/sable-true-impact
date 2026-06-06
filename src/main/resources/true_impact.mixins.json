@@ -1,4 +1,5 @@
 {
+  "plugin": "io.github.omegau371.trueimpact.mixin.TrueImpactMixinPlugin",
   "required": true,
   "package": "io.github.omegau371.trueimpact.mixin",
   "compatibilityLevel": "JAVA_21",
