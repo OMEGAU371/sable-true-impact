@@ -60,13 +60,13 @@ Two separate test runs:
 
 **Run 1 — at-pose-pos explosion (pre-0.2.1 build):**
 
-| variant | input | |Δv| | |ω| | outcome |
+| variant | input | delta-v magnitude | angular speed | outcome |
 |---|---|---|---|---|
 | `at-pose-pos` | (100, 0, 0) | ≈ 2.15×10⁹ | ≈ 3.61×10⁹ | **EXPLOSION — server 21 s behind, Sable emergency removal** |
 
 **Run 2 — safety verification after at-pose-pos removed (0.2.1 build):**
 
-| variant | input | ratio = \|input\|/(M·Δv) | angVelAfter | conclusion |
+| variant | input | ratio = inputMagnitude/(M·Δv) | angVelAfter | conclusion |
 |---|---|---|---|---|
 | `linear-only` | (10, 0, 0) | 1.0166 | ≈ 0.0003 | **Direct impulse confirmed** |
 | `com-current` | (10, 0, 0) | 1.0165 | ≈ 0.0011 | COM application safe, no spurious torque |

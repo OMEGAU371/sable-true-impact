@@ -92,11 +92,11 @@ Two separate test runs:
 
 | variant | input | outcome |
 |---|---|---|
-| `at-pose-pos` | (100, 0, 0) | |Δv|≈2.15×10⁹, |ω|≈3.61×10⁹ — server 21 s behind, Sable emergency removal |
+| `at-pose-pos` | (100, 0, 0) | delta-v magnitude ≈2.15×10⁹, angular speed ≈3.61×10⁹ — server 21 s behind, Sable emergency removal |
 
 **Run 2 — safety verification (0.2.1):**
 
-| variant | input | ratio = \|F\|/(M·Δv) | angVelAfter | conclusion |
+| variant | input | ratio = inputMagnitude/(M·Δv) | angVelAfter | conclusion |
 |---|---|---|---|---|
 | `linear-only` | (10, 0, 0) | 1.0166 | ≈ 0.0003 | Direct impulse confirmed |
 | `com-current` | (10, 0, 0) | 1.0165 | ≈ 0.0011 | COM application safe |
