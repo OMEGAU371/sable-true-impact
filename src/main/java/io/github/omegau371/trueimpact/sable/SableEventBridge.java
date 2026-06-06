@@ -40,6 +40,9 @@ public final class SableEventBridge {
     /** Captured server thread identity (set on first server tick, used by T-1). */
     public static volatile Thread capturedServerThread = null;
 
+    /** Last game-tick at which a T-4 "no-match" diagnostic was emitted (once per tick). */
+    private static volatile long lastT4DiagLogTick = -1L;
+
     private SableEventBridge() {}
 
     static {
@@ -52,6 +55,7 @@ public final class SableEventBridge {
         prevPrePos.clear();
         lastPostSnaps.clear();
         capturedServerThread = null;
+        lastT4DiagLogTick = -1L;
     }
 
     /** Called from TrueImpactMod.onServerTick to capture server thread identity for T-1. */
@@ -88,10 +92,14 @@ public final class SableEventBridge {
 
     /**
      * Called from DiagnosticPhysicsStepMixin after Rapier3D.step() + updateAllPoses().
-     * T-4 check is ALWAYS performed regardless of LOG_BODY_SNAPSHOTS.
+     *
+     * T-4 pending is consumed here regardless of ENABLED or LOG_BODY_SNAPSHOTS.
+     * Body snapshots (SNAP / T-7) still require ENABLED=true.
      */
     public static void onPostStep(SubLevelPhysicsSystem system) {
-        if (!DiagnosticConfig.ENABLED) return;
+        boolean hasPending = !T4ApplyForceExperiment.pendingByKey.isEmpty();
+        // T-4 must run even when ENABLED=false. Body snapshots still require ENABLED.
+        if (!hasPending && !DiagnosticConfig.ENABLED) return;
 
         long tick = system.getLevel().getGameTime();
         int substep = SableBodyReader.substepIndex(system);
@@ -100,28 +108,66 @@ public final class SableEventBridge {
         String levelKey = system.getLevel().dimension().location().toString();
 
         ServerSubLevelContainer container = SubLevelContainer.getContainer(system.getLevel());
-        if (container == null) return;
+        if (container == null) {
+            if (hasPending) {
+                ExperimentLog.warn("[T-4] DIAG tick={} levelKey='{}' container=null — cannot iterate sublevels. pendingKeys={}",
+                        tick, levelKey, T4ApplyForceExperiment.pendingByKey.keySet());
+            }
+            return;
+        }
 
         List<ServerSubLevel> subLevels = container.getAllSubLevels();
+        boolean t4MatchedThisPass = false;
+        StringBuilder visitedIds = hasPending ? new StringBuilder() : null;
+
         for (ServerSubLevel sl : subLevels) {
             if (sl.isRemoved()) continue;
-            String t4Key = T4ApplyForceExperiment.key(levelKey, sl.getRuntimeId());
-            T4ApplyForceExperiment.Pending t4 = T4ApplyForceExperiment.pendingByKey.get(t4Key);
+            int rid = sl.getRuntimeId();
+            if (visitedIds != null) visitedIds.append(rid).append(',');
 
-            // T-4: independent of LOG_BODY_SNAPSHOTS
+            // T-4: always run regardless of ENABLED or LOG_BODY_SNAPSHOTS
+            String t4Key = T4ApplyForceExperiment.key(levelKey, rid);
+            T4ApplyForceExperiment.Pending t4 = T4ApplyForceExperiment.pendingByKey.get(t4Key);
             if (t4 != null) {
+                t4MatchedThisPass = true;
                 handleT4PostStep(sl, system, t4, t4Key, dt, tick);
             }
 
-            // Body snapshots (T-7 included)
-            if (DiagnosticConfig.LOG_BODY_SNAPSHOTS) {
+            // Body snapshots (T-7 included) — still gated on ENABLED
+            if (DiagnosticConfig.ENABLED && DiagnosticConfig.LOG_BODY_SNAPSHOTS) {
                 BodySnapshot snap = SableBodyReader.snapshot(sl, system, tick, substep, SnapshotPhase.POST_STEP);
-                lastPostSnaps.put(sl.getRuntimeId(), snap);
+                lastPostSnaps.put(rid, snap);
                 logSnap(snap);
                 if (DiagnosticConfig.LOG_T7_VELOCITY_RATIO) {
-                    logT7(sl.getRuntimeId(), snap, dt, tick, substep, substepCount);
+                    logT7(rid, snap, dt, tick, substep, substepCount);
                 }
             }
+        }
+
+        // ── T-4 diagnostics: log when pending exists but no match was found ─────
+        if (hasPending && !t4MatchedThisPass && tick != lastT4DiagLogTick) {
+            lastT4DiagLogTick = tick;
+            String ids = (visitedIds != null && visitedIds.length() > 0)
+                    ? visitedIds.substring(0, visitedIds.length() - 1) : "none";
+            ExperimentLog.warn("[T-4] DIAG tick={} levelKey='{}' pending NOT consumed this pass. " +
+                    "pendingKeys={} visibleRuntimeIds=[{}] " +
+                    "(key mismatch? runtimeId changed after apply? body removed?)",
+                    tick, levelKey, T4ApplyForceExperiment.pendingByKey.keySet(), ids);
+        }
+
+        // ── T-4 timeout: clear stuck pending after PENDING_TIMEOUT_TICKS ────────
+        if (!T4ApplyForceExperiment.pendingByKey.isEmpty()) {
+            T4ApplyForceExperiment.pendingByKey.entrySet().removeIf(entry -> {
+                long age = tick - entry.getValue().tickApplied();
+                if (age > T4ApplyForceExperiment.PENDING_TIMEOUT_TICKS) {
+                    ExperimentLog.warn("[T-4] TIMEOUT key={} applied=tick{} age={}ticks (>{}). " +
+                            "Auto-cleared. Re-run after checking /trueimpact debug status.",
+                            entry.getKey(), entry.getValue().tickApplied(), age,
+                            T4ApplyForceExperiment.PENDING_TIMEOUT_TICKS);
+                    return true;
+                }
+                return false;
+            });
         }
     }
 

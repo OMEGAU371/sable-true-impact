@@ -41,6 +41,9 @@ public final class T4ApplyForceExperiment {
     /** Reject experiment if pre-experiment |v| exceeds this threshold. */
     public static final double MAX_PRE_VELOCITY_THRESHOLD = 2.0;
 
+    /** After this many ticks with no POST_STEP match, pending is considered stuck and auto-cleared. */
+    public static final int PENDING_TIMEOUT_TICKS = 100;
+
     public record Pending(
             String levelKey,
             int runtimeId,

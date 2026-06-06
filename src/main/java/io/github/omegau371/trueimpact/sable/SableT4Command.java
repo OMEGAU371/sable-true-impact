@@ -169,6 +169,10 @@ public final class SableT4Command {
                 vBefore.x, vBefore.y, vBefore.z,
                 mass, dt, level.getGameTime()
         ));
+        // Diagnostic: log exactly what key was stored so onPostStep mismatch can be diagnosed
+        io.github.omegau371.trueimpact.diagnostic.ExperimentLog.info(
+                "[T-4] PENDING stored: key='{}' levelKey='{}' runtimeId={} pendingMapSize={}",
+                key, levelKey, runtimeId, T4ApplyForceExperiment.pendingByKey.size());
 
         final double vbx = vBefore.x, vby = vBefore.y, vbz = vBefore.z;
         final double fxF = fx, fyF = fy, fzF = fz, magF = inputMag, mF = mass;
