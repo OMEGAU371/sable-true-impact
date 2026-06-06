@@ -44,9 +44,10 @@ public abstract class DiagnosticContactCaptureMixin {
         if (DiagnosticConfig.is(DiagnosticConfig.LOG_RAW_CONTACTS)) {
             SubLevelPhysicsSystem system = SubLevelPhysicsSystem.get(level);
             int substepCount = (system != null) ? system.getConfig().substepsPerTick : -1;
-            // Provide last POST_STEP snapshots for T-3/T-6 correlation
             Map<Integer, BodySnapshot> snaps = SableEventBridge.getLastPostSnapshots();
-            ContactLogger.onClearCollisions(data, level.getGameTime(), substepCount, snaps);
+            // tickStartVels: populated at substep 0 PRE_STEP; used by T-3-MISS pairwise scan
+            Map<Integer, double[]> tickStartVels = SableEventBridge.getTickStartVels();
+            ContactLogger.onClearCollisions(data, level.getGameTime(), substepCount, snaps, tickStartVels);
         }
         return data;
     }

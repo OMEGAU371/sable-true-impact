@@ -32,9 +32,25 @@ public final class SableEventBridge {
     /** Most recent POST_STEP snapshots, keyed by runtimeId, used by T-3/T-6 in ContactLogger. */
     private static final Map<Integer, BodySnapshot> lastPostSnaps = new HashMap<>();
 
+    /**
+     * Tick-start linear velocities (substep 0 PRE_STEP), keyed by runtimeId.
+     * Populated when LOG_RAW_CONTACTS is enabled. Used by T-3-MISS pairwise Δv scan.
+     * Cleared at the start of each substep-0 PRE_STEP pass.
+     */
+    private static final Map<Integer, double[]> tickStartVelById = new HashMap<>();
+
     /** Returns an unmodifiable view of the last POST_STEP snapshots for contact correlation. */
     public static Map<Integer, BodySnapshot> getLastPostSnapshots() {
         return java.util.Collections.unmodifiableMap(lastPostSnaps);
+    }
+
+    /**
+     * Returns an unmodifiable view of tick-start velocities (substep 0 PRE_STEP).
+     * Used by ContactLogger for T-3-MISS pairwise Δv scan.
+     * Empty if LOG_RAW_CONTACTS was off, or if no substep-0 PRE_STEP has fired yet.
+     */
+    public static Map<Integer, double[]> getTickStartVels() {
+        return java.util.Collections.unmodifiableMap(tickStartVelById);
     }
 
     /** Captured server thread identity (set on first server tick, used by T-1). */
@@ -54,6 +70,7 @@ public final class SableEventBridge {
     public static void clearState() {
         prevPrePos.clear();
         lastPostSnaps.clear();
+        tickStartVelById.clear();
         capturedServerThread = null;
         lastT4DiagLogTick = -1L;
     }
@@ -69,10 +86,15 @@ public final class SableEventBridge {
 
     /**
      * Called from DiagnosticPhysicsStepMixin before Rapier3D.step().
+     *
+     * Two independent code paths — each gated separately:
+     *   needSnapshots  = ENABLED + LOG_BODY_SNAPSHOTS → body snapshot + T-7 position tracking
+     *   needTickStart  = LOG_RAW_CONTACTS, substep 0 only → tick-start velocity for T-3-MISS
      */
     public static void onPreStep(SubLevelPhysicsSystem system) {
-        if (!DiagnosticConfig.ENABLED) return;
-        if (!DiagnosticConfig.LOG_BODY_SNAPSHOTS) return;
+        boolean needSnapshots = DiagnosticConfig.ENABLED && DiagnosticConfig.LOG_BODY_SNAPSHOTS;
+        boolean needTickStart = DiagnosticConfig.is(DiagnosticConfig.LOG_RAW_CONTACTS);
+        if (!needSnapshots && !needTickStart) return;
 
         long tick = system.getLevel().getGameTime();
         int substep = SableBodyReader.substepIndex(system);
@@ -80,11 +102,31 @@ public final class SableEventBridge {
         if (container == null) return;
 
         List<ServerSubLevel> subLevels = container.getAllSubLevels();
-        for (ServerSubLevel sl : subLevels) {
-            if (sl.isRemoved()) continue;
-            BodySnapshot snap = SableBodyReader.snapshot(sl, system, tick, substep, SnapshotPhase.PRE_STEP);
-            prevPrePos.put(sl.getRuntimeId(), new double[]{snap.posX(), snap.posY(), snap.posZ()});
-            logSnap(snap);
+
+        // Capture tick-start velocity at substep 0 for T-3-MISS pairwise scan.
+        // Cleared each substep-0 pass to avoid stale data from the previous tick.
+        if (needTickStart && substep == 0) {
+            tickStartVelById.clear();
+            for (ServerSubLevel sl : subLevels) {
+                if (sl.isRemoved()) continue;
+                try {
+                    RigidBodyHandle handle = system.getPhysicsHandle(sl);
+                    if (handle != null && handle.isValid()) {
+                        var lv = handle.getLinearVelocity(new org.joml.Vector3d());
+                        tickStartVelById.put(sl.getRuntimeId(), new double[]{lv.x, lv.y, lv.z});
+                    }
+                } catch (Exception ignored) {}
+            }
+        }
+
+        // Body snapshots for SNAP log and T-7.
+        if (needSnapshots) {
+            for (ServerSubLevel sl : subLevels) {
+                if (sl.isRemoved()) continue;
+                BodySnapshot snap = SableBodyReader.snapshot(sl, system, tick, substep, SnapshotPhase.PRE_STEP);
+                prevPrePos.put(sl.getRuntimeId(), new double[]{snap.posX(), snap.posY(), snap.posZ()});
+                logSnap(snap);
+            }
         }
     }
 

@@ -35,16 +35,26 @@ public final class ContactLogger {
      * @param lastPostSnaps  most-recent POST_STEP snapshots, keyed by runtimeId
      *                       (from SableEventBridge — may be empty if LOG_BODY_SNAPSHOTS was off)
      */
+    /**
+     * @param tickStartVels  linVel captured at substep-0 PRE_STEP; used by T-3-MISS.
+     *                       Empty if LOG_RAW_CONTACTS was off before first substep, or
+     *                       if debug bodies was off (caller still provides the map).
+     */
     public static void onClearCollisions(double[] data, long serverTick,
                                           int substepCount,
-                                          Map<Integer, BodySnapshot> lastPostSnaps) {
+                                          Map<Integer, BodySnapshot> lastPostSnaps,
+                                          Map<Integer, double[]> tickStartVels) {
         if (!DiagnosticConfig.is(DiagnosticConfig.LOG_RAW_CONTACTS)) return;
 
         int count = data.length / 15;
 
-        // T-5: raw contact count — NO substep attribution claim
-        ExperimentLog.info("[T-5] tick={} totalContacts={} substepCount={}" +
-                " [substepIndex=UNCONFIRMED — clearCollisions covers all substeps combined]",
+        // T-5: raw count from Rapier3D.clearCollisions() — TI applies NO filter here.
+        // Sable's forceAmountRaw > 25*min(mass) filter runs in processCollisionEffects AFTER this.
+        // If count=0, Rapier itself returned an empty array; sub-level vs sub-level pairs
+        // may never appear here if Sable configures Rapier collision groups to exclude them.
+        ExperimentLog.info("[T-5] tick={} rawContactCount={} substepCount={}" +
+                " [raw Rapier3D.clearCollisions output; TI applies no filter;" +
+                " sub-level vs sub-level contacts may not exist in this array]",
                 serverTick, count, substepCount);
 
         for (int i = 0; i < count; i++) {
@@ -126,7 +136,94 @@ public final class ContactLogger {
                 break;
             }
         }
+
+        // T-3-MISS: when Rapier returned no contacts, scan active body pairs for
+        // correlated velocity changes that indicate a hidden transfer mechanism.
+        if (count == 0) {
+            logT3Miss(serverTick, substepCount, lastPostSnaps, tickStartVels);
+        }
     }
+
+    // ── T-3-MISS ─────────────────────────────────────────────────────────────
+
+    // Proximity threshold: bodies must be within this many WORLD blocks to be scanned.
+    private static final double T3_MISS_PROXIMITY = 20.0;
+    // Minimum Δv magnitude to report (filters ticks with no meaningful velocity change).
+    private static final double T3_MISS_DV_MIN = 0.05;
+
+    /**
+     * Pairwise Δv scan when rawContactCount=0.
+     *
+     * For every pair of active bodies within T3_MISS_PROXIMITY blocks (world distance),
+     * if either body has |Δv| ≥ T3_MISS_DV_MIN, emit [T-3-MISS] with full kinematic data.
+     *
+     * Δv = vAfter (lastPostSnaps linVel) − vBefore (tickStartVels, substep-0 PRE_STEP).
+     *
+     * Requires: debug bodies ON (lastPostSnaps populated) AND LOG_RAW_CONTACTS ON.
+     * If lastPostSnaps is empty, a single warning is emitted and the scan is skipped.
+     */
+    private static void logT3Miss(long serverTick, int substepCount,
+                                   Map<Integer, BodySnapshot> lastPostSnaps,
+                                   Map<Integer, double[]> tickStartVels) {
+        if (lastPostSnaps.size() < 2) {
+            if (!lastPostSnaps.isEmpty()) return; // only 1 body, no pairs
+            // 0 bodies: snapshots unavailable (debug bodies off?)
+            ExperimentLog.info("[T-3-MISS] tick={} skipped: lastPostSnaps empty" +
+                    " — enable 'debug bodies on' alongside 'debug contacts on'", serverTick);
+            return;
+        }
+
+        Integer[] ids = lastPostSnaps.keySet().toArray(new Integer[0]);
+        for (int i = 0; i < ids.length; i++) {
+            for (int j = i + 1; j < ids.length; j++) {
+                int idA = ids[i], idB = ids[j];
+                BodySnapshot sA = lastPostSnaps.get(idA);
+                BodySnapshot sB = lastPostSnaps.get(idB);
+                if (sA == null || sB == null) continue;
+                if (!sA.velocityReadValid() || !sB.velocityReadValid()) continue;
+
+                double[] vbA = tickStartVels.get(idA);
+                double[] vbB = tickStartVels.get(idB);
+                if (vbA == null || vbB == null) continue; // tick-start not captured
+
+                // World-space distance between body origins (logicalPose position)
+                double dx = sA.posX() - sB.posX();
+                double dy = sA.posY() - sB.posY();
+                double dz = sA.posZ() - sB.posZ();
+                double dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+                if (dist > T3_MISS_PROXIMITY) continue;
+
+                // Δv: POST_STEP linVel − substep-0 PRE_STEP linVel (full tick Δv)
+                double dvAx = sA.linVelX() - vbA[0];
+                double dvAy = sA.linVelY() - vbA[1];
+                double dvAz = sA.linVelZ() - vbA[2];
+                double dvBx = sB.linVelX() - vbB[0];
+                double dvBy = sB.linVelY() - vbB[1];
+                double dvBz = sB.linVelZ() - vbB[2];
+                double dvAMag = Math.sqrt(dvAx*dvAx + dvAy*dvAy + dvAz*dvAz);
+                double dvBMag = Math.sqrt(dvBx*dvBx + dvBy*dvBy + dvBz*dvBz);
+                if (dvAMag < T3_MISS_DV_MIN && dvBMag < T3_MISS_DV_MIN) continue;
+
+                if (!ExperimentLog.info(
+                        "[T-3-MISS] tick={} substepCount={} rawContactCount=0 idA={} idB={} dist={}" +
+                        " massA={}kpg vBeforeA=({},{},{}) vAfterA=({},{},{}) deltaVA=({},{},{}) |deltaVA|={}" +
+                        " massB={}kpg vBeforeB=({},{},{}) vAfterB=({},{},{}) deltaVB=({},{},{}) |deltaVB|={}" +
+                        " [clearCollisions empty; transfer likely via Sable-level mechanism," +
+                        " NOT Rapier contact manifold; sub-level vs sub-level collision groups unconfirmed]",
+                        serverTick, substepCount, idA, idB, fmt(dist),
+                        fmt(sA.massKpg()), fmt(vbA[0]), fmt(vbA[1]), fmt(vbA[2]),
+                        fmt(sA.linVelX()), fmt(sA.linVelY()), fmt(sA.linVelZ()),
+                        fmt(dvAx), fmt(dvAy), fmt(dvAz), fmt(dvAMag),
+                        fmt(sB.massKpg()), fmt(vbB[0]), fmt(vbB[1]), fmt(vbB[2]),
+                        fmt(sB.linVelX()), fmt(sB.linVelY()), fmt(sB.linVelZ()),
+                        fmt(dvBx), fmt(dvBy), fmt(dvBz), fmt(dvBMag))) {
+                    break; // rate limit hit
+                }
+            }
+        }
+    }
+
+    private static String fmt(double v) { return String.format("%.4f", v); }
 
     // ── Coordinate helpers ───────────────────────────────────────────────────
 
