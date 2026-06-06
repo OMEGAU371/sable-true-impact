@@ -29,16 +29,11 @@ public final class ContactLogger {
     /**
      * Called from DiagnosticContactCaptureMixin after Rapier3D.clearCollisions() returns.
      *
-     * @param data           raw double[N*15] from clearCollisions
+     * @param data           raw double[N*15] from clearCollisions — NO TI filter applied
      * @param serverTick     level.getGameTime()
      * @param substepCount   configured substeps per tick (for T-5 annotation)
      * @param lastPostSnaps  most-recent POST_STEP snapshots, keyed by runtimeId
-     *                       (from SableEventBridge — may be empty if LOG_BODY_SNAPSHOTS was off)
-     */
-    /**
-     * @param tickStartVels  linVel captured at substep-0 PRE_STEP; used by T-3-MISS.
-     *                       Empty if LOG_RAW_CONTACTS was off before first substep, or
-     *                       if debug bodies was off (caller still provides the map).
+     * @param tickStartVels  linVel captured at substep-0 PRE_STEP; used by T-3-MISS
      */
     public static void onClearCollisions(double[] data, long serverTick,
                                           int substepCount,
@@ -146,30 +141,39 @@ public final class ContactLogger {
 
     // ── T-3-MISS ─────────────────────────────────────────────────────────────
 
-    // Proximity threshold: bodies must be within this many WORLD blocks to be scanned.
-    private static final double T3_MISS_PROXIMITY = 20.0;
-    // Minimum Δv magnitude to report (filters ticks with no meaningful velocity change).
-    private static final double T3_MISS_DV_MIN = 0.05;
+    // Proximity: bodies must be within this many WORLD blocks.
+    // 4 blocks catches touching/overlapping structures; excludes distant pairs.
+    private static final double T3_MISS_PROXIMITY    = 4.0;
+    // Minimum |dv along pair axis| for a pair to be evaluated.
+    private static final double T3_MISS_AXIS_DV_MIN  = 0.05;
+    // STRONG criterion: momentum residual along pair axis below this fraction.
+    // residual = |mA*dvA_n + mB*dvB_n| / max(|mA*dvA_n|, |mB*dvB_n|)
+    // → 0.0 = perfect momentum conservation; 1.0 = completely non-conserved.
+    private static final double T3_MISS_RESIDUAL_MAX = 0.50;
 
     /**
      * Pairwise Δv scan when rawContactCount=0.
      *
-     * For every pair of active bodies within T3_MISS_PROXIMITY blocks (world distance),
-     * if either body has |Δv| ≥ T3_MISS_DV_MIN, emit [T-3-MISS] with full kinematic data.
+     * Classification:
+     *   STRONG — opposite Δv along pair axis AND momentum residual < RESIDUAL_MAX
+     *            → strong evidence of hidden impulse transfer; emits [T-3-MISS-STRONG]
+     *   WEAK   — same-direction Δv (gravity, global accel) or high residual
+     *            → silently suppressed; not collision evidence
      *
-     * Δv = vAfter (lastPostSnaps linVel) − vBefore (tickStartVels, substep-0 PRE_STEP).
+     * Pair axis  n = normalize(posB − posA)  (world space)
+     * dvX_n     = dot(deltaVX, n)
+     * residual   = |mA*dvA_n + mB*dvB_n| / max(|mA*dvA_n|, |mB*dvB_n|)
      *
-     * Requires: debug bodies ON (lastPostSnaps populated) AND LOG_RAW_CONTACTS ON.
-     * If lastPostSnaps is empty, a single warning is emitted and the scan is skipped.
+     * Requires: debug bodies ON (lastPostSnaps populated) AND debug contacts ON.
      */
     private static void logT3Miss(long serverTick, int substepCount,
                                    Map<Integer, BodySnapshot> lastPostSnaps,
                                    Map<Integer, double[]> tickStartVels) {
         if (lastPostSnaps.size() < 2) {
-            if (!lastPostSnaps.isEmpty()) return; // only 1 body, no pairs
-            // 0 bodies: snapshots unavailable (debug bodies off?)
-            ExperimentLog.info("[T-3-MISS] tick={} skipped: lastPostSnaps empty" +
-                    " — enable 'debug bodies on' alongside 'debug contacts on'", serverTick);
+            if (lastPostSnaps.isEmpty()) {
+                ExperimentLog.info("[T-3-MISS] tick={} skipped: no POST_STEP snapshots" +
+                        " — enable 'debug bodies on' alongside 'debug contacts on'", serverTick);
+            }
             return;
         }
 
@@ -184,41 +188,70 @@ public final class ContactLogger {
 
                 double[] vbA = tickStartVels.get(idA);
                 double[] vbB = tickStartVels.get(idB);
-                if (vbA == null || vbB == null) continue; // tick-start not captured
+                if (vbA == null || vbB == null) continue;
 
-                // World-space distance between body origins (logicalPose position)
-                double dx = sA.posX() - sB.posX();
-                double dy = sA.posY() - sB.posY();
-                double dz = sA.posZ() - sB.posZ();
-                double dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
-                if (dist > T3_MISS_PROXIMITY) continue;
+                // ── Proximity (world distance between body pose origins) ──────
+                double sepX = sB.posX() - sA.posX();
+                double sepY = sB.posY() - sA.posY();
+                double sepZ = sB.posZ() - sA.posZ();
+                double dist = Math.sqrt(sepX*sepX + sepY*sepY + sepZ*sepZ);
+                if (dist > T3_MISS_PROXIMITY || dist < 1e-6) continue;
 
-                // Δv: POST_STEP linVel − substep-0 PRE_STEP linVel (full tick Δv)
+                // ── Pair axis n = normalize(posB − posA) ────────────────────
+                double nx = sepX/dist, ny = sepY/dist, nz = sepZ/dist;
+
+                // ── Full-tick Δv (POST_STEP − substep-0 PRE_STEP) ───────────
                 double dvAx = sA.linVelX() - vbA[0];
                 double dvAy = sA.linVelY() - vbA[1];
                 double dvAz = sA.linVelZ() - vbA[2];
                 double dvBx = sB.linVelX() - vbB[0];
                 double dvBy = sB.linVelY() - vbB[1];
                 double dvBz = sB.linVelZ() - vbB[2];
-                double dvAMag = Math.sqrt(dvAx*dvAx + dvAy*dvAy + dvAz*dvAz);
-                double dvBMag = Math.sqrt(dvBx*dvBx + dvBy*dvBy + dvBz*dvBz);
-                if (dvAMag < T3_MISS_DV_MIN && dvBMag < T3_MISS_DV_MIN) continue;
 
-                if (!ExperimentLog.info(
-                        "[T-3-MISS] tick={} substepCount={} rawContactCount=0 idA={} idB={} dist={}" +
-                        " massA={}kpg vBeforeA=({},{},{}) vAfterA=({},{},{}) deltaVA=({},{},{}) |deltaVA|={}" +
-                        " massB={}kpg vBeforeB=({},{},{}) vAfterB=({},{},{}) deltaVB=({},{},{}) |deltaVB|={}" +
-                        " [clearCollisions empty; transfer likely via Sable-level mechanism," +
-                        " NOT Rapier contact manifold; sub-level vs sub-level collision groups unconfirmed]",
-                        serverTick, substepCount, idA, idB, fmt(dist),
-                        fmt(sA.massKpg()), fmt(vbA[0]), fmt(vbA[1]), fmt(vbA[2]),
-                        fmt(sA.linVelX()), fmt(sA.linVelY()), fmt(sA.linVelZ()),
-                        fmt(dvAx), fmt(dvAy), fmt(dvAz), fmt(dvAMag),
-                        fmt(sB.massKpg()), fmt(vbB[0]), fmt(vbB[1]), fmt(vbB[2]),
-                        fmt(sB.linVelX()), fmt(sB.linVelY()), fmt(sB.linVelZ()),
-                        fmt(dvBx), fmt(dvBy), fmt(dvBz), fmt(dvBMag))) {
-                    break; // rate limit hit
+                // ── Project onto pair axis ───────────────────────────────────
+                double dvA_n = dvAx*nx + dvAy*ny + dvAz*nz;
+                double dvB_n = dvBx*nx + dvBy*ny + dvBz*nz;
+
+                // Skip if neither body changed along pair axis beyond threshold
+                if (Math.abs(dvA_n) < T3_MISS_AXIS_DV_MIN
+                        && Math.abs(dvB_n) < T3_MISS_AXIS_DV_MIN) continue;
+
+                // ── Momentum residual (Newton 3rd: mA*dvA_n + mB*dvB_n ≈ 0) ─
+                double mA = sA.massKpg(), mB = sB.massKpg();
+                double momA_n = mA * dvA_n, momB_n = mB * dvB_n;
+                double maxMom = Math.max(Math.abs(momA_n), Math.abs(momB_n));
+                double residual = (maxMom > 1e-9)
+                        ? Math.abs(momA_n + momB_n) / maxMom : Double.NaN;
+
+                // ── Classify ─────────────────────────────────────────────────
+                boolean oppositeSigns    = dvA_n * dvB_n < 0;
+                boolean residualLow      = !Double.isNaN(residual) && residual < T3_MISS_RESIDUAL_MAX;
+                boolean isStrong         = oppositeSigns && residualLow;
+
+                if (isStrong) {
+                    // Opposite Δv along pair axis + momentum roughly conserved
+                    // → likely real impulse transfer not captured by clearCollisions
+                    if (!ExperimentLog.info(
+                            "[T-3-MISS-STRONG] tick={} substepCount={} rawContactCount=0" +
+                            " idA={} idB={} dist={}" +
+                            " mA={}kpg dvA_n={} dvA=({},{},{})" +
+                            " mB={}kpg dvB_n={} dvB=({},{},{})" +
+                            " momA_n={} momB_n={} residual={}" +
+                            " [opp-sign dv along pair axis; residual<{};" +
+                            " clearCollisions empty; Sable-level transfer suspected]",
+                            serverTick, substepCount,
+                            idA, idB, fmt(dist),
+                            fmt(mA), fmt(dvA_n), fmt(dvAx), fmt(dvAy), fmt(dvAz),
+                            fmt(mB), fmt(dvB_n), fmt(dvBx), fmt(dvBy), fmt(dvBz),
+                            fmt(momA_n), fmt(momB_n),
+                            Double.isNaN(residual) ? "NaN" : fmt(residual),
+                            T3_MISS_RESIDUAL_MAX)) {
+                        break; // rate limit hit — stop scanning this tick
+                    }
                 }
+                // WEAK (same-direction or high-residual): silently suppressed.
+                // These are gravity/global-acceleration artefacts; not collision evidence.
+                // Use SNAP logs to observe them independently.
             }
         }
     }
