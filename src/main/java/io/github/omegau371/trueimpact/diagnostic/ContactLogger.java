@@ -42,15 +42,22 @@ public final class ContactLogger {
         if (!DiagnosticConfig.is(DiagnosticConfig.LOG_RAW_CONTACTS)) return;
 
         int count = data.length / 15;
+        double substepDt = (substepCount > 0) ? 0.05 / substepCount : 0.05;
 
-        // T-5: raw count from Rapier3D.clearCollisions() — TI applies NO filter here.
-        // Sable's forceAmountRaw > 25*min(mass) filter runs in processCollisionEffects AFTER this.
-        // If count=0, Rapier itself returned an empty array; sub-level vs sub-level pairs
-        // may never appear here if Sable configures Rapier collision groups to exclude them.
+        // T-5: raw count (TI applies NO filter; Sable's 25*min(mass) filter follows AFTER this)
         ExperimentLog.info("[T-5] tick={} rawContactCount={} substepCount={}" +
                 " [raw Rapier3D.clearCollisions output; TI applies no filter;" +
                 " sub-level vs sub-level contacts may not exist in this array]",
                 serverTick, count, substepCount);
+
+        // Per-tick accumulators for [T-3-SUMMARY]
+        double sumForceAmountRaw  = 0;
+        double sumNormalMomChange = 0;
+        double sumReconJ          = 0;
+        double maxClosingVel      = 0;
+        int    activeActiveCount  = 0;
+        boolean reconJAvailable   = false;
+        boolean nomMomAvailable   = false;
 
         for (int i = 0; i < count; i++) {
             int base = i * 15;
@@ -63,50 +70,90 @@ public final class ContactLogger {
             double pAx = data[base+9], pAy = data[base+10], pAz = data[base+11];
             double pBx = data[base+12], pBy = data[base+13], pBz = data[base+14];
 
-            // T-3: correlate with last known body snapshots
-            // [C2] Body not in snapshots → NON_ACTIVE_SUBLEVEL_BODY (NOT proven terrain)
             BodySnapshot snapA = lastPostSnaps.get(idA);
             BodySnapshot snapB = lastPostSnaps.get(idB);
             String bodyTypeA = (snapA != null) ? "ACTIVE_SUBLEVEL" : "NON_ACTIVE_SUBLEVEL_BODY";
             String bodyTypeB = (snapB != null) ? "ACTIVE_SUBLEVEL" : "NON_ACTIVE_SUBLEVEL_BODY";
 
-            // T-3: normal relative velocity and momentum change (only if both snaps available)
-            // Snapshot timing: LAST SUBSTEP POST_STEP — may not match contact substep [T-5 pending]
+            // Calibration fields — NaN when data unavailable
+            double closingVel      = Double.NaN;
+            double normalMomChange = Double.NaN;
+            double mEff            = Double.NaN;
+            double dotSep          = Double.NaN, dotRelVel = Double.NaN;
+            double J_avg           = Double.NaN; // reconstructed from tick-start + POST_STEP Δv
             String t3Data;
+
             if (snapA != null && snapB != null
                     && snapA.velocityReadValid() && snapB.velocityReadValid()) {
-                // Contact point A in world: world = Q_A * localPointA + posA
-                double[] wPA = rotateAndAdd(snapA, pAx, pAy, pAz);
-                // Velocity at contact point (post-step approx): v_cm + ω × r
-                // r_A = wPA - posA = Q_A * localPointA (already computed)
-                double[] vPA = contactPointVelocity(snapA, wPA[0]-snapA.posX(), wPA[1]-snapA.posY(), wPA[2]-snapA.posZ());
-                double[] vPB = contactPointVelocity(snapB,
-                        rotateAndAdd(snapB, pBx, pBy, pBz)[0]-snapB.posX(),
-                        rotateAndAdd(snapB, pBx, pBy, pBz)[1]-snapB.posY(),
-                        rotateAndAdd(snapB, pBx, pBy, pBz)[2]-snapB.posZ());
-                // Normal in world (using A's normal, direction [UC: T-6])
+                // ── Contact point world positions ────────────────────────────
+                double[] wPA   = rotateAndAdd(snapA, pAx, pAy, pAz);
+                double[] wPB   = rotateAndAdd(snapB, pBx, pBy, pBz);
+                double[] vPA   = contactPointVelocity(snapA,
+                        wPA[0]-snapA.posX(), wPA[1]-snapA.posY(), wPA[2]-snapA.posZ());
+                double[] vPB   = contactPointVelocity(snapB,
+                        wPB[0]-snapB.posX(), wPB[1]-snapB.posY(), wPB[2]-snapB.posZ());
+
+                // ── Normal in world (A's normal; direction UC: T-6) ──────────
                 double[] nWorld = rotateVec(snapA, nAx, nAy, nAz);
                 double nMag = Math.sqrt(nWorld[0]*nWorld[0]+nWorld[1]*nWorld[1]+nWorld[2]*nWorld[2]);
                 if (nMag > 1e-9) { nWorld[0]/=nMag; nWorld[1]/=nMag; nWorld[2]/=nMag; }
-                // Closing velocity along normal
+
+                // ── Closing velocity (POST_STEP contact point relative vel) ──
                 double relVx = vPA[0]-vPB[0], relVy = vPA[1]-vPB[1], relVz = vPA[2]-vPB[2];
-                double closingVel = relVx*nWorld[0]+relVy*nWorld[1]+relVz*nWorld[2];
+                closingVel = relVx*nWorld[0]+relVy*nWorld[1]+relVz*nWorld[2];
                 double massA = snapA.massKpg(), massB = snapB.massKpg();
                 double kA = (massA > 0) ? 1.0/massA : 0;
                 double kB = (massB > 0) ? 1.0/massB : 0;
-                double mEff = (kA + kB > 0) ? 1.0/(kA+kB) : Double.NaN;
-                double normalMomChange = Double.isNaN(mEff) ? Double.NaN
-                        : mEff * Math.abs(closingVel);
-                // T-6: dot products for normal direction analysis
-                double[] wPB = rotateAndAdd(snapB, pBx, pBy, pBz);
-                double bMinusAx = wPB[0]-wPA[0], bMinusAy = wPB[1]-wPA[1], bMinusAz = wPB[2]-wPA[2];
-                double dotSep = nWorld[0]*bMinusAx + nWorld[1]*bMinusAy + nWorld[2]*bMinusAz;
-                double dotRelVel = nWorld[0]*relVx + nWorld[1]*relVy + nWorld[2]*relVz;
-                t3Data = String.format("closingVel=%.4f normalMomChange=%.6f mEff=%.4f" +
-                        " [T-6] dot(nA_world,wPointB-wPointA)=%.4f dot(nA_world,relVel)=%.4f" +
-                        " [snapshot timing=LAST_SUBSTEP_POST, NOT exact contact substep]",
-                        closingVel, Double.isNaN(normalMomChange) ? Double.NaN : normalMomChange,
-                        Double.isNaN(mEff) ? Double.NaN : mEff, dotSep, dotRelVel);
+                mEff = (kA + kB > 0) ? 1.0/(kA+kB) : Double.NaN;
+                normalMomChange = Double.isNaN(mEff) ? Double.NaN : mEff * Math.abs(closingVel);
+
+                // ── T-6 dot products ─────────────────────────────────────────
+                double bAx = wPB[0]-wPA[0], bAy = wPB[1]-wPA[1], bAz = wPB[2]-wPA[2];
+                dotSep    = nWorld[0]*bAx    + nWorld[1]*bAy    + nWorld[2]*bAz;
+                dotRelVel = nWorld[0]*relVx  + nWorld[1]*relVy  + nWorld[2]*relVz;
+
+                // ── Reconstructed impulse J from tick-start + POST_STEP Δv ──
+                // Uses abs(dot) because T-6 normal direction is unconfirmed.
+                double[] vbA = tickStartVels.get(idA);
+                double[] vbB = tickStartVels.get(idB);
+                if (vbA != null && vbB != null) {
+                    double dvAn = Math.abs(
+                            (snapA.linVelX()-vbA[0])*nWorld[0]
+                          + (snapA.linVelY()-vbA[1])*nWorld[1]
+                          + (snapA.linVelZ()-vbA[2])*nWorld[2]);
+                    double dvBn = Math.abs(
+                            (snapB.linVelX()-vbB[0])*nWorld[0]
+                          + (snapB.linVelY()-vbB[1])*nWorld[1]
+                          + (snapB.linVelZ()-vbB[2])*nWorld[2]);
+                    J_avg = (massA * dvAn + massB * dvBn) / 2.0;
+                }
+
+                // ── Calibration ratios ───────────────────────────────────────
+                // rawOverNomMom : compares forceAmountRaw to mEff*|closingVel_after|
+                // rawOverReconJ : compares forceAmountRaw to (mA*|dvAn| + mB*|dvBn|)/2
+                // impulseFromRaw_dt    : forceAmountRaw * 0.05  (treat raw as force/tick)
+                // impulseFromRaw_subDt : forceAmountRaw * substepDt (treat raw as force/substep)
+                double rawOverNomMom = (!Double.isNaN(normalMomChange) && normalMomChange > 1e-9)
+                        ? forceAmountRaw / normalMomChange : Double.NaN;
+                double rawOverReconJ = (!Double.isNaN(J_avg) && J_avg > 1e-9)
+                        ? forceAmountRaw / J_avg : Double.NaN;
+
+                t3Data = String.format(
+                        "closingVel=%s normalMomChange=%s mEff=%s" +
+                        " rawOverNomMom=%s rawOverReconJ=%s" +
+                        " impulseFromRaw_dt=%s impulseFromRaw_subDt=%s J_avg_recon=%s" +
+                        " [T-6] dotSep=%s dotRelVel=%s" +
+                        " [snap=LAST_SUBSTEP_POST; T-6 normal dir UC; abs(dot) for recon]",
+                        fmtOrNaN(closingVel), fmtOrNaN(normalMomChange), fmtOrNaN(mEff),
+                        fmtOrNaN(rawOverNomMom), fmtOrNaN(rawOverReconJ),
+                        fmt(forceAmountRaw * 0.05), fmt(forceAmountRaw * substepDt),
+                        fmtOrNaN(J_avg),
+                        fmt(dotSep), fmt(dotRelVel));
+
+                if (!Double.isNaN(normalMomChange)) { sumNormalMomChange += normalMomChange; nomMomAvailable = true; }
+                if (!Double.isNaN(J_avg))            { sumReconJ          += J_avg;           reconJAvailable = true; }
+                if (!Double.isNaN(closingVel))        maxClosingVel = Math.max(maxClosingVel, Math.abs(closingVel));
+                activeActiveCount++;
             } else {
                 String reason = "";
                 if (snapA == null) reason += " snapA=unavailable(NON_ACTIVE_SUBLEVEL)";
@@ -115,6 +162,8 @@ public final class ContactLogger {
                 if (snapB != null && !snapB.velocityReadValid()) reason += " snapB.velValid=false";
                 t3Data = "T3_T6=unavailable" + reason;
             }
+
+            sumForceAmountRaw += forceAmountRaw;
 
             if (!ExperimentLog.info(
                     "[T-3] tick={} idx={} idA={}({}) idB={}({}) forceAmountRaw={}" +
@@ -130,6 +179,32 @@ public final class ContactLogger {
                 ExperimentLog.info("[T-3] tick={} rate limit hit after {} contacts", serverTick, i);
                 break;
             }
+        }
+
+        // [T-3-SUMMARY]: per-tick aggregate — main calibration output
+        // ratioRawOverNomMom ≈ 1        → forceAmountRaw is impulse (mEff·|closingVel| units)
+        // ratioRawOverReconJ ≈ 1        → forceAmountRaw is impulse (mX·|ΔvX_n| units)
+        // ratioRawOverReconJ ≈ 1/subDt  → forceAmountRaw is force per substep
+        // ratioRawOverReconJ ≈ 1/0.05   → forceAmountRaw is force per tick
+        if (count > 0) {
+            double ratioRawOverNomMom = nomMomAvailable  && sumNormalMomChange > 1e-9
+                    ? sumForceAmountRaw / sumNormalMomChange : Double.NaN;
+            double ratioRawOverReconJ = reconJAvailable  && sumReconJ > 1e-9
+                    ? sumForceAmountRaw / sumReconJ          : Double.NaN;
+            ExperimentLog.info(
+                    "[T-3-SUMMARY] tick={} substepCount={} substepDt={} contactCount={} activeActiveCount={}" +
+                    " sumForceAmountRaw={} sumNormalMomChange={} sumReconJ={}" +
+                    " maxClosingVel={}" +
+                    " ratioRawOverNomMom={} ratioRawOverReconJ={}" +
+                    " sumRaw_times_dt={} sumRaw_times_subDt={}" +
+                    " [~1→raw≈impulse; ~1/subDt→raw≈force/substep; ~1/0.05→raw≈force/tick]",
+                    serverTick, substepCount, fmt(substepDt), count, activeActiveCount,
+                    fmt(sumForceAmountRaw),
+                    nomMomAvailable  ? fmt(sumNormalMomChange) : "NaN",
+                    reconJAvailable  ? fmt(sumReconJ)          : "NaN",
+                    fmt(maxClosingVel),
+                    fmtOrNaN(ratioRawOverNomMom), fmtOrNaN(ratioRawOverReconJ),
+                    fmt(sumForceAmountRaw * 0.05), fmt(sumForceAmountRaw * substepDt));
         }
 
         // T-3-MISS: when Rapier returned no contacts, scan active body pairs for
@@ -256,7 +331,8 @@ public final class ContactLogger {
         }
     }
 
-    private static String fmt(double v) { return String.format("%.4f", v); }
+    private static String fmt(double v)       { return String.format("%.4f", v); }
+    private static String fmtOrNaN(double v)  { return Double.isNaN(v) ? "NaN" : String.format("%.4f", v); }
 
     // ── Coordinate helpers ───────────────────────────────────────────────────
 
