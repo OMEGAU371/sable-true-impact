@@ -9,6 +9,7 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import org.joml.Vector3d;
+import org.joml.Vector3dc;
 
 import java.util.List;
 
@@ -182,20 +183,33 @@ public final class SableT4Command {
         return 1;
     }
 
-    /**
-     * @param src  command source (op level 4 required — enforced by DiagnosticCommand)
-     * @param runtimeId  target sub-level runtime ID (use 'bodies' to list)
-     * @param fx/fy/fz   input vector (kpg·block/s equivalent); magnitude hard-capped
-     */
-    public static int applyForExperiment(CommandSourceStack src,
-                                          int runtimeId, double fx, double fy, double fz) {
-        ServerLevel level = src.getLevel();
+    // ── Shared pre-experiment validation ────────────────────────────────────
 
-        // ── 0. Finite input guard — must precede any arithmetic ──────────────
+    /** All state needed after pre-checks pass. */
+    private record ValidatedT4(
+            ServerLevel level,
+            ServerSubLevel target,
+            SubLevelPhysicsSystem system,
+            Vector3d vBefore,
+            boolean velValid,
+            Vector3dc com,       // getCenterOfMass() — non-null (checked by validate)
+            double mass,
+            double dt,
+            String levelKey,
+            String key,
+            double inputMag
+    ) {}
+
+    /**
+     * Runs all pre-experiment checks common to every apply variant.
+     * Returns null and sends failure if any check fails.
+     */
+    private static ValidatedT4 validate(CommandSourceStack src,
+                                         int runtimeId, double fx, double fy, double fz) {
+        // ── 0. Finite input guard ────────────────────────────────────────────
         if (!InputVectorGuard.isFiniteInput(fx, fy, fz)) {
-            src.sendFailure(Component.literal(
-                    "[T-4] Input contains NaN or Infinity — rejected."));
-            return 0;
+            src.sendFailure(Component.literal("[T-4] Input contains NaN or Infinity — rejected."));
+            return null;
         }
 
         // ── 1. Input magnitude check ─────────────────────────────────────────
@@ -204,18 +218,19 @@ public final class SableT4Command {
             src.sendFailure(Component.literal(String.format(
                     "[T-4] Input magnitude %.2f exceeds hard limit %.1f. Reduce input.",
                     inputMag, T4ApplyForceExperiment.MAX_INPUT_MAGNITUDE)));
-            return 0;
+            return null;
         }
         if (inputMag < 1e-9) {
             src.sendFailure(Component.literal("[T-4] Input is zero vector — nothing to measure."));
-            return 0;
+            return null;
         }
 
         // ── 2. Find target sub-level ─────────────────────────────────────────
+        ServerLevel level = src.getLevel();
         ServerSubLevelContainer container = SubLevelContainer.getContainer(level);
         if (container == null) {
             src.sendFailure(Component.literal("[T-4] No Sable container on this level."));
-            return 0;
+            return null;
         }
         ServerSubLevel target = null;
         for (ServerSubLevel sl : container.getAllSubLevels()) {
@@ -223,16 +238,16 @@ public final class SableT4Command {
         }
         if (target == null) {
             src.sendFailure(Component.literal("[T-4] No active sub-level with runtimeId=" + runtimeId));
-            return 0;
+            return null;
         }
 
         SubLevelPhysicsSystem system = SubLevelPhysicsSystem.get(level);
         if (system == null) {
             src.sendFailure(Component.literal("[T-4] PhysicsSystem not available."));
-            return 0;
+            return null;
         }
 
-        // ── 3. Pre-velocity check ────────────────────────────────────────────
+        // ── 3. Pre-velocity check (authoritative handle read) ────────────────
         var handle = system.getPhysicsHandle(target);
         Vector3d vBefore = new Vector3d();
         boolean velValid = false;
@@ -249,7 +264,7 @@ public final class SableT4Command {
                     "[T-4] REJECTED: structure is not at rest (|v|=%.3f > threshold %.1f). " +
                     "Wait for it to stop before running experiment.",
                     preSpeed, T4ApplyForceExperiment.MAX_PRE_VELOCITY_THRESHOLD)));
-            return 0;
+            return null;
         }
         if (!velValid) {
             src.sendSuccess(() -> Component.literal(
@@ -260,57 +275,127 @@ public final class SableT4Command {
         // ── 4. COM check ─────────────────────────────────────────────────────
         var com = target.getMassTracker().getCenterOfMass();
         if (com == null) {
-            src.sendFailure(Component.literal("[T-4] Sub-level COM is null — cannot apply at COM."));
-            return 0;
+            src.sendFailure(Component.literal("[T-4] Sub-level COM is null."));
+            return null;
         }
 
-        // ── 5. Isolation WARNING ──────────────────────────────────────────────
-        // Cannot programmatically prove the structure has no contacts.
-        final int idFinal = runtimeId;
-        final double gravEstFinal = target.getMassTracker().getMass() * 0.08 *
-                (0.05 / system.getConfig().substepsPerTick);
-        src.sendSuccess(() -> Component.literal(String.format(
-                "[T-4] ISOLATION WARNING: Cannot confirm structure id=%d has no contacts. " +
-                "Contact forces and gravity (≈%.4f kpg·block/s per substep) are error sources. " +
-                "Run in a position where the structure is free-falling or clearly isolated.",
-                idFinal, gravEstFinal)), true);
-
-        double mass = target.getMassTracker().getMass();
-        double dt = 0.05 / system.getConfig().substepsPerTick;
+        // ── 5. Duplicate pending check ────────────────────────────────────────
         String levelKey = level.dimension().location().toString();
         String key = T4ApplyForceExperiment.key(levelKey, runtimeId);
-
-        // ── 6. Check no duplicate pending for same key ───────────────────────
         if (T4ApplyForceExperiment.pendingByKey.containsKey(key)) {
             src.sendFailure(Component.literal(
                     "[T-4] Experiment for id=" + runtimeId + " in " + levelKey +
                     " already pending. Wait for result or run /trueimpact debug all off to clear."));
-            return 0;
+            return null;
         }
 
-        // ── 7. Apply impulse at COM ───────────────────────────────────────────
-        system.getPipeline().applyImpulse(target, com, new Vector3d(fx, fy, fz));
+        double mass = target.getMassTracker().getMass();
+        double dt = 0.05 / system.getConfig().substepsPerTick;
+        return new ValidatedT4(level, target, system, vBefore, velValid, com, mass, dt, levelKey, key, inputMag);
+    }
 
-        // ── 8. Store pending for onPostStep measurement ───────────────────────
-        T4ApplyForceExperiment.pendingByKey.put(key, new T4ApplyForceExperiment.Pending(
-                levelKey, runtimeId, fx, fy, fz,
-                vBefore.x, vBefore.y, vBefore.z,
-                mass, dt, level.getGameTime()
-        ));
-        // Diagnostic: log exactly what key was stored so onPostStep mismatch can be diagnosed
-        io.github.omegau371.trueimpact.diagnostic.ExperimentLog.info(
-                "[T-4] PENDING stored: key='{}' levelKey='{}' runtimeId={} pendingMapSize={}",
-                key, levelKey, runtimeId, T4ApplyForceExperiment.pendingByKey.size());
-
-        final double vbx = vBefore.x, vby = vBefore.y, vbz = vBefore.z;
-        final double fxF = fx, fyF = fy, fzF = fz, magF = inputMag, mF = mass;
-        final boolean velValidF = velValid;
+    /** Sends the isolation warning — common to all apply variants. */
+    private static void sendIsolationWarning(CommandSourceStack src, int runtimeId,
+                                              SubLevelPhysicsSystem system, ServerSubLevel target) {
+        final int idF = runtimeId;
+        final double gravEst = target.getMassTracker().getMass() * 0.08 *
+                (0.05 / system.getConfig().substepsPerTick);
         src.sendSuccess(() -> Component.literal(String.format(
-                "[T-4] Applied input=(%.3f,%.3f,%.3f) |input|=%.3f to id=%d (M=%.3f kpg). " +
+                "[T-4] ISOLATION WARNING: Cannot confirm structure id=%d has no contacts. " +
+                "Contact forces and gravity (≈%.4f kpg·block/s per substep) are error sources.",
+                idF, gravEst)), true);
+    }
+
+    /** Stores pending and sends confirmation. */
+    private static void storePendingAndConfirm(
+            CommandSourceStack src, ValidatedT4 v,
+            int runtimeId, double fx, double fy, double fz,
+            String variant, String pointLabel) {
+        T4ApplyForceExperiment.pendingByKey.put(v.key(), new T4ApplyForceExperiment.Pending(
+                v.levelKey(), runtimeId, fx, fy, fz,
+                v.vBefore().x, v.vBefore().y, v.vBefore().z,
+                v.mass(), v.dt(), v.level().getGameTime(), variant));
+        io.github.omegau371.trueimpact.diagnostic.ExperimentLog.info(
+                "[T-4] PENDING stored: key='{}' variant={} point={} levelKey='{}' runtimeId={} mapSize={}",
+                v.key(), variant, pointLabel, v.levelKey(), runtimeId,
+                T4ApplyForceExperiment.pendingByKey.size());
+        final double vbx = v.vBefore().x, vby = v.vBefore().y, vbz = v.vBefore().z;
+        final double magF = v.inputMag(), mF = v.mass();
+        final boolean velValidF = v.velValid();
+        final int idF = runtimeId;
+        final double fxF = fx, fyF = fy, fzF = fz;
+        final String variantF = variant, pointF = pointLabel;
+        src.sendSuccess(() -> Component.literal(String.format(
+                "[T-4] variant=%s point=%s  input=(%.3f,%.3f,%.3f) |input|=%.3f to id=%d (M=%.3f kpg). " +
                 "vBefore=(%.4f,%.4f,%.4f) velValid=%b. " +
-                "Results will be logged on next POST_STEP. " +
-                "DO NOT move the structure manually before POST_STEP fires.",
-                fxF, fyF, fzF, magF, idFinal, mF, vbx, vby, vbz, velValidF)), false);
+                "Results on next POST_STEP. DO NOT move structure before POST_STEP fires.",
+                variantF, pointF, fxF, fyF, fzF, magF, idF, mF, vbx, vby, vbz, velValidF)), false);
+    }
+
+    // ── Variant A: com-current (original behaviour) ──────────────────────────
+
+    /**
+     * Original T-4: applies at getCenterOfMass() (plot space).
+     * Rapier receives (com - com) = (0,0,0) as body-local point → intended pure linear.
+     *
+     * @param src  command source (op level 4 required — enforced by DiagnosticCommand)
+     * @param runtimeId  target sub-level runtime ID (use 't4 bodies' to list)
+     * @param fx/fy/fz   input vector; magnitude hard-capped at MAX_INPUT_MAGNITUDE
+     */
+    public static int applyForExperiment(CommandSourceStack src,
+                                          int runtimeId, double fx, double fy, double fz) {
+        ValidatedT4 v = validate(src, runtimeId, fx, fy, fz);
+        if (v == null) return 0;
+        sendIsolationWarning(src, runtimeId, v.system(), v.target());
+        // Apply at getCenterOfMass() (plot space) → (com - com) = (0,0,0) in Rapier
+        v.system().getPipeline().applyImpulse(v.target(), v.com(), new Vector3d(fx, fy, fz));
+        storePendingAndConfirm(src, v, runtimeId, fx, fy, fz,
+                "com-current", "PLOT_COM");
+        return 1;
+    }
+
+    // ── Variant B: linear-only (applyLinearAndAngularImpulse, torque=0) ──────
+
+    /**
+     * T-4 variant B: bypasses the point system entirely.
+     * Uses applyLinearAndAngularImpulse(body, force, zero_torque, wakeUp=true).
+     * This is the only way to guarantee zero torque regardless of coordinate space.
+     * Expected ratio: ~1/dt if applyForceAndTorque = Rapier force; ~1 if impulse.
+     * Angular velocity after = 0 confirms no torque was generated.
+     */
+    public static int applyLinearExperiment(CommandSourceStack src,
+                                             int runtimeId, double fx, double fy, double fz) {
+        ValidatedT4 v = validate(src, runtimeId, fx, fy, fz);
+        if (v == null) return 0;
+        sendIsolationWarning(src, runtimeId, v.system(), v.target());
+        // applyLinearAndAngularImpulse: force + zero torque, no application point
+        v.system().getPipeline().applyLinearAndAngularImpulse(
+                v.target(), new Vector3d(fx, fy, fz), new Vector3d(), true);
+        storePendingAndConfirm(src, v, runtimeId, fx, fy, fz,
+                "linear-only", "N/A(no-point)");
+        return 1;
+    }
+
+    // ── Variant C: at-pose-pos (logicalPose().position() as application point) ─
+
+    /**
+     * T-4 variant C: applies at logicalPose().position() (the body's pivot in plot space).
+     * Rapier receives (pose_pos - COM) as body-local point → typically off-COM → generates torque.
+     * Useful as a sanity-check: if ratio and angular velocity change vs com-current,
+     * it proves the application point does affect the result (coordinate space is correct).
+     */
+    public static int applyAtPoseExperiment(CommandSourceStack src,
+                                             int runtimeId, double fx, double fy, double fz) {
+        ValidatedT4 v = validate(src, runtimeId, fx, fy, fz);
+        if (v == null) return 0;
+        sendIsolationWarning(src, runtimeId, v.system(), v.target());
+        // Apply at logicalPose().position() (body pivot in plot space)
+        var posePos = v.target().logicalPose().position();
+        v.system().getPipeline().applyImpulse(v.target(),
+                new Vector3d(posePos.x(), posePos.y(), posePos.z()), new Vector3d(fx, fy, fz));
+        storePendingAndConfirm(src, v, runtimeId, fx, fy, fz,
+                "at-pose-pos",
+                String.format("PLOT_POSE_POS(%.2f,%.2f,%.2f)", posePos.x(), posePos.y(), posePos.z()));
         return 1;
     }
 }

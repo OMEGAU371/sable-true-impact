@@ -58,7 +58,19 @@ public final class DiagnosticCommand {
                                             .then(Commands.argument("fx", DoubleArgumentType.doubleArg())
                                                     .then(Commands.argument("fy", DoubleArgumentType.doubleArg())
                                                             .then(Commands.argument("fz", DoubleArgumentType.doubleArg())
-                                                                    .executes(DiagnosticCommand::t4Apply)))))));
+                                                                    .executes(DiagnosticCommand::t4Apply))))))
+                            .then(Commands.literal("apply-linear")
+                                    .then(Commands.argument("runtimeId", IntegerArgumentType.integer(0))
+                                            .then(Commands.argument("fx", DoubleArgumentType.doubleArg())
+                                                    .then(Commands.argument("fy", DoubleArgumentType.doubleArg())
+                                                            .then(Commands.argument("fz", DoubleArgumentType.doubleArg())
+                                                                    .executes(DiagnosticCommand::t4ApplyLinear))))))
+                            .then(Commands.literal("apply-at-pose")
+                                    .then(Commands.argument("runtimeId", IntegerArgumentType.integer(0))
+                                            .then(Commands.argument("fx", DoubleArgumentType.doubleArg())
+                                                    .then(Commands.argument("fy", DoubleArgumentType.doubleArg())
+                                                            .then(Commands.argument("fz", DoubleArgumentType.doubleArg())
+                                                                    .executes(DiagnosticCommand::t4ApplyAtPose)))))));
         }
 
         dispatcher.register(
@@ -121,6 +133,24 @@ public final class DiagnosticCommand {
     private static int t4Inspect(CommandContext<CommandSourceStack> ctx) {
         int id = IntegerArgumentType.getInteger(ctx, "runtimeId");
         return io.github.omegau371.trueimpact.sable.SableT4Command.inspectBody(ctx.getSource(), id);
+    }
+
+    private static int t4ApplyLinear(CommandContext<CommandSourceStack> ctx) {
+        int id = IntegerArgumentType.getInteger(ctx, "runtimeId");
+        double fx = DoubleArgumentType.getDouble(ctx, "fx");
+        double fy = DoubleArgumentType.getDouble(ctx, "fy");
+        double fz = DoubleArgumentType.getDouble(ctx, "fz");
+        return io.github.omegau371.trueimpact.sable.SableT4Command.applyLinearExperiment(
+                ctx.getSource(), id, fx, fy, fz);
+    }
+
+    private static int t4ApplyAtPose(CommandContext<CommandSourceStack> ctx) {
+        int id = IntegerArgumentType.getInteger(ctx, "runtimeId");
+        double fx = DoubleArgumentType.getDouble(ctx, "fx");
+        double fy = DoubleArgumentType.getDouble(ctx, "fy");
+        double fz = DoubleArgumentType.getDouble(ctx, "fz");
+        return io.github.omegau371.trueimpact.sable.SableT4Command.applyAtPoseExperiment(
+                ctx.getSource(), id, fx, fy, fz);
     }
 
     private static int t4Apply(CommandContext<CommandSourceStack> ctx) {

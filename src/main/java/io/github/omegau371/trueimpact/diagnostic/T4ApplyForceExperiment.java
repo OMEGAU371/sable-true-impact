@@ -51,7 +51,9 @@ public final class T4ApplyForceExperiment {
             double vbx, double vby, double vbz,
             double massKpg,
             double substepDt,
-            long tickApplied
+            long tickApplied,
+            /** Which apply variant created this pending entry. */
+            String variant
     ) {}
 
     /**

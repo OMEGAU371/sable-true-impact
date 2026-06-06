@@ -178,8 +178,9 @@ public final class SableEventBridge {
             T4ApplyForceExperiment.Pending p, String t4Key,
             double dt, long tick
     ) {
-        // Independently read vAfter — does NOT depend on LOG_BODY_SNAPSHOTS
+        // Independently read vAfter and angular velocity
         double vax = 0, vay = 0, vaz = 0;
+        double avx = 0, avy = 0, avz = 0;
         boolean velValid = false;
         try {
             RigidBodyHandle handle = system.getPhysicsHandle(sl);
@@ -187,6 +188,10 @@ public final class SableEventBridge {
                 var lv = handle.getLinearVelocity(new org.joml.Vector3d());
                 vax = lv.x; vay = lv.y; vaz = lv.z;
                 velValid = true;
+                try {
+                    var av = handle.getAngularVelocity(new org.joml.Vector3d());
+                    avx = av.x; avy = av.y; avz = av.z;
+                } catch (Exception ignored) {}
             }
         } catch (Exception ignored) {}
 
@@ -194,8 +199,8 @@ public final class SableEventBridge {
         T4ApplyForceExperiment.pendingByKey.remove(t4Key);
 
         if (!velValid) {
-            ExperimentLog.warn("[T-4] id={} tick={} ABORTED: vAfter read failed (velocityReadValid=false)",
-                    p.runtimeId(), tick);
+            ExperimentLog.warn("[T-4] id={} variant={} tick={} ABORTED: vAfter read failed (velocityReadValid=false)",
+                    p.runtimeId(), p.variant(), tick);
             return;
         }
 
@@ -216,15 +221,18 @@ public final class SableEventBridge {
 
         // Gravity error estimate (kpg·block/s per substep, g ≈ 0.08 block/s² default)
         double gravityErrorEst = p.massKpg() * 0.08 * dt;
+        double avMag = Math.sqrt(avx*avx + avy*avy + avz*avz);
 
-        ExperimentLog.info("[T-4] RESULT id={} M={}kpg input=({},{},{}) |input|={} dt={}s" +
+        ExperimentLog.info("[T-4] RESULT id={} variant={} M={}kpg input=({},{},{}) |input|={} dt={}s" +
                 " vBefore=({},{},{}) vAfter=({},{},{})" +
                 " Δv=({},{},{}) |Δv|={}" +
                 " deltaVAlongInput={} measuredMomentumAlongInput={}" +
                 " input/(M·deltaVAlongInput)={}" +
                 " [~1=impulse, ~1/dt=force — NOT AUTO-CONCLUDED]" +
+                " angVelAfter=({},{},{}) |ω|={}" +
                 " gravityErrorEst={}kpg·block/s [contact/isolation NOT confirmed]",
                 p.runtimeId(),
+                p.variant(),
                 fmt(p.massKpg()),
                 fmt(p.fx()), fmt(p.fy()), fmt(p.fz()), fmt(inMag),
                 fmt5(dt),
@@ -233,6 +241,7 @@ public final class SableEventBridge {
                 fmt(dvx), fmt(dvy), fmt(dvz), fmt(dvMag),
                 fmt(deltaVAlongInput), fmt(measuredMomentumAlongInput),
                 Double.isNaN(ratio) ? "NaN(~0)" : fmt(ratio),
+                fmt(avx), fmt(avy), fmt(avz), fmt(avMag),
                 fmt(gravityErrorEst));
     }
 
