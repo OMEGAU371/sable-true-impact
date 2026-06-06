@@ -50,6 +50,9 @@ public final class DiagnosticCommand {
             experiment = experiment.then(
                     Commands.literal("t4")
                             .then(Commands.literal("bodies").executes(DiagnosticCommand::t4Bodies))
+                            .then(Commands.literal("inspect")
+                                    .then(Commands.argument("runtimeId", IntegerArgumentType.integer(0))
+                                            .executes(DiagnosticCommand::t4Inspect)))
                             .then(Commands.literal("apply")
                                     .then(Commands.argument("runtimeId", IntegerArgumentType.integer(0))
                                             .then(Commands.argument("fx", DoubleArgumentType.doubleArg())
@@ -113,6 +116,11 @@ public final class DiagnosticCommand {
 
     private static int t4Bodies(CommandContext<CommandSourceStack> ctx) {
         return io.github.omegau371.trueimpact.sable.SableT4Command.listBodies(ctx.getSource());
+    }
+
+    private static int t4Inspect(CommandContext<CommandSourceStack> ctx) {
+        int id = IntegerArgumentType.getInteger(ctx, "runtimeId");
+        return io.github.omegau371.trueimpact.sable.SableT4Command.inspectBody(ctx.getSource(), id);
     }
 
     private static int t4Apply(CommandContext<CommandSourceStack> ctx) {

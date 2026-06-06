@@ -30,6 +30,11 @@ public final class SableT4Command {
 
     private SableT4Command() {}
 
+    /**
+     * Lists all active sub-levels with both latestLinearVelocity (cached) and
+     * handle.getLinearVelocity() (authoritative — same source the t4 apply rejection uses).
+     * t4Ready=true means handleSpeed is within MAX_PRE_VELOCITY_THRESHOLD.
+     */
     public static int listBodies(CommandSourceStack src) {
         ServerLevel level = src.getLevel();
         ServerSubLevelContainer container = SubLevelContainer.getContainer(level);
@@ -37,21 +42,144 @@ public final class SableT4Command {
             src.sendFailure(Component.literal("[T-4] No Sable container on this level."));
             return 0;
         }
+        SubLevelPhysicsSystem system = SubLevelPhysicsSystem.get(level);
         List<ServerSubLevel> subLevels = container.getAllSubLevels();
-        src.sendSuccess(() -> Component.literal("[T-4] Active sub-levels (" + subLevels.size() + "):"), false);
+
+        int active = 0;
+        for (ServerSubLevel sl : subLevels) { if (!sl.isRemoved()) active++; }
+        final int activeCount = active;
+        src.sendSuccess(() -> Component.literal(
+                "[T-4] Active sub-levels (" + activeCount + ")" +
+                " — handleSpeed is the authoritative velocity used by t4 apply:"), false);
+
         for (ServerSubLevel sl : subLevels) {
             if (sl.isRemoved()) continue;
-            double mass = sl.getMassTracker().getMass();
-            double lvx = sl.latestLinearVelocity.x;
-            double lvy = sl.latestLinearVelocity.y;
-            double lvz = sl.latestLinearVelocity.z;
-            double speed = Math.sqrt(lvx*lvx + lvy*lvy + lvz*lvz);
+
             final int id = sl.getRuntimeId();
-            final double m = mass, s = speed;
-            src.sendSuccess(() -> Component.literal(
-                    String.format("  id=%d  mass=%.3f kpg  latestSpeed=%.3f", id, m, s)), false);
+            final double mass = sl.getMassTracker().getMass();
+            final double lvx = sl.latestLinearVelocity.x;
+            final double lvy = sl.latestLinearVelocity.y;
+            final double lvz = sl.latestLinearVelocity.z;
+            final double latestSpeed = Math.sqrt(lvx*lvx + lvy*lvy + lvz*lvz);
+
+            // Authoritative handle velocity — same read path as applyForExperiment pre-check
+            double _hx = 0, _hy = 0, _hz = 0;
+            boolean _handleValid = false;
+            if (system != null) {
+                try {
+                    var handle = system.getPhysicsHandle(sl);
+                    if (handle != null && handle.isValid()) {
+                        var hv = handle.getLinearVelocity(new Vector3d());
+                        _hx = hv.x; _hy = hv.y; _hz = hv.z;
+                        _handleValid = true;
+                    }
+                } catch (Exception ignored) {}
+            }
+            final double hx = _hx, hy = _hy, hz = _hz;
+            final boolean handleValid = _handleValid;
+            final double handleSpeed = handleValid ? Math.sqrt(hx*hx + hy*hy + hz*hz) : Double.NaN;
+            final boolean t4Ready = handleValid
+                    && handleSpeed <= T4ApplyForceExperiment.MAX_PRE_VELOCITY_THRESHOLD;
+
+            src.sendSuccess(() -> {
+                String hStr = handleValid
+                        ? String.format("handleSpeed=%.3f handleVel=(%.3f,%.3f,%.3f)", handleSpeed, hx, hy, hz)
+                        : "handleSpeed=invalid";
+                return Component.literal(String.format(
+                        "  id=%d  mass=%.3f kpg  latestSpeed=%.3f  %s  handleValid=%b  t4Ready=%b",
+                        id, mass, latestSpeed, hStr, handleValid, t4Ready));
+            }, false);
         }
-        return subLevels.size();
+        return activeCount;
+    }
+
+    /**
+     * Detailed single-body readout: mass, latestVel, handleVel, pose, COM, t4Ready.
+     * Use before t4 apply to confirm exact handle velocity and isolation state.
+     */
+    public static int inspectBody(CommandSourceStack src, int runtimeId) {
+        ServerLevel level = src.getLevel();
+        ServerSubLevelContainer container = SubLevelContainer.getContainer(level);
+        if (container == null) {
+            src.sendFailure(Component.literal("[T-4] No Sable container on this level."));
+            return 0;
+        }
+        ServerSubLevel target = null;
+        for (ServerSubLevel sl : container.getAllSubLevels()) {
+            if (!sl.isRemoved() && sl.getRuntimeId() == runtimeId) { target = sl; break; }
+        }
+        if (target == null) {
+            src.sendFailure(Component.literal("[T-4] No active sub-level with runtimeId=" + runtimeId));
+            return 0;
+        }
+        SubLevelPhysicsSystem system = SubLevelPhysicsSystem.get(level);
+        if (system == null) {
+            src.sendFailure(Component.literal("[T-4] PhysicsSystem not available."));
+            return 0;
+        }
+
+        final int id = runtimeId;
+        final double mass = target.getMassTracker().getMass();
+
+        // latestLinearVelocity (cached, may lag)
+        final double lvx = target.latestLinearVelocity.x;
+        final double lvy = target.latestLinearVelocity.y;
+        final double lvz = target.latestLinearVelocity.z;
+        final double latestSpeed = Math.sqrt(lvx*lvx + lvy*lvy + lvz*lvz);
+
+        // handle velocity (authoritative — same path as t4 apply)
+        double _hx = 0, _hy = 0, _hz = 0;
+        boolean _handleValid = false;
+        try {
+            var handle = system.getPhysicsHandle(target);
+            if (handle != null && handle.isValid()) {
+                var hv = handle.getLinearVelocity(new Vector3d());
+                _hx = hv.x; _hy = hv.y; _hz = hv.z;
+                _handleValid = true;
+            }
+        } catch (Exception ignored) {}
+        final double hx = _hx, hy = _hy, hz = _hz;
+        final boolean handleValid = _handleValid;
+        final double handleSpeed = handleValid ? Math.sqrt(hx*hx + hy*hy + hz*hz) : Double.NaN;
+        final boolean t4Ready = handleValid
+                && handleSpeed <= T4ApplyForceExperiment.MAX_PRE_VELOCITY_THRESHOLD;
+
+        // Logical pose
+        var pose = target.logicalPose();
+        final double px = pose.position().x(), py = pose.position().y(), pz = pose.position().z();
+        final double ox = pose.orientation().x(), oy = pose.orientation().y();
+        final double oz = pose.orientation().z(), ow = pose.orientation().w();
+
+        // Center of mass
+        var comData = target.getMassTracker().getCenterOfMass();
+        final boolean comValid = comData != null;
+        final double cx = comValid ? comData.x() : 0;
+        final double cy = comValid ? comData.y() : 0;
+        final double cz = comValid ? comData.z() : 0;
+
+        src.sendSuccess(() -> Component.literal(String.format(
+                "[T-4 inspect] id=%d  mass=%.4f kpg", id, mass)), false);
+        src.sendSuccess(() -> Component.literal(String.format(
+                "  latestVel=(%.4f,%.4f,%.4f)  |latest|=%.4f", lvx, lvy, lvz, latestSpeed)), false);
+        src.sendSuccess(() -> {
+            String hStr = handleValid
+                    ? String.format("(%.4f,%.4f,%.4f)  |handle|=%.4f", hx, hy, hz, handleSpeed)
+                    : "invalid";
+            return Component.literal(String.format(
+                    "  handleVel=%s  handleValid=%b", hStr, handleValid));
+        }, false);
+        src.sendSuccess(() -> Component.literal(String.format(
+                "  pos=(%.4f,%.4f,%.4f)", px, py, pz)), false);
+        src.sendSuccess(() -> Component.literal(String.format(
+                "  ori=(%.4f,%.4f,%.4f,%.4f) [xyzw]", ox, oy, oz, ow)), false);
+        src.sendSuccess(() -> {
+            String cStr = comValid ? String.format("(%.4f,%.4f,%.4f)", cx, cy, cz) : "invalid";
+            return Component.literal("  com=" + cStr + "  comValid=" + comValid);
+        }, false);
+        src.sendSuccess(() -> Component.literal(String.format(
+                "  t4Ready=%b  [threshold=%.1f — handleSpeed is what t4 apply checks]",
+                t4Ready, T4ApplyForceExperiment.MAX_PRE_VELOCITY_THRESHOLD)), false);
+        return 1;
     }
 
     /**
