@@ -17,6 +17,16 @@ public final class ExperimentLog {
 
     private ExperimentLog() {}
 
+    /**
+     * Log at INFO level unconditionally, bypassing the rate limiter.
+     * MUST only be used for structural lines guaranteed ≤1 per physics pass by caller contract.
+     * Examples: [T-5] (one per clearCollisions call), [T-3-SUMMARY] (one per tick).
+     * Never use for per-event or per-contact lines.
+     */
+    public static void infoAlways(String fmt, Object... args) {
+        LOG.info(fmt, args);
+    }
+
     /** Log at INFO level, subject to global hard limit. @return true if logged. */
     public static boolean info(String msg) {
         if (!DiagnosticConfig.LIMITER.tryLog()) return false;
