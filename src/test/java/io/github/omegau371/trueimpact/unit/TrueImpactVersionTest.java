@@ -23,9 +23,10 @@ class TrueImpactVersionTest {
         assertTrue(
                 TrueImpactVersion.VERSION.contains("foundation")
                 || TrueImpactVersion.VERSION.contains("sable-study")
+                || TrueImpactVersion.VERSION.contains("phase1")
                 || TrueImpactVersion.VERSION.contains("alpha")
                 || TrueImpactVersion.VERSION.contains("beta"),
-                "Version must contain a phase marker (foundation, sable-study, alpha, beta, ...)");
+                "Version must contain a phase marker (foundation, sable-study, phase1x, alpha, beta, ...)");
     }
 
     @Test

@@ -50,18 +50,35 @@ Deploy targets:
 
 ```
 io.github.omegau371.trueimpact
-├── TrueImpactMod        — @Mod entry point; wires NeoForge event bus
-├── TrueImpactVersion    — MOD_ID and VERSION constants
+├── TrueImpactMod           -- @Mod entry point; wires NeoForge event bus
+├── TrueImpactVersion       -- MOD_ID and VERSION constants
 ├── platform/
-│   └── DistInfo         — dist detection, Sable presence, mod version queries
-│                          (no client-only classes; safe on dedicated server)
-└── command/
-    └── StatusCommand    — /trueimpact status implementation
+│   └── DistInfo            -- dist detection, Sable presence, mod version queries
+├── command/
+│   ├── StatusCommand       -- /trueimpact status implementation
+│   └── DiagnosticCommand   -- /trueimpact debug and experiment subcommands
+├── observation/            -- read-only state snapshots; no physics side effects
+├── diagnostic/             -- experiment logging (T-1 through T-7); rate-limited output
+├── sable/                  -- Sable bridge: body reader, event bridge, T-4 commands
+├── mixin/                  -- SpongeMixin hooks for Sable physics pipeline
+├── physics/                -- Phase 1B: damage input contract (pure data, no side effects)
+│   ├── ContactType.java    -- enum: ACTIVE_IMPACT / ACTIVE_SUSTAINED / WORLD_VS_ACTIVE / UNKNOWN
+│   └── ImpactRecord.java   -- immutable record: the damage input contract
+└── damage/                 -- Phase 1B skeleton; Phase 1C+ resolver/accumulator/hardness
+    └── DamageResolver.java -- skeleton: always returns NONE (Phase 1B)
 ```
 
-Future packages (phases 1+):
-- `physics/`   — impact events, energy model
-- `damage/`    — resolver, accumulator, hardness profiles
+ArchUnit layer rules (enforced at build time):
+  physics/    must NOT depend on damage/, diagnostic/, observation/
+  damage/     must NOT depend on diagnostic/ or observation/
+  diagnostic/ must NOT depend on damage/
+  observation/ must NOT depend on damage/
+  All production packages: no net.minecraft.client.* references
+
+Future packages (Phase 1C+):
+- `damage/BlockHardnessProfile`    -- single source for vanilla hardness reads
+- `damage/DamageAccumulator`       -- per-block crack state
+- `damage/ImpactBreakQueue`        -- deferred destroyBlock (never inside Rapier step)
 - `mixin/`     — Sable engine adapters
 - `compat/`    — Create, etc.
 
