@@ -1,49 +1,52 @@
 package io.github.omegau371.trueimpact.physics;
 
 /**
- * Immutable damage-input contract for one contact event between two active sub-levels.
+ * Immutable data contract for one active-vs-active contact event in a single physics tick.
  *
- * All quantities are derived from Phase 1A calibration:
+ * Scope constraint: ImpactRecord represents ONLY active sub-level vs active sub-level pairs.
+ * World-vs-active and unknown-body contacts are discarded by the capture layer before
+ * this record is constructed. The type system enforces this: ContactType has no
+ * WORLD_VS_ACTIVE or UNKNOWN values.
  *
- *   totalImpulseJ        = sumForceAmountRaw * substepDt
- *                          T-3 CONFIRMED (2026-06-09). Canonical. Use for damage formula.
+ * Field calibration status:
  *
- *   impulseAlongNormalJ  = (mA*|dvA_n| + mB*|dvB_n|) / 2 summed across contacts.
- *                          T-6 UNCONFIRMED: normal direction convention not yet verified.
- *                          abs() applied at assembly to absorb sign ambiguity.
- *                          Do NOT use as primary damage input until T-6 passes.
+ *   totalImpulseJ         T-3 CONFIRMED (2026-06-09). Canonical damage input.
+ *                         = sumForceAmountRaw * substepDt
+ *                         Use this as the primary formula input.
  *
- *   effectiveMassKpg     = 1 / (1/mA + 1/mB).
- *                          Represents collision inertia. NaN if mass is unavailable.
+ *   impulseAlongNormalJ   T-6 UNCONFIRMED. Normal direction convention not verified.
+ *                         abs() is applied at construction to absorb sign ambiguity.
+ *                         Do NOT use as primary formula input until T-6 passes.
+ *                         Retained for directional diagnostic analysis only.
  *
- *   contactCount         = number of Rapier contact records for this pair in this tick.
- *                          Used as proxy for contact surface area.
- *                          Larger structures in contact produce more records.
+ *   effectiveMassKpg      Derived from confirmed T-3 snapshot masses. Ready for use.
  *
- *   contactType          = DIAGNOSTIC FILTER TAG only.
- *                          The resolver uses it only to skip non-ACTIVE_IMPACT records.
- *                          The threshold (kpg*block/s per contact) that classifies
- *                          ACTIVE_IMPACT lives in the capture layer, not here.
- *                          The resolver MUST NOT branch on contactType to choose formula
- *                          parameters -- that would bake a diagnostic heuristic into physics.
+ *   contactCount          [DIAGNOSTIC METADATA -- UNCONFIRMED as contact area proxy]
+ *                         = number of Rapier contact records for this pair in this tick.
+ *                         Whether contactCount correlates with contact surface area has NOT
+ *                         been experimentally verified. A dedicated experiment is required
+ *                         before contactCount may appear in any damage root formula.
+ *                         It is included here so the capture layer does not have to re-derive
+ *                         it later, not because it is ready for formula use.
  *
- * Invariants enforced at construction site (SableImpactCapture, Phase 1B):
- *   totalImpulseJ >= 0
- *   impulseAlongNormalJ >= 0  (abs applied)
- *   contactCount >= 1
- *   substepDt > 0
+ *   contactType           Diagnostic filter tag only.
+ *                         Used by the resolver for a single early-return guard.
+ *                         Must NOT appear in formula branches or as a formula parameter.
+ *
+ *   substepDt             Reference value. Already baked into totalImpulseJ; do not
+ *                         multiply again.
  */
 public record ImpactRecord(
         long        serverTick,
-        long        bodyPairKey,        // orderedBodyPairKey = min(idA,idB)<<32 | max(idA,idB)
+        long        bodyPairKey,         // min(idA,idB)<<32 | max(idA,idB)
         int         idA,
         int         idB,
         double      massAKpg,
         double      massBKpg,
-        double      effectiveMassKpg,   // 1/(1/mA + 1/mB); NaN if unavailable
-        int         contactCount,       // Rapier record count -- proxy for contact area
-        double      totalImpulseJ,      // sumForce * substepDt  [CANONICAL]
-        double      impulseAlongNormalJ,// dv reconstruction along normal [T-6 dir UC; abs applied]
-        double      substepDt,          // reference only; baked into totalImpulseJ already
+        double      effectiveMassKpg,    // 1/(1/mA + 1/mB); NaN if unavailable
+        int         contactCount,        // DIAGNOSTIC METADATA -- UNCONFIRMED as area proxy
+        double      totalImpulseJ,       // sumForce * substepDt [CANONICAL T-3]
+        double      impulseAlongNormalJ, // dv reconstruction [T-6 UNCONFIRMED; abs applied]
+        double      substepDt,           // reference only; already baked into totalImpulseJ
         ContactType contactType
 ) {}

@@ -12,41 +12,50 @@ import io.github.omegau371.trueimpact.physics.ImpactRecord;
  * [arch] MUST NOT call Level.destroyBlock directly or indirectly.
  * [arch] MUST NOT read DiagnosticConfig, GlobalRateLimiter, or any observation/ state.
  * [arch] MUST NOT import from diagnostic/ or observation/ packages.
- * [arch] MUST NOT branch on ImpactRecord.contactType() to choose formula PARAMETERS.
- *         contactType is used only as a pipeline filter (skip non-impact records).
- *         The threshold that separates ACTIVE_IMPACT from ACTIVE_SUSTAINED is a
- *         diagnostic heuristic and must NOT appear in this class.
+ *
+ * contactType filter rule:
+ *   The resolver uses impact.contactType() only as a filter guard (skip ACTIVE_SUSTAINED).
+ *   It MUST NOT branch on contactType to choose formula parameters.
+ *   The threshold that classifies ACTIVE_IMPACT vs ACTIVE_SUSTAINED lives in the
+ *   capture layer (SableImpactCapture). The resolver must not reproduce it.
+ *
+ * contactCount rule:
+ *   MUST NOT appear in any formula in this class until a dedicated experiment confirms
+ *   that contactCount correlates with contact surface area.
+ *   It is available on ImpactRecord as diagnostic metadata; do not use it here yet.
+ *
+ * impulseAlongNormalJ rule:
+ *   MUST NOT be used as primary formula input. T-6 normal direction is unconfirmed.
+ *   Use totalImpulseJ (canonical) instead.
  *
  * Future formula direction (Phase 1C -- NOT YET):
- *   Input fields to use:    totalImpulseJ, effectiveMassKpg, contactCount
- *   Input fields to defer:  impulseAlongNormalJ  (needs T-6 normal direction confirmation)
- *   Formula sketch:
- *     equivalentStressJ = totalImpulseJ / contactCount  (per contact point)
- *     compare against BlockHardnessProfile per block face in the contact region
- *     -> crack fraction delta per block, accumulated in DamageAccumulator
- *   destroyBlock deferred to ImpactBreakQueue (never called inside Rapier physics step).
+ *   Use: totalImpulseJ, effectiveMassKpg, massAKpg, massBKpg
+ *   Skip: contactCount (unconfirmed area proxy), impulseAlongNormalJ (T-6 unconfirmed)
+ *   Route output to DamageAccumulator (per-block state, Phase 1C).
+ *   destroyBlock deferred to ImpactBreakQueue (Phase 1D, never inside Rapier step).
  */
 public final class DamageResolver {
 
     private DamageResolver() {}
 
     public enum DamageEvent {
-        /** No damage this tick (resting contact, below threshold, or Phase 1B skeleton). */
+        /** No damage this tick. Phase 1B always produces this. */
         NONE
     }
 
     /**
-     * Resolves an ImpactRecord into a DamageEvent.
+     * Resolves one active-vs-active ImpactRecord into a DamageEvent.
      *
-     * Phase 1B: always returns NONE.
-     * Non-ACTIVE_IMPACT records are filtered here; do not reach accumulator.
+     * Phase 1B: always returns NONE after the contactType guard.
+     * The guard ensures sustained contacts never reach the accumulator (Phase 1C+).
      */
     public static DamageEvent resolve(ImpactRecord impact) {
+        // Filter: sustained contacts never enter the damage path.
+        // contactType is a filter tag, not a formula parameter.
         if (impact.contactType() != ContactType.ACTIVE_IMPACT) {
             return DamageEvent.NONE;
         }
-        // Phase 1B: observation only.
-        // Future: compute damage from impact.totalImpulseJ() and impact.effectiveMassKpg().
+        // Phase 1B observation only. totalImpulseJ is available for Phase 1C formula.
         return DamageEvent.NONE;
     }
 }

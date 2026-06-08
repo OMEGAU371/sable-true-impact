@@ -77,40 +77,37 @@ public class FoundationArchTest {
                     .resideInAPackage("net.minecraft.client..");
 
     // -- Phase 1B rules ----------------------------------------------------------
-
-    // R9: physics/ is the pure data contract layer -- no upstream TI dependencies.
-    // It must not depend on observation, diagnostic, damage, command, platform, or sable.
+    // R9: physics/ is the pure data contract layer.
+    // It must not depend on ANY other TI package: not damage, diagnostic, observation,
+    // command, platform, sable, or mixin. This rule is a single comprehensive guard.
+    // If physics/ ever needs a type from another TI package, that is a design smell.
     @ArchTest
-    static final ArchRule physics_must_not_depend_on_damage =
+    static final ArchRule physics_must_have_no_ti_internal_dependencies =
             noClasses().that().resideInAPackage("..physics..")
                     .should().dependOnClassesThat()
-                    .resideInAPackage("..damage..");
+                    .resideInAnyPackage(
+                            "..damage..", "..diagnostic..", "..observation..",
+                            "..command..", "..platform..", "..sable..", "..mixin..");
 
+    // R10: physics/ must not use client-only classes.
     @ArchTest
-    static final ArchRule physics_must_not_depend_on_diagnostic_or_observation =
+    static final ArchRule physics_must_not_use_client_classes =
             noClasses().that().resideInAPackage("..physics..")
                     .should().dependOnClassesThat()
-                    .resideInAnyPackage("..diagnostic..", "..observation..");
+                    .resideInAPackage("net.minecraft.client..");
 
-    // R10: damage/ resolver reads only physics/ -- never diagnostic or observation state.
-    // This ensures the resolver cannot read DiagnosticConfig or GlobalRateLimiter.
+    // R11: damage/ reads only physics/ -- never diagnostic or observation state.
+    // Ensures the resolver cannot read DiagnosticConfig or GlobalRateLimiter.
     @ArchTest
     static final ArchRule damage_must_not_depend_on_diagnostic_or_observation =
             noClasses().that().resideInAPackage("..damage..")
                     .should().dependOnClassesThat()
                     .resideInAnyPackage("..diagnostic..", "..observation..");
 
-    // R11: damage/ must not use client-only classes.
+    // R12: damage/ must not use client-only classes.
     @ArchTest
     static final ArchRule damage_must_not_use_client_classes =
             noClasses().that().resideInAPackage("..damage..")
-                    .should().dependOnClassesThat()
-                    .resideInAPackage("net.minecraft.client..");
-
-    // R12: physics/ must not use client-only classes.
-    @ArchTest
-    static final ArchRule physics_must_not_use_client_classes =
-            noClasses().that().resideInAPackage("..physics..")
                     .should().dependOnClassesThat()
                     .resideInAPackage("net.minecraft.client..");
 }
