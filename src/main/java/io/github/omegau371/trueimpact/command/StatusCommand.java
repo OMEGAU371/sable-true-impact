@@ -22,7 +22,7 @@ public final class StatusCommand {
     private static int execute(CommandContext<CommandSourceStack> ctx) {
         CommandSourceStack src = ctx.getSource();
 
-        // Version read from live ModContainer — single source of truth at runtime
+        // Version read from live ModContainer -- single source of truth at runtime
         String tiVersion  = nvl(DistInfo.modVersion(TrueImpactVersion.MOD_ID), "unknown");
         String mcVersion  = nvl(DistInfo.modVersion("minecraft"), "1.21.1");
         String neoVersion = nvl(DistInfo.modVersion("neoforge"), "?");

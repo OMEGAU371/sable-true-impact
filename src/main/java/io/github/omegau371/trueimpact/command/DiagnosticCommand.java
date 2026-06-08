@@ -17,20 +17,21 @@ import net.minecraft.network.chat.Component;
  * All debug commands require operator permission (level 2).
  * T-4 experiment commands require operator permission (level 4).
  *
- *   /trueimpact debug contacts [on|off]              — T-3/T-5/T-6 raw contact logging
- *   /trueimpact debug callbacks [on|off]             — T-1/T-2 callback logging
- *   /trueimpact debug bodies [on|off]                — body snapshot + T-7 logging
- *   /trueimpact debug status                         — print all current flags
- *   /trueimpact debug all off                        — disable everything + clear state (op 2)
- *   /trueimpact experiment t4 bodies                 — list sub-levels (op 4, Sable only)
- *   /trueimpact experiment t4 inspect <id>           — detailed body readout (op 4, Sable only)
- *   /trueimpact experiment t4 apply <id> fx fy fz    — T-4 com-current variant (op 4, Sable only)
- *   /trueimpact experiment t4 apply-linear <id> ...  — T-4 linear-only variant (op 4, Sable only)
+ *   /trueimpact debug contacts [on|off]              -- T-3/T-5/T-6 raw contact logging
+ *   /trueimpact debug callbacks [on|off]             -- T-1/T-2 callback logging
+ *   /trueimpact debug bodies [on|off]                -- body snapshot + T-7 logging
+ *   /trueimpact debug status                         -- print all current flags
+ *   /trueimpact debug all off                        -- disable everything + clear state (op 2)
+ *   /trueimpact experiment t4 bodies                 -- list sub-levels (op 4, Sable only)
+ *   /trueimpact experiment t4 inspect <id>           -- detailed body readout (op 4, Sable only)
+ *   /trueimpact experiment t4 apply <id> fx fy fz    -- T-4 com-current variant (op 4, Sable only)
+ *   /trueimpact experiment t4 apply-linear <id> ...  -- T-4 linear-only variant (op 4, Sable only)
  *
- * [PERMANENTLY REMOVED] apply-at-pose: produced |Δv|≈2.15e9 and |ω|≈3.61e9 in live test,
+ * [PERMANENTLY REMOVED] apply-at-pose: produced |dv|~2.15e9 and |omega|~3.61e9 in live test,
  *   causing server 21 s behind and Sable emergency sub-level removal.
- *   logicalPose().position() is not a valid application point for applyImpulse — coordinate
- *   space mismatch yields astronomical lever arm. Do NOT re-add without full coordinate-space audit.
+ *   logicalPose().position() is not a valid application point for applyImpulse --
+ *   coordinate space mismatch yields astronomical lever arm.
+ *   Do NOT re-add without full coordinate-space audit.
  */
 public final class DiagnosticCommand {
 
@@ -72,9 +73,9 @@ public final class DiagnosticCommand {
                                                     .then(Commands.argument("fy", DoubleArgumentType.doubleArg())
                                                             .then(Commands.argument("fz", DoubleArgumentType.doubleArg())
                                                                     .executes(DiagnosticCommand::t4ApplyLinear)))))));
-                            // apply-at-pose PERMANENTLY REMOVED: live test caused |Δv|≈2.15e9, |ω|≈3.61e9,
+                            // apply-at-pose PERMANENTLY REMOVED: live test caused |dv|~2.15e9, |omega|~3.61e9,
                             // server 21 s behind, Sable emergency sub-level removal.
-                            // logicalPose().position() yields astronomical lever arm — unsafe application point.
+                            // logicalPose().position() yields astronomical lever arm -- unsafe application point.
         }
 
         dispatcher.register(
@@ -84,7 +85,7 @@ public final class DiagnosticCommand {
         );
     }
 
-    // ── debug subcommands ────────────────────────────────────────────────────
+    // -- debug subcommands --------------------------------------------------------
 
     private static int setContacts(CommandContext<CommandSourceStack> ctx, boolean on) {
         DiagnosticConfig.ENABLED = on || DiagnosticConfig.ENABLED;
@@ -128,7 +129,7 @@ public final class DiagnosticCommand {
         return 1;
     }
 
-    // ── T-4 (Sable-only) ─────────────────────────────────────────────────────
+    // -- T-4 (Sable-only) ---------------------------------------------------------
 
     private static int t4Bodies(CommandContext<CommandSourceStack> ctx) {
         return io.github.omegau371.trueimpact.sable.SableT4Command.listBodies(ctx.getSource());

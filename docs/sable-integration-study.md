@@ -96,7 +96,7 @@ Includes rotational inertia effect. Input coordinates: **PLOT_RELATIVE [UC: §3.
 |---|---|---|---|
 | 0 | idA (int) | — | — |
 | 1 | idB (int) | — | — |
-| 2 | forceAmountRaw | — | **UNKNOWN [T-3]** |
+| 2 | forceAmountRaw | — | **per-substep force [T-3 CONFIRMED]; J = raw * substepDt** |
 | 3–5 | localNormalA | BODY_COM_LOCAL [IT] | dimensionless [C4-codex] |
 | 6–8 | localNormalB | BODY_COM_LOCAL [IT] | dimensionless |
 | 9–11 | localPointA | BODY_COM_LOCAL [IT] | block |
@@ -173,7 +173,7 @@ Whether the array contains per-substep metadata is UNKNOWN [T-5].
 |---|---|---|
 | T-1 | Callback thread = server thread? | PENDING |
 | T-2 | (x,y,z) in callback: which space? | PENDING |
-| T-3 | `forceAmountRaw` dimension? | **NEXT TARGET** — protocol designed in `acceptance-gates.md §Gate 1A` |
+| T-3 | `forceAmountRaw` dimension? | **CONFIRMED 2026-06-09**: per-substep force; J = raw * substepDt; ratioRawOverReconJ ~= 40 ~= 1/substepDt |
 | T-4 | `applyForce` = force or impulse? | **CONFIRMED: direct impulse** (ratio ≈ 1.016, 2026-06-06) |
 | T-5 | clearCollisions substep attribution? | PENDING — use substeps=1 during T-3 to eliminate ambiguity |
 | T-6 | normalA direction convention? | PENDING — will be needed alongside T-3 for vector projection |

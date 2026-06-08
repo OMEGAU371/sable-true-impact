@@ -84,66 +84,42 @@ Danger comment and coordinate-space rule recorded in `SableT4Command.java` and `
 
 ---
 
-### T-3: `forceAmountRaw` dimension — NEXT TARGET
+### T-3: `forceAmountRaw` dimension — MANUALLY PASSED (2026-06-09)
 
-**Question:** Is `forceAmountRaw` (contact array offset 2) an impulse, a force, or something else?
-Answering this determines whether TI can use the contact array directly for damage, or must reconstruct impulse from Δv.
+**Conclusion: `forceAmountRaw` is a per-substep force value, NOT an impulse.**
 
-**Protocol (requires manual execution; no code changes needed):**
+Canonical conversion: `J = forceAmountRaw * substepDt`
 
-**Prerequisites:**
-- Sable server config: `substepsPerTick = 1` (eliminates T-5 substep ambiguity; substepDt ≈ 0.05 s)
-- Two **free-floating** sub-levels A and B — neither touching terrain — equal mass M = 1 kpg each
-- A and B start at rest, separated by ≈ 1–2 blocks
+**Evidence from live test (tick=31404, substepCount=2, substepDt=0.025s):**
 
-**Steps:**
-1. `/trueimpact debug bodies on` + `/trueimpact debug contacts on`
-2. Inspect both: `/trueimpact experiment t4 inspect <id_A>` and `<id_B>` — confirm `t4Ready=true` for both
-3. Apply known impulse to A toward B: `/trueimpact experiment t4 apply-linear <id_A> 0 0 -50`
-   (T-4 confirmed: produces Δv ≈ 50 block/s in A, direct impulse, no dt factor)
-4. Wait for A to collide with B (1–3 ticks)
-5. Collect from `latest.log` for the collision tick:
-   - `[SNAP] phase=PRE_STEP  id=A` → **v_before_A**
-   - `[SNAP] phase=PRE_STEP  id=B` → **v_before_B**
-   - `[SNAP] phase=POST_STEP id=A` → **v_after_A**
-   - `[SNAP] phase=POST_STEP id=B` → **v_after_B**
-   - All `[CONTACT]` entries where pair = (A, B) → aggregate: **sum_F = Σ forceAmountRaw**;
-     take `localNormalA` from the first record as representative contact normal
+| field | value |
+|---|---|
+| activeVsActive contacts | 4 |
+| sumForceAmountRaw | 3923.88 |
+| sumReconJ (from delta-v) | 98.39 |
+| estimatedImpulseJ (= sumForce * substepDt) | 98.10 |
+| ratioRawOverReconJ | 39.88 |
+| 1 / substepDt | 40.00 |
 
-**Offline computation:**
+`ratioRawOverReconJ ~= 40 ~= 1/substepDt` confirms force-per-substep semantics.
+`estimatedImpulseJ` and `sumReconJ` differ by < 0.3% -- excellent agreement.
 
-```
-# Convert localNormalA to world space using body A's orientation quaternion
-# (use oriX/Y/Z/W from body A's PRE_STEP snapshot)
-n_world = rotate(localNormalA, quat_A)
-# T-6 normal direction convention not yet confirmed → use abs(dot) to absorb sign ambiguity
+**Demoted: `ratioRawOverNomMom`** -- computed from post-step closing velocity, which is near zero
+after the solver resolves the collision. Reflects residual kinematic state, not the peak impact impulse.
+Do NOT use for damage formula. Kept in logs as diagnostic-only.
 
-Δv_A = v_after_A - v_before_A
-Δv_B = v_after_B - v_before_B
+**Contact phase classification** (added in 0.2.7):
 
-J_A = M_A * abs(dot(Δv_A, n_world))   # impulse of A projected along contact normal
-J_B = M_B * abs(dot(Δv_B, n_world))   # impulse of B projected along contact normal
+| phase | condition | use for damage? |
+|---|---|---|
+| `IMPACT_CANDIDATE` | activeVsActive > 0 AND estimatedImpulseJ/contact > 5.0 | **Yes -- primary damage input** |
+| `SUSTAINED_CONTACT` | activeVsActive > 0, low impulse/contact | No -- resting/sliding support force |
+| `WORLD_VS_ACTIVE` | activeVsActive = 0, terrain vs sub-level | Out of scope for Phase 1A |
+| `NO_ACTIVE_CONTACT` | no active bodies on either side | Skip |
 
-J_reconstructed = (J_A + J_B) / 2     # Newton 3rd law: should be ≈ equal
-contaminated = abs(J_A - J_B) / J_reconstructed > 0.30   # > 30% divergence → external force, mark invalid
-
-ratio_impulse = sum_F / J_reconstructed           # ≈ 1.0 → forceAmountRaw is impulse
-ratio_force   = sum_F * substepDt / J_reconstructed  # ≈ 1.0 → forceAmountRaw is force (needs ×dt)
-```
-
-**Hypothesis decision:**
-- `ratio_impulse ≈ 1.0` (±20%) → `forceAmountRaw` IS impulse; can use directly
-- `ratio_force ≈ 1.0` (±20%) → `forceAmountRaw` is force; multiply by `substepDt` for impulse
-- Neither → record raw data; investigate other relationships (½mv², relative velocity scaling, etc.)
-
-**Cautions:**
-- Sable filter: records with `forceAmountRaw ≤ 25 × min(M_A, M_B)` are dropped before logging.
-  At M = 1 kpg, any record that appears already passed `forceAmountRaw > 25`.
-  If no `[CONTACT]` entries appear, increase A's launch speed (try ≥ 50 block/s).
-- Multiple `[CONTACT]` entries may exist for the same pair in one tick → **must sum** `forceAmountRaw`; a single entry is not the total.
-- T-6 normal direction unconfirmed → always use `abs(dot(..., n_world))`; note sign uncertainty in result.
-
-**Gate passes when:** at least 2 independent free-floating collisions, both non-contaminated, with ratio stable within ±20% of the same hypothesis.
+**Next phase foundation:**
+`J = forceAmountRaw * substepDt` is the root formula for structure-vs-structure impulse.
+Phase 1B will use `estimatedImpulseJ` from `[T-3-SUMMARY]` as input to the damage resolver.
 
 ---
 

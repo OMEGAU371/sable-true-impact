@@ -7,8 +7,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Single rate-limited entry point for all diagnostic log output.
  *
- * [C5-log] The underlying Logger is private. All callers — including classes
- * in this package — MUST use info() or warn(). Direct LOG access is forbidden.
+ * [C5-log] The underlying Logger is private. All callers -- including classes
+ * in this package -- MUST use info() or warn(). Direct LOG access is forbidden.
  * Dropped-count summary is also subject to the hard limit via tryLogDroppedSummary().
  */
 public final class ExperimentLog {
@@ -19,7 +19,7 @@ public final class ExperimentLog {
 
     /**
      * Log at INFO level unconditionally, bypassing the rate limiter.
-     * MUST only be used for structural lines guaranteed ≤1 per physics pass by caller contract.
+     * MUST only be used for structural lines guaranteed <=1 per physics pass by caller contract.
      * Examples: [T-5] (one per clearCollisions call), [T-3-SUMMARY] (one per tick).
      * Never use for per-event or per-contact lines.
      */

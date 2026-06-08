@@ -27,9 +27,9 @@ public class TrueImpactMod {
         NeoForge.EVENT_BUS.addListener(this::onServerStopped);
 
         if (DistInfo.isSableLoaded()) {
-            LOGGER.info("True Impact: Sable detected — diagnostic observation layer ready (mixins applied by plugin)");
+            LOGGER.info("True Impact: Sable detected -- diagnostic observation layer ready (mixins applied by plugin)");
         } else {
-            LOGGER.info("True Impact: Sable not found — mixin plugin skipped all Sable mixins");
+            LOGGER.info("True Impact: Sable not found -- mixin plugin skipped all Sable mixins");
         }
     }
 
