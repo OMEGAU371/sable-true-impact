@@ -121,6 +121,8 @@ This boolean must NOT trigger destroyBlock, crack overlay, or any game state cha
 package io.github.omegau371.trueimpact.physics;
 
 public record ImpactMetrics(
+    long serverTick,
+    long bodyPairKey,
     double impactEnergyJ,          // J^2 / (2 * m_eff) [PRIMARY]
     double normalImpulseJ,         // impulseAlongNormalJ [T-6 UNCONFIRMED]
     double contactPressureProxy,   // J / contactCount   [area UNCONFIRMED]
@@ -152,7 +154,7 @@ ImpactMetrics fields are added to SableImpactCapture.RuntimeStats and surfaced b
 /trueimpact debug status as a fourth output line:
 
 ```
-[TI capture last-impact-metrics] energy=X normalImpulse=Y(T-6-UC) pressure=Z(area-UC) threshold=W exceeds=false
+[TI capture last-impact-metrics] tick=T energy=X normalJ=Y pressureProxy=Z stress=S thresholdJ=W exceeds=false
 ```
 
 ---

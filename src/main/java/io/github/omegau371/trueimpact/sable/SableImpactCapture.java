@@ -3,6 +3,7 @@ package io.github.omegau371.trueimpact.sable;
 import io.github.omegau371.trueimpact.damage.DamageResolver;
 import io.github.omegau371.trueimpact.observation.BodySnapshot;
 import io.github.omegau371.trueimpact.physics.ContactType;
+import io.github.omegau371.trueimpact.physics.ImpactMetrics;
 import io.github.omegau371.trueimpact.physics.ImpactRecord;
 
 import java.util.ArrayList;
@@ -21,9 +22,10 @@ import java.util.Map;
  * (i.e., not a live active sub-level) is silently discarded. No ImpactRecord is created
  * for world-vs-active or unknown pairs.
  *
- * Phase 1B contract:
+ * Phase 1C contract:
  *   - DamageResolver.resolve() is called for every assembled record.
- *   - Resolver always returns NONE in Phase 1B. No block damage, no destroyBlock.
+ *   - Resolver still returns NONE. No block damage, no destroyBlock.
+ *   - ImpactMetrics is diagnostic-only and never flows into DamageResolver.
  *   - The returned list is available for test and diagnostic inspection; production callers
  *     may ignore it.
  *
@@ -40,6 +42,7 @@ public final class SableImpactCapture {
      * Mirrors ContactLogger.T3_IMPACT_IMPULSE_PER_CONTACT for consistent classification.
      */
     static final double IMPACT_IMPULSE_PER_CONTACT_THRESHOLD = 5.0;
+    static final double PHASE_1C_PLACEHOLDER_MATERIAL_THRESHOLD_J = 50.0;
 
     private static long totalProcessCalls;
     private static long totalRawContactsSeen;
@@ -56,6 +59,7 @@ public final class SableImpactCapture {
     private static int  lastNonZeroRecordCount;
     private static int  lastNonZeroActiveImpactCount;
     private static int  lastNonZeroSustainedCount;
+    private static ImpactMetrics lastImpactMetrics;
 
     public record RuntimeStats(
             long totalProcessCalls,
@@ -68,7 +72,8 @@ public final class SableImpactCapture {
             long lastNonZeroRecordTick,
             int  lastNonZeroRecordCount,
             int  lastNonZeroActiveImpactCount,
-            int  lastNonZeroSustainedCount
+            int  lastNonZeroSustainedCount,
+            ImpactMetrics lastImpactMetrics
     ) {}
 
     public static synchronized RuntimeStats stats() {
@@ -83,7 +88,8 @@ public final class SableImpactCapture {
                 lastNonZeroRecordTick,
                 lastNonZeroRecordCount,
                 lastNonZeroActiveImpactCount,
-                lastNonZeroSustainedCount);
+                lastNonZeroSustainedCount,
+                lastImpactMetrics);
     }
 
     public static synchronized void resetCounters() {
@@ -98,6 +104,7 @@ public final class SableImpactCapture {
         lastNonZeroRecordCount        = 0;
         lastNonZeroActiveImpactCount  = 0;
         lastNonZeroSustainedCount     = 0;
+        lastImpactMetrics             = null;
     }
 
     /**
@@ -182,6 +189,7 @@ public final class SableImpactCapture {
         List<ImpactRecord> result = new ArrayList<>(pairMap.size());
         int activeImpactCount = 0;
         int sustainedCount = 0;
+        ImpactMetrics latestMetrics = null;
         for (PairAccum acc : pairMap.values()) {
             double totalImpulseJ   = acc.sumForce * substepDt;
             double impulsePerPair  = (acc.contactCount > 0)
@@ -213,15 +221,24 @@ public final class SableImpactCapture {
                     type
             );
             result.add(record);
-            DamageResolver.resolve(record);    // Phase 1B: always NONE
+            if (type == ContactType.ACTIVE_IMPACT) {
+                latestMetrics = computeMetrics(record);
+            }
+            DamageResolver.resolve(record);    // Phase 1C: still always NONE
         }
 
-        recordStats(serverTick, count, result.size(), activeImpactCount, sustainedCount);
+        recordStats(serverTick, count, result.size(), activeImpactCount, sustainedCount, latestMetrics);
         return result;
     }
 
     private static synchronized void recordStats(long tick, int rawContacts, int records,
                                                   int activeImpacts, int sustained) {
+        recordStats(tick, rawContacts, records, activeImpacts, sustained, null);
+    }
+
+    private static synchronized void recordStats(long tick, int rawContacts, int records,
+                                                  int activeImpacts, int sustained,
+                                                  ImpactMetrics latestMetrics) {
         totalProcessCalls++;
         totalRawContactsSeen     += rawContacts;
         totalImpactRecordsCreated += records;
@@ -238,6 +255,35 @@ public final class SableImpactCapture {
             lastNonZeroActiveImpactCount  = activeImpacts;
             lastNonZeroSustainedCount     = sustained;
         }
+        if (latestMetrics != null) {
+            lastImpactMetrics = latestMetrics;
+        }
+    }
+
+    static ImpactMetrics computeMetrics(ImpactRecord record) {
+        double impactEnergyJ = Double.NaN;
+        if (Double.isFinite(record.effectiveMassKpg()) && record.effectiveMassKpg() > 0.0) {
+            impactEnergyJ = (record.totalImpulseJ() * record.totalImpulseJ())
+                    / (2.0 * record.effectiveMassKpg());
+        }
+
+        double contactPressureProxy = (record.contactCount() > 0)
+                ? record.totalImpulseJ() / record.contactCount()
+                : Double.NaN;
+        double candidateStressEstimate = impactEnergyJ;
+        double threshold = PHASE_1C_PLACEHOLDER_MATERIAL_THRESHOLD_J;
+        boolean exceeds = Double.isFinite(candidateStressEstimate)
+                && candidateStressEstimate > threshold;
+
+        return new ImpactMetrics(
+                record.serverTick(),
+                record.bodyPairKey(),
+                impactEnergyJ,
+                record.impulseAlongNormalJ(),
+                contactPressureProxy,
+                candidateStressEstimate,
+                threshold,
+                exceeds);
     }
 
     // Canonical pair key: min(idA,idB)<<32 | max(idA,idB) (matches ImpactRecord contract)

@@ -4,6 +4,7 @@ import io.github.omegau371.trueimpact.observation.BodySnapshot;
 import io.github.omegau371.trueimpact.observation.BodyType;
 import io.github.omegau371.trueimpact.observation.SnapshotPhase;
 import io.github.omegau371.trueimpact.physics.ContactType;
+import io.github.omegau371.trueimpact.physics.ImpactMetrics;
 import io.github.omegau371.trueimpact.physics.ImpactRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -645,6 +646,68 @@ class SableImpactCaptureTest {
         assertEquals(1, s.lastNonZeroSustainedCount());
     }
 
+    // -- Phase 1C diagnostic metrics ---------------------------------------------
+
+    @Test
+    void active_impact_computes_lastImpactMetrics() {
+        Map<Integer, BodySnapshot> snaps = Map.of(
+                10, snap(10, 5.0),
+                20, snap(20, 10.0));
+
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 70L, 2, snaps, Map.of());
+
+        ImpactMetrics m = SableImpactCapture.stats().lastImpactMetrics();
+        assertNotNull(m, "ACTIVE_IMPACT must compute diagnostic ImpactMetrics");
+        double totalImpulseJ = 300.0 * (0.05 / 2);
+        double effMass = 1.0 / (1.0 / 5.0 + 1.0 / 10.0);
+        double expectedEnergy = (totalImpulseJ * totalImpulseJ) / (2.0 * effMass);
+
+        assertEquals(70L, m.serverTick());
+        assertEquals(expectedEnergy, m.impactEnergyJ(), 1e-9);
+        assertEquals(0.0, m.normalImpulseJ(), 1e-9);
+        assertEquals(totalImpulseJ, m.contactPressureProxy(), 1e-9);
+        assertEquals(expectedEnergy, m.candidateStressEstimate(), 1e-9);
+        assertEquals(50.0, m.materialThresholdJ(), 1e-9);
+        assertFalse(m.exceedsThreshold());
+    }
+
+    @Test
+    void sustained_record_does_not_overwrite_lastImpactMetrics() {
+        Map<Integer, BodySnapshot> snaps = Map.of(
+                10, snap(10, 5.0),
+                20, snap(20, 8.0));
+
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 71L, 2, snaps, Map.of());
+        ImpactMetrics first = SableImpactCapture.stats().lastImpactMetrics();
+        assertNotNull(first);
+
+        SableImpactCapture.process(oneContact(10, 20, 100.0), 72L, 2, snaps, Map.of());
+
+        ImpactMetrics afterSustained = SableImpactCapture.stats().lastImpactMetrics();
+        assertNotNull(afterSustained);
+        assertEquals(first.serverTick(), afterSustained.serverTick(),
+                "ACTIVE_SUSTAINED must not overwrite last ACTIVE_IMPACT metrics");
+        assertEquals(first.impactEnergyJ(), afterSustained.impactEnergyJ(), 1e-9);
+    }
+
+    @Test
+    void high_energy_metric_sets_exceedsThreshold_but_resolver_still_NONE() {
+        Map<Integer, BodySnapshot> snaps = Map.of(
+                10, snap(10, 5.0),
+                20, snap(20, 10.0));
+
+        List<ImpactRecord> records = SableImpactCapture.process(
+                oneContact(10, 20, 1000.0), 73L, 2, snaps, Map.of());
+
+        ImpactMetrics m = SableImpactCapture.stats().lastImpactMetrics();
+        assertNotNull(m);
+        assertTrue(m.exceedsThreshold(),
+                "Phase 1C threshold comparison is diagnostic-only but should be visible");
+        assertEquals(io.github.omegau371.trueimpact.damage.DamageResolver.DamageEvent.NONE,
+                io.github.omegau371.trueimpact.damage.DamageResolver.resolve(records.get(0)),
+                "Phase 1C metrics must not enable damage yet");
+    }
+
     @Test
     void resetCounters_clears_runtime_stats() {
         Map<Integer, BodySnapshot> snaps = Map.of(
@@ -667,5 +730,6 @@ class SableImpactCaptureTest {
         assertEquals(0, s.lastNonZeroRecordCount());
         assertEquals(0, s.lastNonZeroActiveImpactCount());
         assertEquals(0, s.lastNonZeroSustainedCount());
+        assertNull(s.lastImpactMetrics());
     }
 }

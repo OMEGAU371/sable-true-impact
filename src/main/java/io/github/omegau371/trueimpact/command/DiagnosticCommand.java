@@ -7,6 +7,7 @@ import com.mojang.brigadier.context.CommandContext;
 import io.github.omegau371.trueimpact.diagnostic.T4ApplyForceExperiment;
 import io.github.omegau371.trueimpact.observation.DiagnosticConfig;
 import io.github.omegau371.trueimpact.observation.DiagnosticStateManager;
+import io.github.omegau371.trueimpact.physics.ImpactMetrics;
 import io.github.omegau371.trueimpact.sable.SableImpactCapture;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -134,7 +135,26 @@ public final class DiagnosticCommand {
                 + " records=" + stats.lastNonZeroRecordCount()
                 + " activeImpact=" + stats.lastNonZeroActiveImpactCount()
                 + " sustained=" + stats.lastNonZeroSustainedCount()), false);
+        ImpactMetrics metrics = stats.lastImpactMetrics();
+        if (metrics == null) {
+            ctx.getSource().sendSuccess(() -> Component.literal(
+                    "[TI capture last-impact-metrics] none"), false);
+        } else {
+            ctx.getSource().sendSuccess(() -> Component.literal(
+                    "[TI capture last-impact-metrics] tick=" + metrics.serverTick()
+                    + " energyJ=" + fmt(metrics.impactEnergyJ())
+                    + " normalJ=" + fmt(metrics.normalImpulseJ())
+                    + " pressureProxy=" + fmt(metrics.contactPressureProxy())
+                    + " stress=" + fmt(metrics.candidateStressEstimate())
+                    + " thresholdJ=" + fmt(metrics.materialThresholdJ())
+                    + " exceeds=" + metrics.exceedsThreshold()), false);
+        }
         return 1;
+    }
+
+    private static String fmt(double value) {
+        if (!Double.isFinite(value)) return String.valueOf(value);
+        return String.format(java.util.Locale.ROOT, "%.3f", value);
     }
 
     private static int allOff(CommandContext<CommandSourceStack> ctx) {

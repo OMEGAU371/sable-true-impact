@@ -183,12 +183,12 @@ After active-vs-active collision (bodies allowed to collide freely):
 See `docs/phase-1c-damage-model.md` for design.
 DamageResolver remains NONE throughout Phase 1C.
 
-- [ ] `ImpactMetrics` record defined in physics/ with all five diagnostic fields
-- [ ] SableImpactCapture computes ImpactMetrics for each ACTIVE_IMPACT record
-- [ ] `/trueimpact debug status` outputs last-hit ImpactMetrics (no gameplay effect)
+- [x] `ImpactMetrics` record defined in physics/ with all five calculation outputs
+- [x] SableImpactCapture computes ImpactMetrics for each ACTIVE_IMPACT record
+- [x] `/trueimpact debug status` outputs last-hit ImpactMetrics (no gameplay effect)
 - [ ] T-8: impactEnergyJ = J^2/(2*m_eff) validated against observable velocity change
 - [ ] materialThresholdJ placeholder calibrated against one known-fragile block type
-- [ ] DamageResolver still returns NONE; exceedsThreshold is logged only
+- [x] DamageResolver still returns NONE; exceedsThreshold is logged only
 
 ---
 
