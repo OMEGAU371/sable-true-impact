@@ -6,6 +6,7 @@ import io.github.omegau371.trueimpact.diagnostic.ContactLogger;
 import io.github.omegau371.trueimpact.observation.BodySnapshot;
 import io.github.omegau371.trueimpact.observation.DiagnosticConfig;
 import io.github.omegau371.trueimpact.sable.SableEventBridge;
+import io.github.omegau371.trueimpact.sable.SableImpactCapture;
 import net.minecraft.server.level.ServerLevel;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -48,6 +49,7 @@ public abstract class DiagnosticContactCaptureMixin {
             // tickStartVels: populated at substep 0 PRE_STEP; used by T-3-MISS pairwise scan
             Map<Integer, double[]> tickStartVels = SableEventBridge.getTickStartVels();
             ContactLogger.onClearCollisions(data, level.getGameTime(), substepCount, snaps, tickStartVels);
+            SableImpactCapture.process(data, level.getGameTime(), substepCount, snaps, tickStartVels);
         }
         return data;
     }
