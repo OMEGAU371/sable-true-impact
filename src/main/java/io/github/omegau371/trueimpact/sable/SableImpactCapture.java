@@ -7,6 +7,7 @@ import io.github.omegau371.trueimpact.physics.ImpactMetrics;
 import io.github.omegau371.trueimpact.physics.ImpactRecord;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -69,6 +70,32 @@ public final class SableImpactCapture {
     // null until the first ACTIVE_IMPACT record is produced since last reset.
     private static ImpactMetrics lastActiveImpactMetrics;
 
+    // -- T-8 rolling stats -------------------------------------------------------
+    // Updated only when: ACTIVE_IMPACT AND impactEnergyJ finite > 0 AND kineticDelta finite.
+    private static final int T8_WINDOW = 32;
+
+    private static int    t8SampleCount;
+    private static double t8LastRatio   = Double.NaN;
+    private static double t8MinRatio    = Double.NaN;
+    private static double t8MaxRatio    = Double.NaN;
+    private static double t8SumRatio;
+    private static final double[] t8RatioWindow = new double[T8_WINDOW];
+    private static int    t8WindowHead;  // next write index (mod T8_WINDOW)
+    private static int    t8WindowSize;  // valid entries: 0..T8_WINDOW
+
+    /** Snapshot of T-8 rolling calibration statistics. */
+    public record T8Stats(
+            int    sampleCount,
+            double lastRatio,
+            double minRatio,
+            double maxRatio,
+            double averageRatio,
+            double p50Ratio
+    ) {
+        /** True when at least one valid T-8 sample exists. */
+        public boolean hasSamples() { return sampleCount > 0; }
+    }
+
     public record RuntimeStats(
             long totalProcessCalls,
             long totalRawContactsSeen,
@@ -82,7 +109,8 @@ public final class SableImpactCapture {
             int  lastNonZeroActiveImpactCount,
             int  lastNonZeroSustainedCount,
             ImpactMetrics lastRecordMetrics,         // any ContactType, most recent record
-            ImpactMetrics lastActiveImpactMetrics    // ACTIVE_IMPACT only; null if none since reset
+            ImpactMetrics lastActiveImpactMetrics,   // ACTIVE_IMPACT only; null if none since reset
+            T8Stats       t8Stats                    // rolling calibration stats
     ) {}
 
     public static synchronized RuntimeStats stats() {
@@ -99,7 +127,8 @@ public final class SableImpactCapture {
                 lastNonZeroActiveImpactCount,
                 lastNonZeroSustainedCount,
                 lastRecordMetrics,
-                lastActiveImpactMetrics);
+                lastActiveImpactMetrics,
+                snapshotT8Stats());
     }
 
     public static synchronized void resetCounters() {
@@ -116,6 +145,13 @@ public final class SableImpactCapture {
         lastNonZeroSustainedCount    = 0;
         lastRecordMetrics        = null;
         lastActiveImpactMetrics  = null;
+        t8SampleCount  = 0;
+        t8LastRatio    = Double.NaN;
+        t8MinRatio     = Double.NaN;
+        t8MaxRatio     = Double.NaN;
+        t8SumRatio     = 0.0;
+        t8WindowHead   = 0;
+        t8WindowSize   = 0;
     }
 
     /**
@@ -240,6 +276,12 @@ public final class SableImpactCapture {
             latestRecordMetrics = metrics;
             if (type == ContactType.ACTIVE_IMPACT) {
                 latestActiveImpactMetrics = metrics;
+                // T-8 rolling stats: only when both energy values are valid and positive.
+                double impulseE = metrics.impactEnergyJ();
+                double kDelta   = metrics.kineticDeltaMagnitudeJ();
+                if (Double.isFinite(impulseE) && impulseE > 0.0 && Double.isFinite(kDelta)) {
+                    updateT8Stats(kDelta / impulseE);
+                }
             }
 
             DamageResolver.resolve(record);    // Phase 1C: still always NONE
@@ -284,6 +326,32 @@ public final class SableImpactCapture {
         if (latestActiveImpactMetrics != null) {
             lastActiveImpactMetrics = latestActiveImpactMetrics;
         }
+    }
+
+    private static synchronized void updateT8Stats(double ratio) {
+        t8SampleCount++;
+        t8LastRatio = ratio;
+        t8SumRatio += ratio;
+        if (Double.isNaN(t8MinRatio) || ratio < t8MinRatio) t8MinRatio = ratio;
+        if (Double.isNaN(t8MaxRatio) || ratio > t8MaxRatio) t8MaxRatio = ratio;
+        t8RatioWindow[t8WindowHead % T8_WINDOW] = ratio;
+        t8WindowHead++;
+        t8WindowSize = Math.min(t8WindowSize + 1, T8_WINDOW);
+    }
+
+    private static synchronized T8Stats snapshotT8Stats() {
+        if (t8SampleCount == 0) {
+            return new T8Stats(0, Double.NaN, Double.NaN, Double.NaN, Double.NaN, Double.NaN);
+        }
+        double avg = t8SumRatio / t8SampleCount;
+        // p50 from circular window (last up-to-T8_WINDOW samples)
+        double[] copy = Arrays.copyOf(t8RatioWindow, t8WindowSize);
+        Arrays.sort(copy);
+        int mid = t8WindowSize / 2;
+        double p50 = (t8WindowSize % 2 == 0)
+                ? (copy[mid - 1] + copy[mid]) / 2.0
+                : copy[mid];
+        return new T8Stats(t8SampleCount, t8LastRatio, t8MinRatio, t8MaxRatio, avg, p50);
     }
 
     /**

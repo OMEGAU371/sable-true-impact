@@ -9,6 +9,7 @@ import io.github.omegau371.trueimpact.physics.ImpactRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -644,6 +645,168 @@ class SableImpactCaptureTest {
         assertEquals(0, s.lastNonZeroActiveImpactCount(),
                 "second impact was SUSTAINED (low impulse), not ACTIVE_IMPACT");
         assertEquals(1, s.lastNonZeroSustainedCount());
+    }
+
+    // -- T-8 rolling stats --------------------------------------------------------
+
+    /** Helpers: bodies with post-step velocity so kineticAfterJ is populated. */
+    private static Map<Integer, BodySnapshot> velSnaps(double vAx, double vBx) {
+        return Map.of(
+                10, snapWithVel(10, 4.0, vAx, 0.0, 0.0),
+                20, snapWithVel(20, 8.0, vBx, 0.0, 0.0));
+    }
+
+    /** Helpers: tick-start vels so kineticBeforeJ is populated too. */
+    private static Map<Integer, double[]> startVels(double svAx, double svBx) {
+        Map<Integer, double[]> m = new HashMap<>();
+        m.put(10, new double[]{svAx, 0.0, 0.0});
+        m.put(20, new double[]{svBx, 0.0, 0.0});
+        return m;
+    }
+
+    @Test
+    void t8_stats_empty_when_kineticDelta_is_NaN() {
+        // snap() has no valid velocity -> kineticDelta NaN -> no T-8 sample
+        Map<Integer, BodySnapshot> snaps = Map.of(
+                10, snap(10, 5.0),
+                20, snap(20, 10.0));
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 200L, 2, snaps, Map.of());
+
+        SableImpactCapture.T8Stats t8 = SableImpactCapture.stats().t8Stats();
+        assertEquals(0, t8.sampleCount(), "kineticDelta=NaN -> no sample");
+        assertFalse(t8.hasSamples());
+        assertTrue(Double.isNaN(t8.lastRatio()));
+    }
+
+    @Test
+    void t8_stats_empty_for_ACTIVE_SUSTAINED() {
+        // force=100 -> J=2.5/contact < 5.0 -> ACTIVE_SUSTAINED -> no T-8 sample
+        Map<Integer, BodySnapshot> snaps = velSnaps(1.0, -1.0);
+        SableImpactCapture.process(oneContact(10, 20, 100.0), 201L, 2, snaps,
+                startVels(0.0, 0.0));
+
+        assertEquals(0, SableImpactCapture.stats().t8Stats().sampleCount(),
+                "ACTIVE_SUSTAINED must not update T-8 stats");
+    }
+
+    @Test
+    void t8_stats_one_sample_populates_all_fields() {
+        // All four velocity flags true -> kineticDelta is computable
+        // relBefore = ||(0,0,0)-(0,0,0)|| = 0; relAfter = ||(3,0,0)-(-1,0,0)|| = 4
+        // mEff = 1/(1/4+1/8) = 8/3
+        // kBefore=0, kAfter=0.5*(8/3)*16=(64/3), kDelta=(64/3)
+        // impactEnergyJ = 7.5^2/(2*(8/3)) = 56.25/(16/3) = 56.25*3/16 = 10.547
+        // ratio = kDelta / impactEnergyJ
+        Map<Integer, BodySnapshot> snaps = velSnaps(3.0, -1.0);
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 202L, 2, snaps,
+                startVels(0.0, 0.0));
+
+        SableImpactCapture.T8Stats t8 = SableImpactCapture.stats().t8Stats();
+        assertEquals(1, t8.sampleCount());
+        assertTrue(t8.hasSamples());
+        assertFalse(Double.isNaN(t8.lastRatio()));
+        assertEquals(t8.lastRatio(), t8.minRatio(),   1e-9, "min == last for single sample");
+        assertEquals(t8.lastRatio(), t8.maxRatio(),   1e-9, "max == last for single sample");
+        assertEquals(t8.lastRatio(), t8.averageRatio(),1e-9,"avg == last for single sample");
+        assertEquals(t8.lastRatio(), t8.p50Ratio(),   1e-9, "p50 == last for single sample");
+
+        // Verify the ratio matches manual computation
+        double mEff       = 1.0 / (1.0 / 4.0 + 1.0 / 8.0);
+        double J          = 300.0 * 0.025;
+        double impE       = (J * J) / (2.0 * mEff);
+        double relAfter   = 4.0;  // ||(3,0,0)-(-1,0,0)||
+        double kAfter     = 0.5 * mEff * relAfter * relAfter;
+        double kDelta     = Math.abs(0.0 - kAfter);
+        double expectedRatio = kDelta / impE;
+        assertEquals(expectedRatio, t8.lastRatio(), 1e-9);
+    }
+
+    @Test
+    void t8_stats_accumulate_min_max_avg_across_multiple_samples() {
+        // Two impacts with different velocities -> different ratios
+        Map<Integer, BodySnapshot> snaps1 = velSnaps(2.0, -1.0);  // relAfter=3
+        Map<Integer, BodySnapshot> snaps2 = velSnaps(5.0, -2.0);  // relAfter=7
+        Map<Integer, double[]> sv = startVels(0.0, 0.0);
+
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 210L, 2, snaps1, sv);
+        double ratio1 = SableImpactCapture.stats().t8Stats().lastRatio();
+
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 211L, 2, snaps2, sv);
+        double ratio2 = SableImpactCapture.stats().t8Stats().lastRatio();
+
+        SableImpactCapture.T8Stats t8 = SableImpactCapture.stats().t8Stats();
+        assertEquals(2, t8.sampleCount());
+        assertEquals(ratio2, t8.lastRatio(), 1e-9, "last = most recent");
+        assertEquals(Math.min(ratio1, ratio2), t8.minRatio(), 1e-9);
+        assertEquals(Math.max(ratio1, ratio2), t8.maxRatio(), 1e-9);
+        assertEquals((ratio1 + ratio2) / 2.0,  t8.averageRatio(), 1e-9);
+        // p50 of 2 samples = average of the two
+        assertEquals((ratio1 + ratio2) / 2.0,  t8.p50Ratio(), 1e-9);
+    }
+
+    @Test
+    void t8_stats_p50_is_median_of_window() {
+        // Insert 3 samples with known ratios: verify p50 is the middle value
+        // We use different post-step velocities to produce different ratios
+        // Ratios will be ratio for relAfter = 1, 3, 5 (with relBefore=0)
+        double J    = 300.0 * 0.025;
+        double mEff = 1.0 / (1.0 / 4.0 + 1.0 / 8.0);
+        double impE = (J * J) / (2.0 * mEff);
+        Map<Integer, double[]> sv = startVels(0.0, 0.0);
+
+        // relAfter=1 (vA=1, vB=0): kDelta=0.5*mEff*1, ratio small
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 220L, 2,
+                velSnaps(1.0, 0.0), sv);
+        // relAfter=3 (vA=2, vB=-1): kDelta=0.5*mEff*9, ratio medium
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 221L, 2,
+                velSnaps(2.0, -1.0), sv);
+        // relAfter=5 (vA=3, vB=-2): kDelta=0.5*mEff*25, ratio large
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 222L, 2,
+                velSnaps(3.0, -2.0), sv);
+
+        SableImpactCapture.T8Stats t8 = SableImpactCapture.stats().t8Stats();
+        assertEquals(3, t8.sampleCount());
+
+        // For odd count, p50 is the middle element after sorting
+        double r1 = 0.5 * mEff * 1.0  / impE;  // relAfter=1
+        double r2 = 0.5 * mEff * 9.0  / impE;  // relAfter=3
+        double r3 = 0.5 * mEff * 25.0 / impE;  // relAfter=5
+        double[] sorted = {r1, r2, r3};
+        Arrays.sort(sorted);
+        assertEquals(sorted[1], t8.p50Ratio(), 1e-9, "p50 is middle of 3 sorted samples");
+    }
+
+    @Test
+    void t8_stats_window_capped_at_32() {
+        // Insert 35 samples; sampleCount tracks all, window only holds last 32
+        Map<Integer, BodySnapshot> snaps = velSnaps(3.0, -1.0);
+        Map<Integer, double[]> sv = startVels(0.0, 0.0);
+        for (int i = 0; i < 35; i++) {
+            SableImpactCapture.process(oneContact(10, 20, 300.0), 300L + i, 2, snaps, sv);
+        }
+        SableImpactCapture.T8Stats t8 = SableImpactCapture.stats().t8Stats();
+        assertEquals(35, t8.sampleCount(), "sampleCount tracks all samples");
+        // All samples have the same ratio, so all stats are equal
+        assertFalse(Double.isNaN(t8.p50Ratio()), "p50 computed from window regardless of total count");
+    }
+
+    @Test
+    void t8_stats_reset_clears_all_fields() {
+        Map<Integer, BodySnapshot> snaps = velSnaps(3.0, -1.0);
+        Map<Integer, double[]> sv = startVels(0.0, 0.0);
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 400L, 2, snaps, sv);
+        assertTrue(SableImpactCapture.stats().t8Stats().hasSamples());
+
+        SableImpactCapture.resetCounters();
+
+        SableImpactCapture.T8Stats t8 = SableImpactCapture.stats().t8Stats();
+        assertEquals(0, t8.sampleCount(), "reset must clear sampleCount");
+        assertFalse(t8.hasSamples());
+        assertTrue(Double.isNaN(t8.lastRatio()),    "reset must clear lastRatio");
+        assertTrue(Double.isNaN(t8.minRatio()),     "reset must clear minRatio");
+        assertTrue(Double.isNaN(t8.maxRatio()),     "reset must clear maxRatio");
+        assertTrue(Double.isNaN(t8.averageRatio()), "reset must clear averageRatio");
+        assertTrue(Double.isNaN(t8.p50Ratio()),     "reset must clear p50Ratio");
     }
 
     // -- Phase 1C diagnostic metrics ---------------------------------------------

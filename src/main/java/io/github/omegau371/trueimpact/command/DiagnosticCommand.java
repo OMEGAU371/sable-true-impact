@@ -169,7 +169,24 @@ public final class DiagnosticCommand {
                     + " exceeds=" + impact.exceedsThreshold()), false);
         }
 
-        // Line 6: T-8 kinetic validation for the last ACTIVE_IMPACT.
+        // Line 6: T-8 rolling calibration stats (kineticDelta/impulseEnergy ratio)
+        SableImpactCapture.T8Stats t8 = stats.t8Stats();
+        if (!t8.hasSamples()) {
+            ctx.getSource().sendSuccess(() -> Component.literal(
+                    "[TI capture T8-stats] n=0 [no valid T-8 samples yet;"
+                    + " need ACTIVE_IMPACT with finite kineticDelta"
+                    + " -- enable 'debug contacts on']"), false);
+        } else {
+            ctx.getSource().sendSuccess(() -> Component.literal(
+                    "[TI capture T8-stats] n=" + t8.sampleCount()
+                    + " last=" + fmt(t8.lastRatio())
+                    + " min="  + fmt(t8.minRatio())
+                    + " avg="  + fmt(t8.averageRatio())
+                    + " p50="  + fmt(t8.p50Ratio())
+                    + " max="  + fmt(t8.maxRatio())), false);
+        }
+
+        // Line 7: T-8 kinetic validation for the last ACTIVE_IMPACT.
         // Shows formula trace (J, mEff, mA, mB, E) and 3D kinetic energy comparison.
         // velAvail shows per-body availability; NaN fields indicate missing data.
         if (impact == null) {
