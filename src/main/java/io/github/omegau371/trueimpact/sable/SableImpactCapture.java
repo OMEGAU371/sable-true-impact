@@ -59,7 +59,15 @@ public final class SableImpactCapture {
     private static int  lastNonZeroRecordCount;
     private static int  lastNonZeroActiveImpactCount;
     private static int  lastNonZeroSustainedCount;
-    private static ImpactMetrics lastImpactMetrics;
+
+    // Most recent ImpactMetrics for any active-vs-active record (ACTIVE_IMPACT or ACTIVE_SUSTAINED).
+    // Updated whenever any ImpactRecord is produced.
+    private static ImpactMetrics lastRecordMetrics;
+
+    // Most recent ImpactMetrics for an ACTIVE_IMPACT record only.
+    // Not overwritten by ACTIVE_SUSTAINED ticks.
+    // null until the first ACTIVE_IMPACT record is produced since last reset.
+    private static ImpactMetrics lastActiveImpactMetrics;
 
     public record RuntimeStats(
             long totalProcessCalls,
@@ -73,7 +81,8 @@ public final class SableImpactCapture {
             int  lastNonZeroRecordCount,
             int  lastNonZeroActiveImpactCount,
             int  lastNonZeroSustainedCount,
-            ImpactMetrics lastImpactMetrics
+            ImpactMetrics lastRecordMetrics,         // any ContactType, most recent record
+            ImpactMetrics lastActiveImpactMetrics    // ACTIVE_IMPACT only; null if none since reset
     ) {}
 
     public static synchronized RuntimeStats stats() {
@@ -89,22 +98,24 @@ public final class SableImpactCapture {
                 lastNonZeroRecordCount,
                 lastNonZeroActiveImpactCount,
                 lastNonZeroSustainedCount,
-                lastImpactMetrics);
+                lastRecordMetrics,
+                lastActiveImpactMetrics);
     }
 
     public static synchronized void resetCounters() {
-        totalProcessCalls        = 0L;
-        totalRawContactsSeen     = 0L;
+        totalProcessCalls         = 0L;
+        totalRawContactsSeen      = 0L;
         totalImpactRecordsCreated = 0L;
-        lastTick                 = -1L;
-        lastRecordCount          = 0;
-        lastActiveImpactCount    = 0;
-        lastSustainedCount       = 0;
-        lastNonZeroRecordTick         = -1L;
-        lastNonZeroRecordCount        = 0;
-        lastNonZeroActiveImpactCount  = 0;
-        lastNonZeroSustainedCount     = 0;
-        lastImpactMetrics             = null;
+        lastTick                  = -1L;
+        lastRecordCount           = 0;
+        lastActiveImpactCount     = 0;
+        lastSustainedCount        = 0;
+        lastNonZeroRecordTick        = -1L;
+        lastNonZeroRecordCount       = 0;
+        lastNonZeroActiveImpactCount = 0;
+        lastNonZeroSustainedCount    = 0;
+        lastRecordMetrics        = null;
+        lastActiveImpactMetrics  = null;
     }
 
     /**
@@ -189,7 +200,8 @@ public final class SableImpactCapture {
         List<ImpactRecord> result = new ArrayList<>(pairMap.size());
         int activeImpactCount = 0;
         int sustainedCount = 0;
-        ImpactMetrics latestMetrics = null;
+        ImpactMetrics latestRecordMetrics      = null;  // any type -- last record this tick
+        ImpactMetrics latestActiveImpactMetrics = null; // ACTIVE_IMPACT only -- last impact this tick
         for (PairAccum acc : pairMap.values()) {
             double totalImpulseJ   = acc.sumForce * substepDt;
             double impulsePerPair  = (acc.contactCount > 0)
@@ -221,26 +233,34 @@ public final class SableImpactCapture {
                     type
             );
             result.add(record);
+
+            // Compute metrics for ALL records -- threshold calibration needs visibility
+            // into ACTIVE_SUSTAINED as well as ACTIVE_IMPACT during Phase 1C.
+            ImpactMetrics metrics = computeMetrics(record);
+            latestRecordMetrics = metrics;
             if (type == ContactType.ACTIVE_IMPACT) {
-                latestMetrics = computeMetrics(record);
+                latestActiveImpactMetrics = metrics;
             }
+
             DamageResolver.resolve(record);    // Phase 1C: still always NONE
         }
 
-        recordStats(serverTick, count, result.size(), activeImpactCount, sustainedCount, latestMetrics);
+        recordStats(serverTick, count, result.size(), activeImpactCount, sustainedCount,
+                latestRecordMetrics, latestActiveImpactMetrics);
         return result;
     }
 
     private static synchronized void recordStats(long tick, int rawContacts, int records,
                                                   int activeImpacts, int sustained) {
-        recordStats(tick, rawContacts, records, activeImpacts, sustained, null);
+        recordStats(tick, rawContacts, records, activeImpacts, sustained, null, null);
     }
 
     private static synchronized void recordStats(long tick, int rawContacts, int records,
                                                   int activeImpacts, int sustained,
-                                                  ImpactMetrics latestMetrics) {
+                                                  ImpactMetrics latestRecordMetrics,
+                                                  ImpactMetrics latestActiveImpactMetrics) {
         totalProcessCalls++;
-        totalRawContactsSeen     += rawContacts;
+        totalRawContactsSeen      += rawContacts;
         totalImpactRecordsCreated += records;
         lastTick              = tick;
         lastRecordCount       = records;
@@ -248,15 +268,21 @@ public final class SableImpactCapture {
         lastSustainedCount    = sustained;
 
         // lastNonZero* fields: only updated when at least one record was produced.
-        // Zero-record ticks (bodies separated, no contact) must not overwrite them.
         if (records > 0) {
-            lastNonZeroRecordTick         = tick;
-            lastNonZeroRecordCount        = records;
-            lastNonZeroActiveImpactCount  = activeImpacts;
-            lastNonZeroSustainedCount     = sustained;
+            lastNonZeroRecordTick        = tick;
+            lastNonZeroRecordCount       = records;
+            lastNonZeroActiveImpactCount = activeImpacts;
+            lastNonZeroSustainedCount    = sustained;
         }
-        if (latestMetrics != null) {
-            lastImpactMetrics = latestMetrics;
+
+        // lastRecordMetrics: updated for any active-vs-active record (any ContactType).
+        if (latestRecordMetrics != null) {
+            lastRecordMetrics = latestRecordMetrics;
+        }
+        // lastActiveImpactMetrics: updated only for ACTIVE_IMPACT records.
+        // ACTIVE_SUSTAINED ticks do NOT overwrite this -- it stays at the last impact.
+        if (latestActiveImpactMetrics != null) {
+            lastActiveImpactMetrics = latestActiveImpactMetrics;
         }
     }
 
@@ -278,6 +304,7 @@ public final class SableImpactCapture {
         return new ImpactMetrics(
                 record.serverTick(),
                 record.bodyPairKey(),
+                record.contactType(),           // included for diagnostic consumers
                 impactEnergyJ,
                 record.impulseAlongNormalJ(),
                 contactPressureProxy,

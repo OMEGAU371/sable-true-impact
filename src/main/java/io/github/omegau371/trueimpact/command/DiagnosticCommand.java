@@ -135,19 +135,38 @@ public final class DiagnosticCommand {
                 + " records=" + stats.lastNonZeroRecordCount()
                 + " activeImpact=" + stats.lastNonZeroActiveImpactCount()
                 + " sustained=" + stats.lastNonZeroSustainedCount()), false);
-        ImpactMetrics metrics = stats.lastImpactMetrics();
-        if (metrics == null) {
+        // Line 4: most recent record of any ContactType (ACTIVE_IMPACT or ACTIVE_SUSTAINED).
+        ImpactMetrics rec = stats.lastRecordMetrics();
+        if (rec == null) {
+            ctx.getSource().sendSuccess(() -> Component.literal(
+                    "[TI capture last-record-metrics] none"), false);
+        } else {
+            ctx.getSource().sendSuccess(() -> Component.literal(
+                    "[TI capture last-record-metrics] tick=" + rec.serverTick()
+                    + " type=" + rec.contactType()
+                    + " energyJ=" + fmt(rec.impactEnergyJ())
+                    + " normalJ=" + fmt(rec.normalImpulseJ())
+                    + " pressureProxy=" + fmt(rec.contactPressureProxy())
+                    + " stress=" + fmt(rec.candidateStressEstimate())
+                    + " thresholdJ=" + fmt(rec.materialThresholdJ())
+                    + " exceeds=" + rec.exceedsThreshold()), false);
+        }
+
+        // Line 5: most recent ACTIVE_IMPACT record only (null if none since last reset).
+        ImpactMetrics impact = stats.lastActiveImpactMetrics();
+        if (impact == null) {
             ctx.getSource().sendSuccess(() -> Component.literal(
                     "[TI capture last-impact-metrics] none"), false);
         } else {
             ctx.getSource().sendSuccess(() -> Component.literal(
-                    "[TI capture last-impact-metrics] tick=" + metrics.serverTick()
-                    + " energyJ=" + fmt(metrics.impactEnergyJ())
-                    + " normalJ=" + fmt(metrics.normalImpulseJ())
-                    + " pressureProxy=" + fmt(metrics.contactPressureProxy())
-                    + " stress=" + fmt(metrics.candidateStressEstimate())
-                    + " thresholdJ=" + fmt(metrics.materialThresholdJ())
-                    + " exceeds=" + metrics.exceedsThreshold()), false);
+                    "[TI capture last-impact-metrics] tick=" + impact.serverTick()
+                    + " type=" + impact.contactType()
+                    + " energyJ=" + fmt(impact.impactEnergyJ())
+                    + " normalJ=" + fmt(impact.normalImpulseJ())
+                    + " pressureProxy=" + fmt(impact.contactPressureProxy())
+                    + " stress=" + fmt(impact.candidateStressEstimate())
+                    + " thresholdJ=" + fmt(impact.materialThresholdJ())
+                    + " exceeds=" + impact.exceedsThreshold()), false);
         }
         return 1;
     }

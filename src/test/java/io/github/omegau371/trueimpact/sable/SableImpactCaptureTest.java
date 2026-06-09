@@ -649,45 +649,99 @@ class SableImpactCaptureTest {
     // -- Phase 1C diagnostic metrics ---------------------------------------------
 
     @Test
-    void active_impact_computes_lastImpactMetrics() {
+    void active_impact_sets_both_metrics_fields() {
+        // force=300, substepDt=0.025 -> J=7.5/contact > 5.0 -> ACTIVE_IMPACT
         Map<Integer, BodySnapshot> snaps = Map.of(
                 10, snap(10, 5.0),
                 20, snap(20, 10.0));
-
         SableImpactCapture.process(oneContact(10, 20, 300.0), 70L, 2, snaps, Map.of());
 
-        ImpactMetrics m = SableImpactCapture.stats().lastImpactMetrics();
-        assertNotNull(m, "ACTIVE_IMPACT must compute diagnostic ImpactMetrics");
+        SableImpactCapture.RuntimeStats s = SableImpactCapture.stats();
+        ImpactMetrics rec    = s.lastRecordMetrics();
+        ImpactMetrics impact = s.lastActiveImpactMetrics();
+
+        assertNotNull(rec,    "ACTIVE_IMPACT must set lastRecordMetrics");
+        assertNotNull(impact, "ACTIVE_IMPACT must set lastActiveImpactMetrics");
+
         double totalImpulseJ = 300.0 * (0.05 / 2);
         double effMass = 1.0 / (1.0 / 5.0 + 1.0 / 10.0);
         double expectedEnergy = (totalImpulseJ * totalImpulseJ) / (2.0 * effMass);
 
-        assertEquals(70L, m.serverTick());
-        assertEquals(expectedEnergy, m.impactEnergyJ(), 1e-9);
-        assertEquals(0.0, m.normalImpulseJ(), 1e-9);
-        assertEquals(totalImpulseJ, m.contactPressureProxy(), 1e-9);
-        assertEquals(expectedEnergy, m.candidateStressEstimate(), 1e-9);
-        assertEquals(50.0, m.materialThresholdJ(), 1e-9);
-        assertFalse(m.exceedsThreshold());
+        // Both fields point to the same record
+        assertEquals(70L, rec.serverTick());
+        assertEquals(70L, impact.serverTick());
+        assertEquals(ContactType.ACTIVE_IMPACT, rec.contactType());
+        assertEquals(ContactType.ACTIVE_IMPACT, impact.contactType());
+        assertEquals(expectedEnergy, rec.impactEnergyJ(), 1e-9);
+        assertEquals(0.0, rec.normalImpulseJ(), 1e-9);
+        assertEquals(totalImpulseJ, rec.contactPressureProxy(), 1e-9);
+        assertEquals(expectedEnergy, rec.candidateStressEstimate(), 1e-9);
+        assertEquals(50.0, rec.materialThresholdJ(), 1e-9);
+        assertFalse(rec.exceedsThreshold());
     }
 
     @Test
-    void sustained_record_does_not_overwrite_lastImpactMetrics() {
+    void sustained_contact_sets_lastRecordMetrics_only() {
+        // force=100, substepDt=0.025 -> J=2.5/contact < 5.0 -> ACTIVE_SUSTAINED
+        Map<Integer, BodySnapshot> snaps = Map.of(
+                10, snap(10, 5.0),
+                20, snap(20, 8.0));
+        SableImpactCapture.process(oneContact(10, 20, 100.0), 80L, 2, snaps, Map.of());
+
+        SableImpactCapture.RuntimeStats s = SableImpactCapture.stats();
+        assertNotNull(s.lastRecordMetrics(),
+                "ACTIVE_SUSTAINED must set lastRecordMetrics for threshold calibration");
+        assertNull(s.lastActiveImpactMetrics(),
+                "ACTIVE_SUSTAINED must NOT set lastActiveImpactMetrics");
+        assertEquals(ContactType.ACTIVE_SUSTAINED, s.lastRecordMetrics().contactType());
+        assertEquals(80L, s.lastRecordMetrics().serverTick());
+    }
+
+    @Test
+    void sustained_updates_lastRecordMetrics_does_not_overwrite_lastActiveImpactMetrics() {
         Map<Integer, BodySnapshot> snaps = Map.of(
                 10, snap(10, 5.0),
                 20, snap(20, 8.0));
 
+        // tick 71: ACTIVE_IMPACT -> sets both fields
         SableImpactCapture.process(oneContact(10, 20, 300.0), 71L, 2, snaps, Map.of());
-        ImpactMetrics first = SableImpactCapture.stats().lastImpactMetrics();
-        assertNotNull(first);
+        ImpactMetrics impactAfterImpact = SableImpactCapture.stats().lastActiveImpactMetrics();
+        assertNotNull(impactAfterImpact);
+        assertEquals(71L, impactAfterImpact.serverTick());
 
+        // tick 72: ACTIVE_SUSTAINED -> updates lastRecordMetrics but NOT lastActiveImpactMetrics
         SableImpactCapture.process(oneContact(10, 20, 100.0), 72L, 2, snaps, Map.of());
 
-        ImpactMetrics afterSustained = SableImpactCapture.stats().lastImpactMetrics();
-        assertNotNull(afterSustained);
-        assertEquals(first.serverTick(), afterSustained.serverTick(),
-                "ACTIVE_SUSTAINED must not overwrite last ACTIVE_IMPACT metrics");
-        assertEquals(first.impactEnergyJ(), afterSustained.impactEnergyJ(), 1e-9);
+        SableImpactCapture.RuntimeStats s = SableImpactCapture.stats();
+
+        // lastRecordMetrics: updated to the sustained tick
+        assertEquals(72L, s.lastRecordMetrics().serverTick(),
+                "ACTIVE_SUSTAINED must update lastRecordMetrics");
+        assertEquals(ContactType.ACTIVE_SUSTAINED, s.lastRecordMetrics().contactType());
+
+        // lastActiveImpactMetrics: must still reflect the impact tick (not overwritten)
+        assertEquals(71L, s.lastActiveImpactMetrics().serverTick(),
+                "ACTIVE_SUSTAINED must NOT overwrite lastActiveImpactMetrics");
+        assertEquals(ContactType.ACTIVE_IMPACT, s.lastActiveImpactMetrics().contactType());
+    }
+
+    @Test
+    void metrics_contactType_matches_record_classification() {
+        Map<Integer, BodySnapshot> snaps = Map.of(
+                10, snap(10, 5.0),
+                20, snap(20, 8.0));
+
+        // Impact: J/contact = 7.5 > 5.0
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 90L, 2, snaps, Map.of());
+        assertEquals(ContactType.ACTIVE_IMPACT,
+                SableImpactCapture.stats().lastRecordMetrics().contactType());
+
+        SableImpactCapture.resetCounters();
+
+        // Sustained: J/contact = 2.5 < 5.0
+        SableImpactCapture.process(oneContact(10, 20, 100.0), 91L, 2, snaps, Map.of());
+        assertEquals(ContactType.ACTIVE_SUSTAINED,
+                SableImpactCapture.stats().lastRecordMetrics().contactType());
     }
 
     @Test
@@ -699,7 +753,7 @@ class SableImpactCaptureTest {
         List<ImpactRecord> records = SableImpactCapture.process(
                 oneContact(10, 20, 1000.0), 73L, 2, snaps, Map.of());
 
-        ImpactMetrics m = SableImpactCapture.stats().lastImpactMetrics();
+        ImpactMetrics m = SableImpactCapture.stats().lastActiveImpactMetrics();
         assertNotNull(m);
         assertTrue(m.exceedsThreshold(),
                 "Phase 1C threshold comparison is diagnostic-only but should be visible");
@@ -730,6 +784,7 @@ class SableImpactCaptureTest {
         assertEquals(0, s.lastNonZeroRecordCount());
         assertEquals(0, s.lastNonZeroActiveImpactCount());
         assertEquals(0, s.lastNonZeroSustainedCount());
-        assertNull(s.lastImpactMetrics());
+        assertNull(s.lastRecordMetrics(),       "resetCounters must clear lastRecordMetrics");
+        assertNull(s.lastActiveImpactMetrics(), "resetCounters must clear lastActiveImpactMetrics");
     }
 }
