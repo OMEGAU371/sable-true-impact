@@ -368,6 +368,70 @@ class SableImpactCaptureTest {
         assertEquals(0.0, result.get(0).impulseAlongNormalJ(), 1e-9);
     }
 
+    // -- stale-id / removed-body protection ---------------------------------------
+
+    /**
+     * Regression guard: after a body is removed, lastPostSnaps must not retain its
+     * stale entry. SableImpactCapture must not generate ImpactRecords for expired ids.
+     *
+     * SableEventBridge.onPostStep() now calls lastPostSnaps.clear() before every
+     * substep iteration, so only currently-active bodies appear in the map.
+     *
+     * This test simulates the "tick N+1" state: id=20 was active in tick N but has
+     * since been removed. lastPostSnaps now contains only id=10. A contact record
+     * that still references id=20 must be discarded.
+     */
+    @Test
+    void removed_body_not_in_snaps_produces_no_record() {
+        // tick N: both id=10 and id=20 were active.
+        // tick N+1: id=20 removed -> onPostStep cleared map, only id=10 repopulated.
+        Map<Integer, BodySnapshot> snapsAfterRemoval = Map.of(10, snap(10, 5.0));
+
+        // Contact still references old id=20 (e.g. Rapier contact buffer not yet flushed).
+        double[] data = oneContact(10, 20, 300.0);
+
+        List<ImpactRecord> result = SableImpactCapture.process(
+                data, 2L, 2, snapsAfterRemoval, Map.of());
+
+        assertTrue(result.isEmpty(),
+                "contact referencing a removed body (id=20 not in snaps) must produce no ImpactRecord");
+    }
+
+    @Test
+    void only_currently_active_pair_produces_record_after_partial_removal() {
+        // Three bodies: id=10 active, id=20 removed, id=30 active.
+        // Contacts: (10 vs 20) and (10 vs 30).
+        // Only (10 vs 30) should produce a record.
+        Map<Integer, BodySnapshot> snaps = Map.of(
+                10, snap(10, 5.0),
+                30, snap(30, 8.0));
+        double[] data = concat(
+                oneContact(10, 20, 100.0),   // id=20 stale -> discard
+                oneContact(10, 30, 200.0));  // both active -> keep
+
+        List<ImpactRecord> result = SableImpactCapture.process(
+                data, 2L, 2, snaps, Map.of());
+
+        assertEquals(1, result.size(),
+                "only the contact between currently-active bodies produces a record");
+        assertEquals(200.0 * (0.05 / 2), result.get(0).totalImpulseJ(), 1e-9);
+    }
+
+    @Test
+    void empty_snaps_produces_no_records_even_with_contacts() {
+        // Simulates container==null case: onPostStep cleared snaps and returned early,
+        // leaving an empty map. No contacts should produce records.
+        double[] data = concat(
+                oneContact(10, 20, 100.0),
+                oneContact(30, 40, 200.0));
+
+        List<ImpactRecord> result = SableImpactCapture.process(
+                data, 2L, 2, Map.of(), Map.of());
+
+        assertTrue(result.isEmpty(),
+                "empty lastPostSnaps (no active bodies) must produce no records");
+    }
+
     // -- debug-off scenario -------------------------------------------------------
 
     /**

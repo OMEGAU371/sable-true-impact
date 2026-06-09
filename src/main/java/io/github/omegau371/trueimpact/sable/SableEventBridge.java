@@ -31,16 +31,18 @@ public final class SableEventBridge {
 
     /**
      * Most recent POST_STEP snapshots, keyed by runtimeId.
-     * Populated UNCONDITIONALLY every substep: damage pipeline (SableImpactCapture)
-     * needs this to identify active sub-levels regardless of whether diagnostic
-     * logging is enabled. ContactLogger (T-3/T-6) also reads from this map.
-     * Cleared by clearState().
+     * Rebuilt from scratch at the start of every onPostStep() call -- the map is
+     * cleared before iterating sub-levels, so stale entries from removed or absent
+     * bodies never persist to the next clearCollisions() call.
+     * SableImpactCapture reads this to identify which bodies are currently active.
+     * ContactLogger (T-3/T-6) also reads from this map.
+     * Additionally cleared by clearState() on session reset.
      */
     private static final Map<Integer, BodySnapshot> lastPostSnaps = new HashMap<>();
 
     /**
      * Tick-start linear velocities (substep 0 PRE_STEP), keyed by runtimeId.
-     * Populated when LOG_RAW_CONTACTS is enabled. Used by T-3-MISS pairwise Δv scan.
+     * Populated when LOG_RAW_CONTACTS is enabled. Used by T-3-MISS pairwise dv scan.
      * Cleared at the start of each substep-0 PRE_STEP pass.
      */
     private static final Map<Integer, double[]> tickStartVelById = new HashMap<>();
@@ -56,7 +58,7 @@ public final class SableEventBridge {
 
     /**
      * Returns an unmodifiable view of tick-start velocities (substep 0 PRE_STEP).
-     * Used by ContactLogger for T-3-MISS pairwise Δv scan.
+     * Used by ContactLogger for T-3-MISS pairwise dv scan.
      * Empty if LOG_RAW_CONTACTS was off, or if no substep-0 PRE_STEP has fired yet.
      */
     public static Map<Integer, double[]> getTickStartVels() {
@@ -92,14 +94,14 @@ public final class SableEventBridge {
         }
     }
 
-    // ── PRE_STEP ────────────────────────────────────────────────────────────
+    // -- PRE_STEP ----------------------------------------------------------------
 
     /**
      * Called from DiagnosticPhysicsStepMixin before Rapier3D.step().
      *
-     * Two independent code paths — each gated separately:
-     *   needSnapshots  = ENABLED + LOG_BODY_SNAPSHOTS → body snapshot + T-7 position tracking
-     *   needTickStart  = LOG_RAW_CONTACTS, substep 0 only → tick-start velocity for T-3-MISS
+     * Two independent code paths -- each gated separately:
+     *   needSnapshots  = ENABLED + LOG_BODY_SNAPSHOTS -> body snapshot + T-7 position tracking
+     *   needTickStart  = LOG_RAW_CONTACTS, substep 0 only -> tick-start velocity for T-3-MISS
      */
     public static void onPreStep(SubLevelPhysicsSystem system) {
         boolean needSnapshots = DiagnosticConfig.ENABLED && DiagnosticConfig.LOG_BODY_SNAPSHOTS;
@@ -140,7 +142,7 @@ public final class SableEventBridge {
         }
     }
 
-    // ── POST_STEP ───────────────────────────────────────────────────────────
+    // -- POST_STEP ---------------------------------------------------------------
 
     /**
      * Called from DiagnosticPhysicsStepMixin after Rapier3D.step() + updateAllPoses().
@@ -160,6 +162,11 @@ public final class SableEventBridge {
         // T-4 measurement also runs unconditionally when pending.
         // Only log output (SNAP, T-7) is gated on DiagnosticConfig flags below.
 
+        // Rebuild lastPostSnaps from scratch every substep.
+        // Clearing before iteration ensures removed or absent bodies never persist
+        // as stale entries to the next clearCollisions() call in captureContactData().
+        lastPostSnaps.clear();
+
         long tick = system.getLevel().getGameTime();
         int substep = SableBodyReader.substepIndex(system);
         double dt = SableBodyReader.substepDt(system);
@@ -168,6 +175,7 @@ public final class SableEventBridge {
 
         ServerSubLevelContainer container = SubLevelContainer.getContainer(system.getLevel());
         if (container == null) {
+            // lastPostSnaps already cleared above -- no active bodies if no container.
             if (hasPending) {
                 ExperimentLog.warn("[T-4] DIAG tick={} levelKey='{}' container=null -- cannot iterate sublevels. pendingKeys={}",
                         tick, levelKey, T4ApplyForceExperiment.pendingByKey.keySet());
