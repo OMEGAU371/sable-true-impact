@@ -186,7 +186,7 @@ DamageResolver remains NONE throughout Phase 1C.
 - [x] `ImpactMetrics` record defined in physics/ with all five calculation outputs
 - [x] SableImpactCapture computes ImpactMetrics for every active-vs-active ImpactRecord
 - [x] `/trueimpact debug status` outputs last-record and last-impact ImpactMetrics (no gameplay effect)
-- [ ] T-8: impactEnergyJ = J^2/(2*m_eff) validated against observable velocity change
+- [ ] T-8: impactEnergyJ = J^2/(2*m_eff) validated against 3D relative kinetic delta
 - [ ] materialThresholdJ placeholder calibrated against one known-fragile block type
 - [x] DamageResolver still returns NONE; exceedsThreshold is logged only
 

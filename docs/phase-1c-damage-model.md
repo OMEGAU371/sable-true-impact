@@ -168,15 +168,26 @@ must not overwrite it.
 
 ### T-8: impactEnergyJ scale validation
 
-Goal: confirm impactEnergyJ = J^2/(2*m_eff) is proportional to observable kinetic energy.
+Goal: confirm impactEnergyJ = J^2/(2*m_eff) is proportional to observable velocity change.
 
 Method:
-  - Controlled drop from known height H; expected E_kin = mA * g * H
-  - Compare impactEnergyJ at contact with expected E_kin
-  - Calibration ratio = impactEnergyJ / (mA * g * H) should be ~1.0 if formula is correct
+  - Enable `/trueimpact debug contacts on` so tick-start velocities are captured.
+  - Compare impulse energy with 3D relative-speed kinetic change:
+    `kineticDeltaMagnitudeJ = abs(0.5*mEff*relBefore^2 - 0.5*mEff*relAfter^2)`.
+  - T-8 ratio is `kineticDeltaMagnitudeJ / impactEnergyJ`.
+  - This comparison deliberately does NOT project onto the contact normal because T-6
+    normal direction convention is still unconfirmed.
 
-Expected output: a calibration factor CF such that E_physical = impactEnergyJ * CF.
-If CF ~= 1.0, the Sable mass/velocity units are consistent with our formula.
+Expected status output:
+
+```
+[TI capture T8-impact] ... E=J^2/(2mEff)=X velAvail=[startA:T startB:T postA:T postB:T] kBefore=A kAfter=B kDelta=C ratio=kDelta/E=R
+```
+
+External sanity check:
+  - For controlled drops, compare impactEnergyJ with m*g*H as a secondary check.
+  - This is not the primary T-8 ratio because world gravity, solver losses, and contact
+    timing can contaminate one-tick velocity snapshots.
 
 ### T-9: materialThresholdJ calibration
 
