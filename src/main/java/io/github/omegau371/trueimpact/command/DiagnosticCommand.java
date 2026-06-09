@@ -162,13 +162,41 @@ public final class DiagnosticCommand {
                     "[TI capture last-impact-metrics] tick=" + impact.serverTick()
                     + " type=" + impact.contactType()
                     + " energyJ=" + fmt(impact.impactEnergyJ())
-                    + " normalJ=" + fmt(impact.normalImpulseJ())
-                    + " pressureProxy=" + fmt(impact.contactPressureProxy())
+                    + " normalJ=" + fmt(impact.normalImpulseJ()) + "(T6-UC)"
+                    + " pressureProxy=" + fmt(impact.contactPressureProxy()) + "(areaUC)"
                     + " stress=" + fmt(impact.candidateStressEstimate())
                     + " thresholdJ=" + fmt(impact.materialThresholdJ())
                     + " exceeds=" + impact.exceedsThreshold()), false);
         }
+
+        // Line 6: T-8 validation fields for the last ACTIVE_IMPACT.
+        // Shows the full formula trace (J, mEff, mA, mB, E=J^2/2mEff) and velocity
+        // reconstruction if tick-start velocities were available (LOG_RAW_CONTACTS on).
+        if (impact == null) {
+            ctx.getSource().sendSuccess(() -> Component.literal(
+                    "[TI capture T8-impact] none"), false);
+        } else {
+            String t8Line = "[TI capture T8-impact] tick=" + impact.serverTick()
+                    + " J=" + fmt(impact.totalImpulseJ())
+                    + " mEff=" + fmt(impact.effectiveMassKpg())
+                    + " mA=" + fmt(impact.massAKpg())
+                    + " mB=" + fmt(impact.massBKpg())
+                    + " E=J^2/(2mEff)=" + fmt(impact.impactEnergyJ());
+            String t8Line2 = impact.velReconAvailable()
+                    ? (" velAvail=true"
+                       + " relSpeedEst=" + fmt(impact.relSpeedReconEstimate())
+                       + " reconE=" + fmt(impact.reconKineticDeltaJ())
+                       + " calibRatio=reconE/E=" + fmtRatio(impact.reconKineticDeltaJ(), impact.impactEnergyJ()))
+                    : " velAvail=false [enable 'debug contacts on' for velocity reconstruction]";
+            final String t8Full = t8Line + t8Line2;
+            ctx.getSource().sendSuccess(() -> Component.literal(t8Full), false);
+        }
         return 1;
+    }
+
+    private static String fmtRatio(double num, double den) {
+        if (!Double.isFinite(num) || !Double.isFinite(den) || den == 0) return "NaN";
+        return String.format(java.util.Locale.ROOT, "%.4f", num / den);
     }
 
     private static String fmt(double value) {

@@ -672,12 +672,27 @@ class SableImpactCaptureTest {
         assertEquals(70L, impact.serverTick());
         assertEquals(ContactType.ACTIVE_IMPACT, rec.contactType());
         assertEquals(ContactType.ACTIVE_IMPACT, impact.contactType());
+
+        // T-8 traceability fields
+        assertEquals(totalImpulseJ, rec.totalImpulseJ(), 1e-9);
+        assertEquals(effMass, rec.effectiveMassKpg(), 1e-9);
+        assertEquals(5.0, rec.massAKpg(), 1e-9);
+        assertEquals(10.0, rec.massBKpg(), 1e-9);
+
+        // Canonical energy formula
         assertEquals(expectedEnergy, rec.impactEnergyJ(), 1e-9);
-        assertEquals(0.0, rec.normalImpulseJ(), 1e-9);
-        assertEquals(totalImpulseJ, rec.contactPressureProxy(), 1e-9);
         assertEquals(expectedEnergy, rec.candidateStressEstimate(), 1e-9);
         assertEquals(50.0, rec.materialThresholdJ(), 1e-9);
         assertFalse(rec.exceedsThreshold());
+
+        // Secondary fields
+        assertEquals(0.0, rec.normalImpulseJ(), 1e-9);
+        assertEquals(totalImpulseJ, rec.contactPressureProxy(), 1e-9);
+
+        // T-8 velocity reconstruction: no tick-start vels provided -> unavailable
+        assertFalse(rec.velReconAvailable());
+        assertTrue(Double.isNaN(rec.relSpeedReconEstimate()));
+        assertTrue(Double.isNaN(rec.reconKineticDeltaJ()));
     }
 
     @Test
@@ -744,6 +759,79 @@ class SableImpactCaptureTest {
                 SableImpactCapture.stats().lastRecordMetrics().contactType());
     }
 
+    // -- T-8 velocity reconstruction fields -------------------------------------
+
+    @Test
+    void t8_velReconAvailable_false_when_no_tick_start_vels() {
+        // No tickStartVels provided -> impulseAlongNormalJ stays 0 -> velReconAvailable=false
+        Map<Integer, BodySnapshot> snaps = Map.of(
+                10, snap(10, 5.0),
+                20, snap(20, 10.0));
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 100L, 2, snaps, Map.of());
+
+        ImpactMetrics m = SableImpactCapture.stats().lastActiveImpactMetrics();
+        assertNotNull(m);
+        assertFalse(m.velReconAvailable(),
+                "velReconAvailable must be false when tickStartVels is empty");
+        assertTrue(Double.isNaN(m.relSpeedReconEstimate()),
+                "relSpeedReconEstimate must be NaN when velocity reconstruction is unavailable");
+        assertTrue(Double.isNaN(m.reconKineticDeltaJ()),
+                "reconKineticDeltaJ must be NaN when velocity reconstruction is unavailable");
+    }
+
+    @Test
+    void t8_velReconAvailable_true_when_tick_start_vels_provided() {
+        // Provide tick-start vels so impulseAlongNormalJ is non-zero -> velReconAvailable=true
+        // Body A: tick-start vel (0,0,0), post-step vel (1,0,0) -> dvAn=1.0
+        // Body B: tick-start vel (0,0,0), post-step vel (-2,0,0) -> dvBn=2.0
+        // normal=(1,0,0), identity quat: impulseAlongNormalJ = (4*1 + 8*2)/2 = 10.0
+        Map<Integer, BodySnapshot> snaps = Map.of(
+                10, snapWithVel(10, 4.0,  1.0, 0.0, 0.0),
+                20, snapWithVel(20, 8.0, -2.0, 0.0, 0.0));
+        Map<Integer, double[]> startVels = new HashMap<>();
+        startVels.put(10, new double[]{0.0, 0.0, 0.0});
+        startVels.put(20, new double[]{0.0, 0.0, 0.0});
+
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 101L, 2, snaps, startVels);
+
+        ImpactMetrics m = SableImpactCapture.stats().lastActiveImpactMetrics();
+        assertNotNull(m);
+        assertTrue(m.velReconAvailable(),
+                "velReconAvailable must be true when impulseAlongNormalJ > 0");
+
+        double mEff = 1.0 / (1.0 / 4.0 + 1.0 / 8.0);
+        double impulseNorm = 10.0;  // (4*1 + 8*2)/2
+        double expectedRelSpeed = impulseNorm / mEff;
+        double expectedReconKinetic = 0.5 * mEff * expectedRelSpeed * expectedRelSpeed;
+
+        assertEquals(expectedRelSpeed, m.relSpeedReconEstimate(), 1e-9);
+        assertEquals(expectedReconKinetic, m.reconKineticDeltaJ(), 1e-9);
+    }
+
+    @Test
+    void t8_formula_trace_fields_match_impact_record() {
+        // Verify totalImpulseJ, effectiveMassKpg, massA, massB copied faithfully from ImpactRecord.
+        // forceRaw=300: J = 300*0.025 = 7.5 > threshold 5.0 -> ACTIVE_IMPACT
+        Map<Integer, BodySnapshot> snaps = Map.of(
+                10, snap(10, 4.0),
+                20, snap(20, 6.0));
+        double forceRaw   = 300.0;
+        double substepDt  = 0.05 / 2;   // substepCount=2
+        double expectedJ  = forceRaw * substepDt;
+        double expectedMeff = 1.0 / (1.0 / 4.0 + 1.0 / 6.0);
+        double expectedEnergy = (expectedJ * expectedJ) / (2.0 * expectedMeff);
+
+        SableImpactCapture.process(oneContact(10, 20, forceRaw), 102L, 2, snaps, Map.of());
+
+        ImpactMetrics m = SableImpactCapture.stats().lastActiveImpactMetrics();
+        assertNotNull(m, "forceRaw=300 -> J/contact=7.5 > 5.0 -> ACTIVE_IMPACT");
+        assertEquals(expectedJ,      m.totalImpulseJ(),    1e-9, "totalImpulseJ");
+        assertEquals(expectedMeff,   m.effectiveMassKpg(), 1e-9, "effectiveMassKpg");
+        assertEquals(4.0,            m.massAKpg(),         1e-9, "massA");
+        assertEquals(6.0,            m.massBKpg(),         1e-9, "massB");
+        assertEquals(expectedEnergy, m.impactEnergyJ(),    1e-9, "E=J^2/(2mEff)");
+    }
+
     @Test
     void high_energy_metric_sets_exceedsThreshold_but_resolver_still_NONE() {
         Map<Integer, BodySnapshot> snaps = Map.of(
@@ -786,5 +874,7 @@ class SableImpactCaptureTest {
         assertEquals(0, s.lastNonZeroSustainedCount());
         assertNull(s.lastRecordMetrics(),       "resetCounters must clear lastRecordMetrics");
         assertNull(s.lastActiveImpactMetrics(), "resetCounters must clear lastActiveImpactMetrics");
+        // verify T-8 fields don't linger after reset
+        assertNull(s.lastActiveImpactMetrics()); // already checked above, but explicit
     }
 }

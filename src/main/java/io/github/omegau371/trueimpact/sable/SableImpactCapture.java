@@ -287,11 +287,13 @@ public final class SableImpactCapture {
     }
 
     static ImpactMetrics computeMetrics(ImpactRecord record) {
-        double impactEnergyJ = Double.NaN;
-        if (Double.isFinite(record.effectiveMassKpg()) && record.effectiveMassKpg() > 0.0) {
-            impactEnergyJ = (record.totalImpulseJ() * record.totalImpulseJ())
-                    / (2.0 * record.effectiveMassKpg());
-        }
+        double mEff = record.effectiveMassKpg();
+        boolean mEffValid = Double.isFinite(mEff) && mEff > 0.0;
+
+        // Canonical energy formula: J^2 / (2*mEff) [T-3 confirmed]
+        double impactEnergyJ = mEffValid
+                ? (record.totalImpulseJ() * record.totalImpulseJ()) / (2.0 * mEff)
+                : Double.NaN;
 
         double contactPressureProxy = (record.contactCount() > 0)
                 ? record.totalImpulseJ() / record.contactCount()
@@ -301,16 +303,33 @@ public final class SableImpactCapture {
         boolean exceeds = Double.isFinite(candidateStressEstimate)
                 && candidateStressEstimate > threshold;
 
+        // T-8 velocity reconstruction: only available when tick-start vels were captured.
+        // impulseAlongNormalJ == 0.0 is the sentinel for "not available" -- it is only
+        // ever non-zero when tickStartVels were populated (i.e. LOG_RAW_CONTACTS on).
+        // Use 1e-12 guard to avoid floating-point near-zero false-positives.
+        boolean velReconAvail = mEffValid && Math.abs(record.impulseAlongNormalJ()) > 1e-12;
+        double relSpeedRecon = velReconAvail
+                ? record.impulseAlongNormalJ() / mEff : Double.NaN;
+        double reconKineticDelta = velReconAvail
+                ? 0.5 * mEff * relSpeedRecon * relSpeedRecon : Double.NaN;
+
         return new ImpactMetrics(
                 record.serverTick(),
                 record.bodyPairKey(),
-                record.contactType(),           // included for diagnostic consumers
+                record.contactType(),
+                record.totalImpulseJ(),
+                mEff,
+                record.massAKpg(),
+                record.massBKpg(),
                 impactEnergyJ,
-                record.impulseAlongNormalJ(),
-                contactPressureProxy,
                 candidateStressEstimate,
                 threshold,
-                exceeds);
+                exceeds,
+                record.impulseAlongNormalJ(),
+                contactPressureProxy,
+                velReconAvail,
+                relSpeedRecon,
+                reconKineticDelta);
     }
 
     // Canonical pair key: min(idA,idB)<<32 | max(idA,idB) (matches ImpactRecord contract)
