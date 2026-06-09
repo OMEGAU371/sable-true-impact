@@ -181,8 +181,13 @@ Method:
 Expected status output:
 
 ```
+[TI capture T8-stats] n=N last=L min=MIN avg=AVG p50=P50 max=MAX
 [TI capture T8-impact] ... E=J^2/(2mEff)=X velAvail=[startA:T startB:T postA:T postB:T] kBefore=A kAfter=B kDelta=C ratio=kDelta/E=R
 ```
+
+T8-stats samples only ACTIVE_IMPACT records where both impactEnergyJ and
+kineticDeltaMagnitudeJ are finite. `p50` is the median of the last 32 valid samples;
+`avg/min/max` are over all valid samples since reset.
 
 External sanity check:
   - For controlled drops, compare impactEnergyJ with m*g*H as a secondary check.
