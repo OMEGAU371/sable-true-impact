@@ -18,14 +18,32 @@ import java.util.Collections;
 import java.util.Map;
 
 /**
- * Captures raw contact array from Rapier3D.clearCollisions() for T-3, T-5, T-6.
- * Passes the most recent POST_STEP body snapshots from SableEventBridge for correlation.
+ * Intercepts Rapier3D.clearCollisions() to feed the damage pipeline and diagnostic logs.
  *
- * [T-5] clearCollisions is called once after all substeps — array covers ALL substeps.
- *        substepIndex is NOT available here. ContactLogger outputs this explicitly.
- * [C2]  Bodies not found in activeSubLevels → NON_ACTIVE_SUBLEVEL_BODY, NOT "terrain".
+ * Two independent paths run after clearCollisions() returns:
  *
- * Observation-only: original double[] passed through unchanged.
+ *   PATH A -- damage pipeline (SableImpactCapture):
+ *     Runs UNCONDITIONALLY on every physics tick.
+ *     MUST NOT be placed inside any DiagnosticConfig gate.
+ *     Phase 1B: DamageResolver always returns NONE (no block damage).
+ *     Phase 1C+: this path produces real DamageEvents; gating it on a debug flag
+ *     would make production damage depend on whether debug logging is enabled,
+ *     violating the principle that diagnostic state must not influence game behavior.
+ *
+ *   PATH B -- diagnostic logging (ContactLogger):
+ *     Runs only when LOG_RAW_CONTACTS is enabled.
+ *     Safe to gate; logs have no game-side effects.
+ *
+ * Dependency note (Phase 1C+ readiness):
+ *   snaps (lastPostSnaps) is currently populated only when LOG_BODY_SNAPSHOTS is on.
+ *   tickStartVels is currently populated only when LOG_RAW_CONTACTS is on.
+ *   SableImpactCapture handles empty maps gracefully (produces zero records).
+ *   Phase 1C+ will need these populated unconditionally for reliable damage output.
+ *
+ * [T-5] clearCollisions is called once after all substeps -- array covers ALL substeps.
+ * [C2]  Bodies not found in activeSubLevels -> NON_ACTIVE_SUBLEVEL_BODY, NOT "terrain".
+ *
+ * Original double[] is passed through unchanged.
  */
 @Mixin(targets = "dev.ryanhcode.sable.physics.impl.rapier.RapierPhysicsPipeline",
        remap = false)
@@ -42,15 +60,21 @@ public abstract class DiagnosticContactCaptureMixin {
     )
     private double[] captureContactData(int sceneId) {
         double[] data = Rapier3D.clearCollisions(sceneId);
+
+        SubLevelPhysicsSystem system   = SubLevelPhysicsSystem.get(level);
+        int substepCount               = (system != null) ? system.getConfig().substepsPerTick : -1;
+        Map<Integer, BodySnapshot> snaps        = SableEventBridge.getLastPostSnapshots();
+        Map<Integer, double[]>    tickStartVels = SableEventBridge.getTickStartVels();
+        long tick                      = level.getGameTime();
+
+        // PATH A: damage pipeline -- MUST remain outside any diagnostic gate.
+        SableImpactCapture.process(data, tick, substepCount, snaps, tickStartVels);
+
+        // PATH B: diagnostic logging -- gated on LOG_RAW_CONTACTS.
         if (DiagnosticConfig.is(DiagnosticConfig.LOG_RAW_CONTACTS)) {
-            SubLevelPhysicsSystem system = SubLevelPhysicsSystem.get(level);
-            int substepCount = (system != null) ? system.getConfig().substepsPerTick : -1;
-            Map<Integer, BodySnapshot> snaps = SableEventBridge.getLastPostSnapshots();
-            // tickStartVels: populated at substep 0 PRE_STEP; used by T-3-MISS pairwise scan
-            Map<Integer, double[]> tickStartVels = SableEventBridge.getTickStartVels();
-            ContactLogger.onClearCollisions(data, level.getGameTime(), substepCount, snaps, tickStartVels);
-            SableImpactCapture.process(data, level.getGameTime(), substepCount, snaps, tickStartVels);
+            ContactLogger.onClearCollisions(data, tick, substepCount, snaps, tickStartVels);
         }
+
         return data;
     }
 }

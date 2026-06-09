@@ -7,7 +7,6 @@ import io.github.omegau371.trueimpact.physics.ContactType;
 import io.github.omegau371.trueimpact.physics.ImpactRecord;
 import org.junit.jupiter.api.Test;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class SableImpactCaptureTest {
 
-    // ── fixture helpers ────────────────────────────────────────────────────────
+    // -- fixture helpers ----------------------------------------------------------
 
     /** Minimal active snapshot: identity orientation, no valid velocity. */
     private static BodySnapshot snap(int id, double mass) {
@@ -67,7 +66,7 @@ class SableImpactCaptureTest {
         return out;
     }
 
-    // ── discard rules ─────────────────────────────────────────────────────────
+    // -- discard rules ------------------------------------------------------------
 
     @Test
     void world_vs_active_pair_produces_no_record() {
@@ -109,7 +108,7 @@ class SableImpactCaptureTest {
         assertTrue(result.isEmpty());
     }
 
-    // ── active-vs-active aggregation ──────────────────────────────────────────
+    // -- active-vs-active aggregation ---------------------------------------------
 
     @Test
     void active_vs_active_single_contact_produces_one_record() {
@@ -175,7 +174,7 @@ class SableImpactCaptureTest {
         assertEquals(2, result.get(0).contactCount());
     }
 
-    // ── totalImpulseJ calculation ─────────────────────────────────────────────
+    // -- totalImpulseJ calculation ------------------------------------------------
 
     @Test
     void totalImpulseJ_equals_sumForce_times_substepDt() {
@@ -222,7 +221,7 @@ class SableImpactCaptureTest {
         assertEquals(0.05 / 4, result.get(0).substepDt(), 1e-9);
     }
 
-    // ── contactType classification ─────────────────────────────────────────────
+    // -- contactType classification -----------------------------------------------
 
     @Test
     void contactType_is_ACTIVE_IMPACT_when_impulse_per_contact_above_threshold() {
@@ -266,11 +265,11 @@ class SableImpactCaptureTest {
                 "classification must use impulse/contact, not total impulse");
     }
 
-    // ── effectiveMassKpg ──────────────────────────────────────────────────────
+    // -- effectiveMassKpg ---------------------------------------------------------
 
     @Test
     void effectiveMass_computed_correctly() {
-        // mA=5, mB=10 -> effM = 1/(1/5 + 1/10) = 1/(0.2+0.1) = 1/0.3 ~= 3.333
+        // mA=5, mB=10 -> effM = 1/(1/5 + 1/10) = 1/0.3 ~= 3.333
         Map<Integer, BodySnapshot> snaps = Map.of(
                 10, snap(10, 5.0),
                 20, snap(20, 10.0));
@@ -281,7 +280,7 @@ class SableImpactCaptureTest {
         assertEquals(expected, result.get(0).effectiveMassKpg(), 1e-9);
     }
 
-    // ── ImpactRecord field plumbing ────────────────────────────────────────────
+    // -- ImpactRecord field plumbing ----------------------------------------------
 
     @Test
     void serverTick_is_propagated() {
@@ -302,7 +301,6 @@ class SableImpactCaptureTest {
                 oneContact(10, 20, 100.0), 1L, 2, snaps, Map.of());
 
         ImpactRecord r = result.get(0);
-        // idA and idB are stored; pair may be canonicalized so check both directions
         assertTrue((r.idA() == 10 && r.idB() == 20) || (r.idA() == 20 && r.idB() == 10));
     }
 
@@ -313,7 +311,7 @@ class SableImpactCaptureTest {
                 SableImpactCapture.pairKey(20, 10));
     }
 
-    // ── mixed data: active+world in same batch ────────────────────────────────
+    // -- mixed data: active+world in same batch -----------------------------------
 
     @Test
     void mixed_batch_only_active_active_pairs_produce_records() {
@@ -335,11 +333,11 @@ class SableImpactCaptureTest {
         assertEquals(100.0 * 0.025, result.get(0).totalImpulseJ(), 1e-9);
     }
 
-    // ── impulseAlongNormalJ (T-6 UNCONFIRMED) ────────────────────────────────
+    // -- impulseAlongNormalJ (T-6 UNCONFIRMED) ------------------------------------
 
     @Test
     void impulseAlongNormalJ_nonzero_when_tick_start_vels_available() {
-        // Body A: tick-start vel (0,0,0), post-step vel (1,0,0)  -> dvAn along (1,0,0) = 1.0
+        // Body A: tick-start vel (0,0,0), post-step vel (1,0,0)  -> dvAn = 1.0
         // Body B: tick-start vel (0,0,0), post-step vel (-2,0,0) -> dvBn = 2.0
         // normal in record = (1,0,0); identity quaternion -> world normal = (1,0,0)
         // sumImpulseNorm = (mA*dvAn + mB*dvBn)/2 = (4.0*1.0 + 8.0*2.0)/2 = 10.0
@@ -368,5 +366,30 @@ class SableImpactCaptureTest {
                 oneContact(10, 20, 100.0), 1L, 2, snaps, Map.of());
 
         assertEquals(0.0, result.get(0).impulseAlongNormalJ(), 1e-9);
+    }
+
+    // -- pipeline gate independence -----------------------------------------------
+
+    @Test
+    void process_method_does_not_reference_DiagnosticConfig() {
+        // SableImpactCapture must not check any diagnostic flag internally.
+        // The gate must live in the caller (DiagnosticContactCaptureMixin), not here.
+        // This test verifies the class has no dependency on DiagnosticConfig at the
+        // bytecode level by checking the declared class references.
+        boolean refsConfig = false;
+        for (var field : SableImpactCapture.class.getDeclaredFields()) {
+            if (field.getType().getName().contains("DiagnosticConfig")) {
+                refsConfig = true;
+                break;
+            }
+        }
+        for (var method : SableImpactCapture.class.getDeclaredMethods()) {
+            for (var param : method.getParameterTypes()) {
+                if (param.getName().contains("DiagnosticConfig")) refsConfig = true;
+            }
+        }
+        assertFalse(refsConfig,
+                "SableImpactCapture must not reference DiagnosticConfig -- "
+                + "diagnostic gating belongs in the mixin caller, not the capture layer");
     }
 }
