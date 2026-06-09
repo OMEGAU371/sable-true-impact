@@ -123,7 +123,76 @@ Phase 1B will use `estimatedImpulseJ` from `[T-3-SUMMARY]` as input to the damag
 
 ---
 
-## Gate 1 — Impact Event Model *(future)*
+## Gate 1B -- Phase 1B Damage Pipeline Skeleton -- MANUALLY PASSED (2026-06-10)
+
+**Objective:** ImpactRecord data contract and SableImpactCapture pipeline running
+unconditionally, independent of all diagnostic flags. DamageResolver always NONE.
+
+### Build verification (automated)
+
+| check | result |
+|---|---|
+| `.\gradlew.bat build` | PASS -- all tests pass, ArchUnit 0 violations |
+| ArchUnit R9: physics/ no TI internal deps | PASS |
+| ArchUnit R11: damage/ no diagnostic/observation deps | PASS |
+| ArchUnit R13: SableImpactCapture no DiagnosticConfig dep | PASS |
+| DamageResolverTest: resolver always NONE | PASS |
+| SableImpactCaptureTest: 25+ cases | PASS |
+
+### In-game verification (2026-06-10, version 0.3.6-phase1b, debug ALL OFF)
+
+Test setup: dedicated server, two active sub-levels, all TI diagnostic flags disabled.
+
+```
+/trueimpact debug all off
+/trueimpact debug status   (before collision)
+```
+```
+[TI diag] enabled=false bodies=false contacts=false callbacks_t1t2=false t7=false t4Pending=0
+[TI capture] calls=195 rawContacts=0 records=0 lastTick=-1 lastRecords=0 ...
+[TI capture last-hit] tick=-1 records=0 activeImpact=0 sustained=0
+```
+
+After active-vs-active collision (bodies allowed to collide freely):
+
+```
+[TI capture] calls=2978 rawContacts=19156 records=59 ...
+[TI capture last-hit] tick=77296 records=1 activeImpact=1 sustained=0
+```
+
+| check | result |
+|---|---|
+| pipeline runs without debug flags | `calls` increases each tick with all flags off -- PASS |
+| active-vs-active contact detected | `records=59` (cumulative), `activeImpact=1` at last-hit tick -- PASS |
+| last-hit counters correct | `tick=77296` preserved after bodies separate -- PASS |
+| no block damage | zero block breaks observed; DamageResolver returned NONE for all inputs -- PASS |
+| lastPostSnaps populated unconditionally | ImpactRecords generated with `ENABLED=false` -- PASS |
+
+### Phase 1B architectural guarantees established
+
+- `lastPostSnaps` rebuilt from scratch each substep; no stale body entries
+- `SableImpactCapture.process()` runs before diagnostic gate in mixin (PATH A always active)
+- ArchUnit R13 enforces SableImpactCapture never reads DiagnosticConfig
+- World-vs-active and unknown pairs discarded at capture layer; ImpactRecord = active-vs-active only
+- `contactCount` stored as diagnostic metadata only; not used in any formula
+
+---
+
+## Gate 1C -- Phase 1C Damage Calculation (Diagnostics Only) *(in progress)*
+
+See `docs/phase-1c-damage-model.md` for design.
+DamageResolver remains NONE throughout Phase 1C.
+
+- [ ] `ImpactMetrics` record defined in physics/ with all five diagnostic fields
+- [ ] SableImpactCapture computes ImpactMetrics for each ACTIVE_IMPACT record
+- [ ] `/trueimpact debug status` outputs last-hit ImpactMetrics (no gameplay effect)
+- [ ] T-8: impactEnergyJ = J^2/(2*m_eff) validated against observable velocity change
+- [ ] materialThresholdJ placeholder calibrated against one known-fragile block type
+- [ ] DamageResolver still returns NONE; exceedsThreshold is logged only
+
+---
+
+## Gate 1 -- Impact Event Model *(future)*
 
 - [ ] Build passes with new `physics/` package ArchUnit rules enforced
 - [ ] With Sable: at least one impact event logged per collision at DEBUG level

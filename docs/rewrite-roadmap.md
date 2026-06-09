@@ -18,17 +18,104 @@ Acceptance gate: `.\gradlew.bat build` passes; `/trueimpact status` prints corre
 
 ---
 
-## Phase 1 — Impact Event Model
+## Phase 1A -- Observation Layer (Sable Impulse Study) -- COMPLETE (2026-06-09)
 
-Goal: define the data model for impact events; no destruction yet.
+Goal: calibrate Sable physics quantities needed for damage formula.
 
-- [ ] `physics/ImpactEvent` — record (level, pos, energyJoules, sourceId, victimId, crackId)
-- [ ] `physics/ImpactReducer` — per-tick aggregation, thread-safe, flushes at `LevelTickEvent.Post`
-- [ ] `DamageResolver` skeleton — accepts `ImpactEvent`, always returns `NONE` (gate only)
-- [ ] ArchUnit rule: source paths must not call `Level.destroyBlock` directly
-- [ ] Sable hook (read-only): log first 10 impact events per tick to LOGGER at DEBUG
+- [x] T-4: applyImpulse/applyForce semantics -- MANUALLY PASSED (ratio ~1.0)
+- [x] T-3: forceAmountRaw dimension -- MANUALLY PASSED (J = forceAmountRaw * substepDt confirmed)
+- [x] SableEventBridge: PRE_STEP / POST_STEP body snapshot infrastructure
+- [x] DiagnosticContactCaptureMixin: clearCollisions interception
+- [x] ContactLogger: T-3/T-5/T-6 diagnostic logging
+- [x] DiagnosticCommand: /trueimpact debug subcommands
 
-Acceptance gate: in-game with Sable loaded, impact events are logged; nothing breaks.
+---
+
+## Phase 1B -- Damage Pipeline Skeleton -- COMPLETE (2026-06-10)
+
+Goal: data contract and unconditional capture pipeline; no destruction.
+
+- [x] `physics/ImpactRecord` -- immutable record, active-vs-active only, all fields calibrated
+- [x] `physics/ContactType` -- ACTIVE_IMPACT / ACTIVE_SUSTAINED (exactly two values)
+- [x] `sable/SableImpactCapture` -- active-vs-active aggregation; world/unknown pairs discarded
+- [x] `damage/DamageResolver` -- skeleton; always returns NONE
+- [x] ArchUnit R9-R13 -- physics/ isolation, damage/ isolation, capture no-diagnostic-config rule
+- [x] `lastPostSnaps` populated unconditionally (independent of LOG_BODY_SNAPSHOTS)
+- [x] `SableImpactCapture` runs before diagnostic gate (PATH A always active)
+- [x] Runtime counters + last-hit fields in RuntimeStats
+- [x] /trueimpact debug status shows [TI capture] and [TI capture last-hit] lines
+
+Acceptance gate: MANUALLY PASSED (2026-06-10) -- see docs/acceptance-gates.md Gate 1B.
+
+---
+
+## Phase 1C -- Damage Calculation (Diagnostics Only) -- IN PROGRESS
+
+Goal: quantitative pass through damage model; all outputs diagnostic only; no destruction.
+
+See `docs/phase-1c-damage-model.md` for full design.
+
+- [ ] `physics/ImpactMetrics` -- five diagnostic calculation outputs (pure data record)
+- [ ] SableImpactCapture computes ImpactMetrics for each ACTIVE_IMPACT record
+- [ ] /trueimpact debug status shows [TI capture last-impact-metrics] line
+- [ ] T-8: impactEnergyJ = J^2/(2*m_eff) scale validation
+- [ ] T-9: materialThresholdJ calibration (one reference block type)
+- [ ] DamageResolver still NONE; exceedsThreshold is logged only, never triggers game effect
+
+Acceptance gate: T-8 and T-9 manually passed; /trueimpact debug status shows all five metrics.
+
+---
+
+## Phase 1D -- BlockHardnessProfile + Threshold Formula *(future)*
+
+Goal: material-aware threshold; still no destruction.
+
+- [ ] `damage/BlockHardnessProfile` -- single source for vanilla hardness reads
+- [ ] Per-block materialThresholdJ derived from hardness
+- [ ] DamageResolver returns `CRACK` signal (not NONE) when threshold exceeded
+- [ ] ArchUnit rule: BlockHardnessProfile is the only class allowed to read vanilla hardness
+
+---
+
+## Phase 2 -- Crack Accumulation (no breaks) *(future)*
+
+Goal: visual crack progress; no block destruction.
+
+- [ ] `damage/DamageAccumulator` -- tracks crack progress per (level, pos)
+- [ ] Crack overlay displays correctly on client
+- [ ] Dedicated server runs without client-side overlay references
+
+---
+
+## Phase 3 -- Destruction Pipeline *(future)*
+
+Goal: full Reducer -> Resolver -> Accumulator -> destroyBlock path.
+
+- [ ] `DamageResolver` outputs `BREAK` / `HEAVY_BREAK`
+- [ ] `ImpactBreakQueue` -- defer ALL `destroyBlock` calls to `ServerTickEvent.Post`
+- [ ] `RopeBindingRegistry` -- gate for constraint-anchored blocks
+- [ ] Narrow-phase crash guard (see legacy [[narrow-phase-crash]] memory)
+
+---
+
+## Phase 4 -- Sable Adapters *(future)*
+
+Goal: full Sable engine adapter layer.
+
+- [ ] `mixin/RapierVoxelColliderBakeryMixin`
+- [ ] `mixin/RapierPhysicsPipelineMixin`
+- [ ] `PhysicsStepGate`
+- [ ] `clampRunawaySubLevels`
+
+---
+
+## Phase 5 -- Create Compatibility *(future)*
+
+Goal: Create contraption integration.
+
+- [ ] Conveyor belt damage
+- [ ] Bearing / pulley / piston anchor damage
+- [ ] `CreateContraptionAnchorDamage`
 
 ---
 
