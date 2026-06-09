@@ -15,7 +15,7 @@ No block is cracked, accumulated, or destroyed in this phase.
 | `totalImpulseJ` | T-3 CONFIRMED | PRIMARY -- all Phase 1C formulas derive from this |
 | `effectiveMassKpg` | derived, ready | PRIMARY -- reduces to a single mass for energy formula |
 | `massAKpg`, `massBKpg` | available | secondary; needed if asymmetric formulas are added later |
-| `contactType` | diagnostic tag | filter: skip ACTIVE_SUSTAINED, process ACTIVE_IMPACT only |
+| `contactType` | diagnostic tag | split last-record vs last-impact diagnostics |
 | `contactCount` | UNCONFIRMED as area proxy | diagnostic metadata ONLY; not in any formula |
 | `impulseAlongNormalJ` | T-6 UNCONFIRMED | secondary diagnostic; not primary input |
 | `substepDt` | reference (baked into J) | do not multiply again |
@@ -139,7 +139,7 @@ Constraints:
 
 ### Compute location: SableImpactCapture
 
-ImpactMetrics is computed in SableImpactCapture.process() for each ACTIVE_IMPACT record,
+ImpactMetrics is computed in SableImpactCapture.process() for every active-vs-active ImpactRecord,
 after ImpactRecord is assembled and before DamageResolver.resolve() is called.
 SableImpactCapture stores the most recent ImpactMetrics as a field for status query.
 
@@ -151,11 +151,16 @@ It must NOT receive ImpactMetrics -- metrics flow only to diagnostic output, nev
 ### Diagnostic output
 
 ImpactMetrics fields are added to SableImpactCapture.RuntimeStats and surfaced by
-/trueimpact debug status as a fourth output line:
+/trueimpact debug status as two output lines:
 
 ```
+[TI capture last-record-metrics] tick=T type=ACTIVE_SUSTAINED energyJ=X normalJ=Y pressureProxy=Z stress=S thresholdJ=W exceeds=false
 [TI capture last-impact-metrics] tick=T energy=X normalJ=Y pressureProxy=Z stress=S thresholdJ=W exceeds=false
 ```
+
+`last-record-metrics` is the most recent active-vs-active record of any ContactType.
+`last-impact-metrics` is the most recent ACTIVE_IMPACT only; ACTIVE_SUSTAINED records
+must not overwrite it.
 
 ---
 

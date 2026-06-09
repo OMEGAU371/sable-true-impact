@@ -56,8 +56,8 @@ Goal: quantitative pass through damage model; all outputs diagnostic only; no de
 See `docs/phase-1c-damage-model.md` for full design.
 
 - [x] `physics/ImpactMetrics` -- five calculation outputs plus source metadata (pure data record)
-- [x] SableImpactCapture computes ImpactMetrics for each ACTIVE_IMPACT record
-- [x] /trueimpact debug status shows [TI capture last-impact-metrics] line
+- [x] SableImpactCapture computes ImpactMetrics for every active-vs-active ImpactRecord
+- [x] /trueimpact debug status shows [TI capture last-record-metrics] and [TI capture last-impact-metrics] lines
 - [ ] T-8: impactEnergyJ = J^2/(2*m_eff) scale validation
 - [ ] T-9: materialThresholdJ calibration (one reference block type)
 - [x] DamageResolver still NONE; exceedsThreshold is logged only, never triggers game effect
