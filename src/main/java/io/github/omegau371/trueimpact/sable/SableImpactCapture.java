@@ -236,7 +236,7 @@ public final class SableImpactCapture {
 
             // Compute metrics for ALL records -- threshold calibration needs visibility
             // into ACTIVE_SUSTAINED as well as ACTIVE_IMPACT during Phase 1C.
-            ImpactMetrics metrics = computeMetrics(record);
+            ImpactMetrics metrics = computeMetrics(record, lastPostSnaps, tickStartVels);
             latestRecordMetrics = metrics;
             if (type == ContactType.ACTIVE_IMPACT) {
                 latestActiveImpactMetrics = metrics;
@@ -286,11 +286,22 @@ public final class SableImpactCapture {
         }
     }
 
-    static ImpactMetrics computeMetrics(ImpactRecord record) {
-        double mEff = record.effectiveMassKpg();
+    /**
+     * Computes ImpactMetrics from an ImpactRecord plus live body velocity data.
+     *
+     * @param record        assembled ImpactRecord for this pair/tick
+     * @param lastPostSnaps last POST_STEP snapshots (always populated; used for hasPostVel flags)
+     * @param tickStartVels substep-0 PRE_STEP velocities (populated only when LOG_RAW_CONTACTS on)
+     */
+    static ImpactMetrics computeMetrics(
+            ImpactRecord record,
+            Map<Integer, BodySnapshot> lastPostSnaps,
+            Map<Integer, double[]> tickStartVels) {
+
+        double mEff      = record.effectiveMassKpg();
         boolean mEffValid = Double.isFinite(mEff) && mEff > 0.0;
 
-        // Canonical energy formula: J^2 / (2*mEff) [T-3 confirmed]
+        // Canonical energy formula: J^2/(2*mEff) [T-3 confirmed]
         double impactEnergyJ = mEffValid
                 ? (record.totalImpulseJ() * record.totalImpulseJ()) / (2.0 * mEff)
                 : Double.NaN;
@@ -298,20 +309,52 @@ public final class SableImpactCapture {
         double contactPressureProxy = (record.contactCount() > 0)
                 ? record.totalImpulseJ() / record.contactCount()
                 : Double.NaN;
-        double candidateStressEstimate = impactEnergyJ;
-        double threshold = PHASE_1C_PLACEHOLDER_MATERIAL_THRESHOLD_J;
-        boolean exceeds = Double.isFinite(candidateStressEstimate)
-                && candidateStressEstimate > threshold;
+        double candidateStress = impactEnergyJ;
+        double threshold       = PHASE_1C_PLACEHOLDER_MATERIAL_THRESHOLD_J;
+        boolean exceeds        = Double.isFinite(candidateStress) && candidateStress > threshold;
 
-        // T-8 velocity reconstruction: only available when tick-start vels were captured.
-        // impulseAlongNormalJ == 0.0 is the sentinel for "not available" -- it is only
-        // ever non-zero when tickStartVels were populated (i.e. LOG_RAW_CONTACTS on).
-        // Use 1e-12 guard to avoid floating-point near-zero false-positives.
-        boolean velReconAvail = mEffValid && Math.abs(record.impulseAlongNormalJ()) > 1e-12;
-        double relSpeedRecon = velReconAvail
-                ? record.impulseAlongNormalJ() / mEff : Double.NaN;
-        double reconKineticDelta = velReconAvail
-                ? 0.5 * mEff * relSpeedRecon * relSpeedRecon : Double.NaN;
+        // T-8: explicit velocity availability -- tracked independently for each body/direction.
+        int idA = record.idA(), idB = record.idB();
+
+        double[] startVelA = tickStartVels.get(idA);
+        double[] startVelB = tickStartVels.get(idB);
+        boolean hasStartVelA = startVelA != null;
+        boolean hasStartVelB = startVelB != null;
+
+        BodySnapshot snapA = lastPostSnaps.get(idA);
+        BodySnapshot snapB = lastPostSnaps.get(idB);
+        boolean hasPostVelA = snapA != null && snapA.velocityReadValid();
+        boolean hasPostVelB = snapB != null && snapB.velocityReadValid();
+
+        // T-8: 3D relative speed -- no normal projection (T-6 independent).
+        double relSpeedBefore = Double.NaN;
+        double kineticBefore  = Double.NaN;
+        if (hasStartVelA && hasStartVelB) {
+            double rvx = startVelA[0] - startVelB[0];
+            double rvy = startVelA[1] - startVelB[1];
+            double rvz = startVelA[2] - startVelB[2];
+            relSpeedBefore = Math.sqrt(rvx*rvx + rvy*rvy + rvz*rvz);
+            if (mEffValid) {
+                kineticBefore = 0.5 * mEff * relSpeedBefore * relSpeedBefore;
+            }
+        }
+
+        double relSpeedAfter = Double.NaN;
+        double kineticAfter  = Double.NaN;
+        if (hasPostVelA && hasPostVelB) {
+            double rvx = snapA.linVelX() - snapB.linVelX();
+            double rvy = snapA.linVelY() - snapB.linVelY();
+            double rvz = snapA.linVelZ() - snapB.linVelZ();
+            relSpeedAfter = Math.sqrt(rvx*rvx + rvy*rvy + rvz*rvz);
+            if (mEffValid) {
+                kineticAfter = 0.5 * mEff * relSpeedAfter * relSpeedAfter;
+            }
+        }
+
+        double deltaRelSpeed = (Double.isNaN(relSpeedBefore) || Double.isNaN(relSpeedAfter))
+                ? Double.NaN : Math.abs(relSpeedBefore - relSpeedAfter);
+        double kineticDelta  = (Double.isNaN(kineticBefore) || Double.isNaN(kineticAfter))
+                ? Double.NaN : Math.abs(kineticBefore - kineticAfter);
 
         return new ImpactMetrics(
                 record.serverTick(),
@@ -322,14 +365,21 @@ public final class SableImpactCapture {
                 record.massAKpg(),
                 record.massBKpg(),
                 impactEnergyJ,
-                candidateStressEstimate,
+                candidateStress,
                 threshold,
                 exceeds,
-                record.impulseAlongNormalJ(),
-                contactPressureProxy,
-                velReconAvail,
-                relSpeedRecon,
-                reconKineticDelta);
+                record.impulseAlongNormalJ(),   // T-6 UC
+                contactPressureProxy,            // area UC
+                hasStartVelA,
+                hasStartVelB,
+                hasPostVelA,
+                hasPostVelB,
+                relSpeedBefore,
+                relSpeedAfter,
+                deltaRelSpeed,
+                kineticBefore,
+                kineticAfter,
+                kineticDelta);
     }
 
     // Canonical pair key: min(idA,idB)<<32 | max(idA,idB) (matches ImpactRecord contract)

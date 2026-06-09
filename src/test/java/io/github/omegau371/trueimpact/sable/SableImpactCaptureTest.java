@@ -689,10 +689,16 @@ class SableImpactCaptureTest {
         assertEquals(0.0, rec.normalImpulseJ(), 1e-9);
         assertEquals(totalImpulseJ, rec.contactPressureProxy(), 1e-9);
 
-        // T-8 velocity reconstruction: no tick-start vels provided -> unavailable
-        assertFalse(rec.velReconAvailable());
-        assertTrue(Double.isNaN(rec.relSpeedReconEstimate()));
-        assertTrue(Double.isNaN(rec.reconKineticDeltaJ()));
+        // T-8 velocity availability: no tick-start vels, but post vels from snap() are invalid
+        assertFalse(rec.hasStartVelA(),  "no tickStartVels -> hasStartVelA=false");
+        assertFalse(rec.hasStartVelB(),  "no tickStartVels -> hasStartVelB=false");
+        assertFalse(rec.hasPostVelA(),   "snap() has velocityReadValid=false");
+        assertFalse(rec.hasPostVelB(),   "snap() has velocityReadValid=false");
+        assertTrue(Double.isNaN(rec.relativeSpeedBeforeMagnitude()));
+        assertTrue(Double.isNaN(rec.relativeSpeedAfterMagnitude()));
+        assertTrue(Double.isNaN(rec.kineticBeforeJ()));
+        assertTrue(Double.isNaN(rec.kineticAfterJ()));
+        assertTrue(Double.isNaN(rec.kineticDeltaMagnitudeJ()));
     }
 
     @Test
@@ -759,11 +765,11 @@ class SableImpactCaptureTest {
                 SableImpactCapture.stats().lastRecordMetrics().contactType());
     }
 
-    // -- T-8 velocity reconstruction fields -------------------------------------
+    // -- T-8 kinetic energy validation fields ------------------------------------
 
     @Test
-    void t8_velReconAvailable_false_when_no_tick_start_vels() {
-        // No tickStartVels provided -> impulseAlongNormalJ stays 0 -> velReconAvailable=false
+    void t8_all_vel_flags_false_when_snaps_have_no_velocity() {
+        // snap() has velocityReadValid=false; no tickStartVels -> all four flags false
         Map<Integer, BodySnapshot> snaps = Map.of(
                 10, snap(10, 5.0),
                 20, snap(20, 10.0));
@@ -771,23 +777,51 @@ class SableImpactCaptureTest {
 
         ImpactMetrics m = SableImpactCapture.stats().lastActiveImpactMetrics();
         assertNotNull(m);
-        assertFalse(m.velReconAvailable(),
-                "velReconAvailable must be false when tickStartVels is empty");
-        assertTrue(Double.isNaN(m.relSpeedReconEstimate()),
-                "relSpeedReconEstimate must be NaN when velocity reconstruction is unavailable");
-        assertTrue(Double.isNaN(m.reconKineticDeltaJ()),
-                "reconKineticDeltaJ must be NaN when velocity reconstruction is unavailable");
+        assertFalse(m.hasStartVelA(), "no tickStartVels -> hasStartVelA=false");
+        assertFalse(m.hasStartVelB(), "no tickStartVels -> hasStartVelB=false");
+        assertFalse(m.hasPostVelA(),  "snap() velocityReadValid=false");
+        assertFalse(m.hasPostVelB(),  "snap() velocityReadValid=false");
+        assertTrue(Double.isNaN(m.relativeSpeedBeforeMagnitude()), "NaN when start vels missing");
+        assertTrue(Double.isNaN(m.relativeSpeedAfterMagnitude()),  "NaN when post vels missing");
+        assertTrue(Double.isNaN(m.kineticBeforeJ()),   "NaN when start vels missing");
+        assertTrue(Double.isNaN(m.kineticAfterJ()),    "NaN when post vels missing");
+        assertTrue(Double.isNaN(m.kineticDeltaMagnitudeJ()), "NaN when either kinetic unavail");
     }
 
     @Test
-    void t8_velReconAvailable_true_when_tick_start_vels_provided() {
-        // Provide tick-start vels so impulseAlongNormalJ is non-zero -> velReconAvailable=true
-        // Body A: tick-start vel (0,0,0), post-step vel (1,0,0) -> dvAn=1.0
-        // Body B: tick-start vel (0,0,0), post-step vel (-2,0,0) -> dvBn=2.0
-        // normal=(1,0,0), identity quat: impulseAlongNormalJ = (4*1 + 8*2)/2 = 10.0
+    void t8_post_vel_available_from_snapWithVel() {
+        // snapWithVel has velocityReadValid=true; no tickStartVels -> only post flags true
         Map<Integer, BodySnapshot> snaps = Map.of(
-                10, snapWithVel(10, 4.0,  1.0, 0.0, 0.0),
-                20, snapWithVel(20, 8.0, -2.0, 0.0, 0.0));
+                10, snapWithVel(10, 5.0,  3.0, 0.0, 0.0),
+                20, snapWithVel(20, 10.0, -1.0, 0.0, 0.0));
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 100L, 2, snaps, Map.of());
+
+        ImpactMetrics m = SableImpactCapture.stats().lastActiveImpactMetrics();
+        assertNotNull(m);
+        assertFalse(m.hasStartVelA(), "no tickStartVels");
+        assertFalse(m.hasStartVelB(), "no tickStartVels");
+        assertTrue(m.hasPostVelA(),   "snapWithVel velocityReadValid=true");
+        assertTrue(m.hasPostVelB(),   "snapWithVel velocityReadValid=true");
+
+        // relBefore NaN; relAfter computable
+        assertTrue(Double.isNaN(m.relativeSpeedBeforeMagnitude()), "start vels absent");
+        assertEquals(4.0, m.relativeSpeedAfterMagnitude(), 1e-9,
+                "||vA - vB|| = ||(3,0,0) - (-1,0,0)|| = 4.0");
+        assertTrue(Double.isNaN(m.kineticBeforeJ()), "start vels absent");
+        assertFalse(Double.isNaN(m.kineticAfterJ()), "post vels present");
+        assertTrue(Double.isNaN(m.kineticDeltaMagnitudeJ()), "NaN: kBefore unavail");
+    }
+
+    @Test
+    void t8_full_kinetic_computation_when_all_vels_present() {
+        // Both tick-start and post vels present -> all T-8 fields populated
+        // Body A: start=(0,0,0), post=(2,0,0)
+        // Body B: start=(0,0,0), post=(-1,0,0)
+        // relBefore = ||(0,0,0) - (0,0,0)|| = 0.0
+        // relAfter  = ||(2,0,0) - (-1,0,0)|| = 3.0
+        Map<Integer, BodySnapshot> snaps = Map.of(
+                10, snapWithVel(10, 4.0, 2.0, 0.0, 0.0),
+                20, snapWithVel(20, 8.0, -1.0, 0.0, 0.0));
         Map<Integer, double[]> startVels = new HashMap<>();
         startVels.put(10, new double[]{0.0, 0.0, 0.0});
         startVels.put(20, new double[]{0.0, 0.0, 0.0});
@@ -796,16 +830,16 @@ class SableImpactCaptureTest {
 
         ImpactMetrics m = SableImpactCapture.stats().lastActiveImpactMetrics();
         assertNotNull(m);
-        assertTrue(m.velReconAvailable(),
-                "velReconAvailable must be true when impulseAlongNormalJ > 0");
+        assertTrue(m.hasStartVelA()); assertTrue(m.hasStartVelB());
+        assertTrue(m.hasPostVelA());  assertTrue(m.hasPostVelB());
 
         double mEff = 1.0 / (1.0 / 4.0 + 1.0 / 8.0);
-        double impulseNorm = 10.0;  // (4*1 + 8*2)/2
-        double expectedRelSpeed = impulseNorm / mEff;
-        double expectedReconKinetic = 0.5 * mEff * expectedRelSpeed * expectedRelSpeed;
-
-        assertEquals(expectedRelSpeed, m.relSpeedReconEstimate(), 1e-9);
-        assertEquals(expectedReconKinetic, m.reconKineticDeltaJ(), 1e-9);
+        assertEquals(0.0, m.relativeSpeedBeforeMagnitude(), 1e-9, "relBefore");
+        assertEquals(3.0, m.relativeSpeedAfterMagnitude(),  1e-9, "relAfter");
+        assertEquals(3.0, m.deltaRelativeSpeedMagnitude(),  1e-9, "|relAfter - relBefore|");
+        assertEquals(0.0,             m.kineticBeforeJ(), 1e-9, "0.5*mEff*0^2");
+        assertEquals(0.5*mEff*9.0,    m.kineticAfterJ(),  1e-9, "0.5*mEff*3^2");
+        assertEquals(0.5*mEff*9.0,    m.kineticDeltaMagnitudeJ(), 1e-9, "|kAfter - kBefore|");
     }
 
     @Test
@@ -815,21 +849,21 @@ class SableImpactCaptureTest {
         Map<Integer, BodySnapshot> snaps = Map.of(
                 10, snap(10, 4.0),
                 20, snap(20, 6.0));
-        double forceRaw   = 300.0;
-        double substepDt  = 0.05 / 2;   // substepCount=2
-        double expectedJ  = forceRaw * substepDt;
+        double forceRaw     = 300.0;
+        double substepDt    = 0.05 / 2;
+        double expectedJ    = forceRaw * substepDt;
         double expectedMeff = 1.0 / (1.0 / 4.0 + 1.0 / 6.0);
-        double expectedEnergy = (expectedJ * expectedJ) / (2.0 * expectedMeff);
+        double expectedE    = (expectedJ * expectedJ) / (2.0 * expectedMeff);
 
         SableImpactCapture.process(oneContact(10, 20, forceRaw), 102L, 2, snaps, Map.of());
 
         ImpactMetrics m = SableImpactCapture.stats().lastActiveImpactMetrics();
         assertNotNull(m, "forceRaw=300 -> J/contact=7.5 > 5.0 -> ACTIVE_IMPACT");
-        assertEquals(expectedJ,      m.totalImpulseJ(),    1e-9, "totalImpulseJ");
-        assertEquals(expectedMeff,   m.effectiveMassKpg(), 1e-9, "effectiveMassKpg");
-        assertEquals(4.0,            m.massAKpg(),         1e-9, "massA");
-        assertEquals(6.0,            m.massBKpg(),         1e-9, "massB");
-        assertEquals(expectedEnergy, m.impactEnergyJ(),    1e-9, "E=J^2/(2mEff)");
+        assertEquals(expectedJ,    m.totalImpulseJ(),    1e-9, "totalImpulseJ");
+        assertEquals(expectedMeff, m.effectiveMassKpg(), 1e-9, "effectiveMassKpg");
+        assertEquals(4.0,          m.massAKpg(),         1e-9, "massA");
+        assertEquals(6.0,          m.massBKpg(),         1e-9, "massB");
+        assertEquals(expectedE,    m.impactEnergyJ(),    1e-9, "E=J^2/(2mEff)");
     }
 
     @Test

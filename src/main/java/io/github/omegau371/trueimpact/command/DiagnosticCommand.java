@@ -169,30 +169,42 @@ public final class DiagnosticCommand {
                     + " exceeds=" + impact.exceedsThreshold()), false);
         }
 
-        // Line 6: T-8 validation fields for the last ACTIVE_IMPACT.
-        // Shows the full formula trace (J, mEff, mA, mB, E=J^2/2mEff) and velocity
-        // reconstruction if tick-start velocities were available (LOG_RAW_CONTACTS on).
+        // Line 6: T-8 kinetic validation for the last ACTIVE_IMPACT.
+        // Shows formula trace (J, mEff, mA, mB, E) and 3D kinetic energy comparison.
+        // velAvail shows per-body availability; NaN fields indicate missing data.
         if (impact == null) {
             ctx.getSource().sendSuccess(() -> Component.literal(
                     "[TI capture T8-impact] none"), false);
         } else {
-            String t8Line = "[TI capture T8-impact] tick=" + impact.serverTick()
+            // Availability summary: explicit per-body flags
+            String velAvail = "startA:" + b(impact.hasStartVelA())
+                    + " startB:" + b(impact.hasStartVelB())
+                    + " postA:"  + b(impact.hasPostVelA())
+                    + " postB:"  + b(impact.hasPostVelB());
+            boolean kineticAvail = !Double.isNaN(impact.kineticDeltaMagnitudeJ());
+            String kineticLine = kineticAvail
+                    ? (" kBefore=" + fmt(impact.kineticBeforeJ())
+                       + " kAfter="  + fmt(impact.kineticAfterJ())
+                       + " kDelta="  + fmt(impact.kineticDeltaMagnitudeJ())
+                       + " ratio=kDelta/E=" + fmtRatio(impact.kineticDeltaMagnitudeJ(), impact.impactEnergyJ()))
+                    : " kDelta=NaN [start or post vels missing]";
+            if (!impact.hasStartVelA() || !impact.hasStartVelB()) {
+                kineticLine += " [enable 'debug contacts on' for start vels]";
+            }
+            final String t8Full = "[TI capture T8-impact] tick=" + impact.serverTick()
                     + " J=" + fmt(impact.totalImpulseJ())
                     + " mEff=" + fmt(impact.effectiveMassKpg())
                     + " mA=" + fmt(impact.massAKpg())
                     + " mB=" + fmt(impact.massBKpg())
-                    + " E=J^2/(2mEff)=" + fmt(impact.impactEnergyJ());
-            String t8Line2 = impact.velReconAvailable()
-                    ? (" velAvail=true"
-                       + " relSpeedEst=" + fmt(impact.relSpeedReconEstimate())
-                       + " reconE=" + fmt(impact.reconKineticDeltaJ())
-                       + " calibRatio=reconE/E=" + fmtRatio(impact.reconKineticDeltaJ(), impact.impactEnergyJ()))
-                    : " velAvail=false [enable 'debug contacts on' for velocity reconstruction]";
-            final String t8Full = t8Line + t8Line2;
+                    + " E=J^2/(2mEff)=" + fmt(impact.impactEnergyJ())
+                    + " velAvail=[" + velAvail + "]"
+                    + kineticLine;
             ctx.getSource().sendSuccess(() -> Component.literal(t8Full), false);
         }
         return 1;
     }
+
+    private static String b(boolean v) { return v ? "T" : "F"; }
 
     private static String fmtRatio(double num, double den) {
         if (!Double.isFinite(num) || !Double.isFinite(den) || den == 0) return "NaN";
