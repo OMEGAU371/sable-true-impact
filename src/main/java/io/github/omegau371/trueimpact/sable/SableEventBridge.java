@@ -22,7 +22,7 @@ import java.util.Map;
  *
  * [C10-inferred] Called on server thread. T-1 experiment verifies.
  *
- * T-4 is INDEPENDENT of LOG_BODY_SNAPSHOTS — onPostStep() always checks T-4 pending map.
+ * T-4 is INDEPENDENT of LOG_BODY_SNAPSHOTS -- onPostStep() always checks T-4 pending map.
  */
 public final class SableEventBridge {
 
@@ -83,6 +83,7 @@ public final class SableEventBridge {
         prevPrePos.clear();
         lastPostSnaps.clear();
         tickStartVelById.clear();
+        SableImpactCapture.resetCounters();
         capturedServerThread = null;
         lastT4DiagLogTick = -1L;
     }

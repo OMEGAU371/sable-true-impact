@@ -41,6 +41,45 @@ public final class SableImpactCapture {
      */
     static final double IMPACT_IMPULSE_PER_CONTACT_THRESHOLD = 5.0;
 
+    private static long totalProcessCalls;
+    private static long totalRawContactsSeen;
+    private static long totalImpactRecordsCreated;
+    private static long lastTick = -1L;
+    private static int lastRecordCount;
+    private static int lastActiveImpactCount;
+    private static int lastSustainedCount;
+
+    public record RuntimeStats(
+            long totalProcessCalls,
+            long totalRawContactsSeen,
+            long totalImpactRecordsCreated,
+            long lastTick,
+            int lastRecordCount,
+            int lastActiveImpactCount,
+            int lastSustainedCount
+    ) {}
+
+    public static synchronized RuntimeStats stats() {
+        return new RuntimeStats(
+                totalProcessCalls,
+                totalRawContactsSeen,
+                totalImpactRecordsCreated,
+                lastTick,
+                lastRecordCount,
+                lastActiveImpactCount,
+                lastSustainedCount);
+    }
+
+    public static synchronized void resetCounters() {
+        totalProcessCalls = 0L;
+        totalRawContactsSeen = 0L;
+        totalImpactRecordsCreated = 0L;
+        lastTick = -1L;
+        lastRecordCount = 0;
+        lastActiveImpactCount = 0;
+        lastSustainedCount = 0;
+    }
+
     /**
      * Processes raw clearCollisions output for one physics tick.
      *
@@ -58,9 +97,11 @@ public final class SableImpactCapture {
             Map<Integer, BodySnapshot> lastPostSnaps,
             Map<Integer, double[]> tickStartVels) {
 
-        if (data == null || data.length < 15) return List.of();
-
-        int count = data.length / 15;
+        int count = (data != null) ? data.length / 15 : 0;
+        if (count <= 0) {
+            recordStats(serverTick, count, 0, 0, 0);
+            return List.of();
+        }
         double substepDt = (substepCount > 0) ? 0.05 / substepCount : 0.05;
 
         // Aggregate contact records by active-vs-active pair.
@@ -113,15 +154,25 @@ public final class SableImpactCapture {
             }
         }
 
-        if (pairMap.isEmpty()) return List.of();
+        if (pairMap.isEmpty()) {
+            recordStats(serverTick, count, 0, 0, 0);
+            return List.of();
+        }
 
         List<ImpactRecord> result = new ArrayList<>(pairMap.size());
+        int activeImpactCount = 0;
+        int sustainedCount = 0;
         for (PairAccum acc : pairMap.values()) {
             double totalImpulseJ   = acc.sumForce * substepDt;
             double impulsePerPair  = (acc.contactCount > 0)
                     ? totalImpulseJ / acc.contactCount : 0.0;
             ContactType type = (impulsePerPair > IMPACT_IMPULSE_PER_CONTACT_THRESHOLD)
                     ? ContactType.ACTIVE_IMPACT : ContactType.ACTIVE_SUSTAINED;
+            if (type == ContactType.ACTIVE_IMPACT) {
+                activeImpactCount++;
+            } else {
+                sustainedCount++;
+            }
 
             double kA     = (acc.massA > 0) ? 1.0 / acc.massA : 0.0;
             double kB     = (acc.massB > 0) ? 1.0 / acc.massB : 0.0;
@@ -145,7 +196,19 @@ public final class SableImpactCapture {
             DamageResolver.resolve(record);    // Phase 1B: always NONE
         }
 
+        recordStats(serverTick, count, result.size(), activeImpactCount, sustainedCount);
         return result;
+    }
+
+    private static synchronized void recordStats(long tick, int rawContacts, int records,
+                                                  int activeImpacts, int sustained) {
+        totalProcessCalls++;
+        totalRawContactsSeen += rawContacts;
+        totalImpactRecordsCreated += records;
+        lastTick = tick;
+        lastRecordCount = records;
+        lastActiveImpactCount = activeImpacts;
+        lastSustainedCount = sustained;
     }
 
     // Canonical pair key: min(idA,idB)<<32 | max(idA,idB) (matches ImpactRecord contract)

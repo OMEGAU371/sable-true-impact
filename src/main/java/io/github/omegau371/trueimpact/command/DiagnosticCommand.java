@@ -7,6 +7,7 @@ import com.mojang.brigadier.context.CommandContext;
 import io.github.omegau371.trueimpact.diagnostic.T4ApplyForceExperiment;
 import io.github.omegau371.trueimpact.observation.DiagnosticConfig;
 import io.github.omegau371.trueimpact.observation.DiagnosticStateManager;
+import io.github.omegau371.trueimpact.sable.SableImpactCapture;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
@@ -112,6 +113,7 @@ public final class DiagnosticCommand {
 
     private static int status(CommandContext<CommandSourceStack> ctx) {
         int t4Pending = T4ApplyForceExperiment.pendingByKey.size();
+        SableImpactCapture.RuntimeStats stats = SableImpactCapture.stats();
         ctx.getSource().sendSuccess(() -> Component.literal(
                 "[TI diag] enabled=" + DiagnosticConfig.ENABLED
                 + " bodies=" + DiagnosticConfig.LOG_BODY_SNAPSHOTS
@@ -119,6 +121,14 @@ public final class DiagnosticCommand {
                 + " callbacks_t1t2=" + DiagnosticConfig.LOG_T1_CALLBACK_THREAD
                 + " t7=" + DiagnosticConfig.LOG_T7_VELOCITY_RATIO
                 + " t4Pending=" + t4Pending), false);
+        ctx.getSource().sendSuccess(() -> Component.literal(
+                "[TI capture] calls=" + stats.totalProcessCalls()
+                + " rawContacts=" + stats.totalRawContactsSeen()
+                + " records=" + stats.totalImpactRecordsCreated()
+                + " lastTick=" + stats.lastTick()
+                + " lastRecords=" + stats.lastRecordCount()
+                + " lastActiveImpact=" + stats.lastActiveImpactCount()
+                + " lastSustained=" + stats.lastSustainedCount()), false);
         return 1;
     }
 

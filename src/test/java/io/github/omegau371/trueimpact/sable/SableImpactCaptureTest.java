@@ -5,6 +5,7 @@ import io.github.omegau371.trueimpact.observation.BodyType;
 import io.github.omegau371.trueimpact.observation.SnapshotPhase;
 import io.github.omegau371.trueimpact.physics.ContactType;
 import io.github.omegau371.trueimpact.physics.ImpactRecord;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
@@ -16,6 +17,11 @@ import static org.junit.jupiter.api.Assertions.*;
 class SableImpactCaptureTest {
 
     // -- fixture helpers ----------------------------------------------------------
+
+    @BeforeEach
+    void resetCaptureCounters() {
+        SableImpactCapture.resetCounters();
+    }
 
     /** Minimal active snapshot: identity orientation, no valid velocity. */
     private static BodySnapshot snap(int id, double mass) {
@@ -496,5 +502,93 @@ class SableImpactCaptureTest {
         assertFalse(refsConfig,
                 "SableImpactCapture must not reference DiagnosticConfig -- "
                 + "diagnostic gating belongs in the mixin caller, not the capture layer");
+    }
+
+    // -- runtime counters ---------------------------------------------------------
+
+    @Test
+    void stats_increment_process_calls_even_when_no_contacts() {
+        SableImpactCapture.process(new double[0], 11L, 2, Map.of(), Map.of());
+
+        SableImpactCapture.RuntimeStats stats = SableImpactCapture.stats();
+        assertEquals(1L, stats.totalProcessCalls());
+        assertEquals(0L, stats.totalRawContactsSeen());
+        assertEquals(0L, stats.totalImpactRecordsCreated());
+        assertEquals(11L, stats.lastTick());
+        assertEquals(0, stats.lastRecordCount());
+    }
+
+    @Test
+    void stats_count_raw_contacts_and_created_records() {
+        Map<Integer, BodySnapshot> snaps = Map.of(
+                10, snap(10, 5.0),
+                20, snap(20, 8.0));
+        double[] data = concat(
+                oneContact(10, 20, 300.0),
+                oneContact(10, 20, 300.0));
+
+        SableImpactCapture.process(data, 12L, 2, snaps, Map.of());
+
+        SableImpactCapture.RuntimeStats stats = SableImpactCapture.stats();
+        assertEquals(1L, stats.totalProcessCalls());
+        assertEquals(2L, stats.totalRawContactsSeen());
+        assertEquals(1L, stats.totalImpactRecordsCreated());
+        assertEquals(1, stats.lastRecordCount());
+        assertEquals(1, stats.lastActiveImpactCount());
+        assertEquals(0, stats.lastSustainedCount());
+    }
+
+    @Test
+    void stats_count_raw_contacts_even_when_world_pairs_are_discarded() {
+        Map<Integer, BodySnapshot> snaps = Map.of(10, snap(10, 5.0));
+        double[] data = concat(
+                oneContact(10, 99, 300.0),
+                oneContact(77, 88, 300.0));
+
+        SableImpactCapture.process(data, 13L, 2, snaps, Map.of());
+
+        SableImpactCapture.RuntimeStats stats = SableImpactCapture.stats();
+        assertEquals(1L, stats.totalProcessCalls());
+        assertEquals(2L, stats.totalRawContactsSeen());
+        assertEquals(0L, stats.totalImpactRecordsCreated());
+        assertEquals(0, stats.lastRecordCount());
+        assertEquals(0, stats.lastActiveImpactCount());
+        assertEquals(0, stats.lastSustainedCount());
+    }
+
+    @Test
+    void stats_accumulate_across_process_calls_and_track_last_call() {
+        Map<Integer, BodySnapshot> snaps = Map.of(
+                10, snap(10, 5.0),
+                20, snap(20, 8.0));
+
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 21L, 2, snaps, Map.of());
+        SableImpactCapture.process(oneContact(10, 99, 100.0), 22L, 2, snaps, Map.of());
+
+        SableImpactCapture.RuntimeStats stats = SableImpactCapture.stats();
+        assertEquals(2L, stats.totalProcessCalls());
+        assertEquals(2L, stats.totalRawContactsSeen());
+        assertEquals(1L, stats.totalImpactRecordsCreated());
+        assertEquals(22L, stats.lastTick());
+        assertEquals(0, stats.lastRecordCount());
+    }
+
+    @Test
+    void resetCounters_clears_runtime_stats() {
+        Map<Integer, BodySnapshot> snaps = Map.of(
+                10, snap(10, 5.0),
+                20, snap(20, 8.0));
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 31L, 2, snaps, Map.of());
+
+        SableImpactCapture.resetCounters();
+
+        SableImpactCapture.RuntimeStats stats = SableImpactCapture.stats();
+        assertEquals(0L, stats.totalProcessCalls());
+        assertEquals(0L, stats.totalRawContactsSeen());
+        assertEquals(0L, stats.totalImpactRecordsCreated());
+        assertEquals(-1L, stats.lastTick());
+        assertEquals(0, stats.lastRecordCount());
+        assertEquals(0, stats.lastActiveImpactCount());
+        assertEquals(0, stats.lastSustainedCount());
     }
 }
