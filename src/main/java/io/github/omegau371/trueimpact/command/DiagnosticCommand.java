@@ -129,6 +129,11 @@ public final class DiagnosticCommand {
                 + " lastRecords=" + stats.lastRecordCount()
                 + " lastActiveImpact=" + stats.lastActiveImpactCount()
                 + " lastSustained=" + stats.lastSustainedCount()), false);
+        ctx.getSource().sendSuccess(() -> Component.literal(
+                "[TI capture last-hit] tick=" + stats.lastNonZeroRecordTick()
+                + " records=" + stats.lastNonZeroRecordCount()
+                + " activeImpact=" + stats.lastNonZeroActiveImpactCount()
+                + " sustained=" + stats.lastNonZeroSustainedCount()), false);
         return 1;
     }
 

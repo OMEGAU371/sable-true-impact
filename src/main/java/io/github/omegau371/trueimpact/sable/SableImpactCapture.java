@@ -45,18 +45,30 @@ public final class SableImpactCapture {
     private static long totalRawContactsSeen;
     private static long totalImpactRecordsCreated;
     private static long lastTick = -1L;
-    private static int lastRecordCount;
-    private static int lastActiveImpactCount;
-    private static int lastSustainedCount;
+    private static int  lastRecordCount;
+    private static int  lastActiveImpactCount;
+    private static int  lastSustainedCount;
+
+    // Last tick on which at least one ImpactRecord was created.
+    // Not overwritten by zero-record ticks -- useful for manual in-game verification
+    // where status is queried after the bodies have separated.
+    private static long lastNonZeroRecordTick      = -1L;
+    private static int  lastNonZeroRecordCount;
+    private static int  lastNonZeroActiveImpactCount;
+    private static int  lastNonZeroSustainedCount;
 
     public record RuntimeStats(
             long totalProcessCalls,
             long totalRawContactsSeen,
             long totalImpactRecordsCreated,
             long lastTick,
-            int lastRecordCount,
-            int lastActiveImpactCount,
-            int lastSustainedCount
+            int  lastRecordCount,
+            int  lastActiveImpactCount,
+            int  lastSustainedCount,
+            long lastNonZeroRecordTick,
+            int  lastNonZeroRecordCount,
+            int  lastNonZeroActiveImpactCount,
+            int  lastNonZeroSustainedCount
     ) {}
 
     public static synchronized RuntimeStats stats() {
@@ -67,17 +79,25 @@ public final class SableImpactCapture {
                 lastTick,
                 lastRecordCount,
                 lastActiveImpactCount,
-                lastSustainedCount);
+                lastSustainedCount,
+                lastNonZeroRecordTick,
+                lastNonZeroRecordCount,
+                lastNonZeroActiveImpactCount,
+                lastNonZeroSustainedCount);
     }
 
     public static synchronized void resetCounters() {
-        totalProcessCalls = 0L;
-        totalRawContactsSeen = 0L;
+        totalProcessCalls        = 0L;
+        totalRawContactsSeen     = 0L;
         totalImpactRecordsCreated = 0L;
-        lastTick = -1L;
-        lastRecordCount = 0;
-        lastActiveImpactCount = 0;
-        lastSustainedCount = 0;
+        lastTick                 = -1L;
+        lastRecordCount          = 0;
+        lastActiveImpactCount    = 0;
+        lastSustainedCount       = 0;
+        lastNonZeroRecordTick         = -1L;
+        lastNonZeroRecordCount        = 0;
+        lastNonZeroActiveImpactCount  = 0;
+        lastNonZeroSustainedCount     = 0;
     }
 
     /**
@@ -203,12 +223,21 @@ public final class SableImpactCapture {
     private static synchronized void recordStats(long tick, int rawContacts, int records,
                                                   int activeImpacts, int sustained) {
         totalProcessCalls++;
-        totalRawContactsSeen += rawContacts;
+        totalRawContactsSeen     += rawContacts;
         totalImpactRecordsCreated += records;
-        lastTick = tick;
-        lastRecordCount = records;
+        lastTick              = tick;
+        lastRecordCount       = records;
         lastActiveImpactCount = activeImpacts;
-        lastSustainedCount = sustained;
+        lastSustainedCount    = sustained;
+
+        // lastNonZero* fields: only updated when at least one record was produced.
+        // Zero-record ticks (bodies separated, no contact) must not overwrite them.
+        if (records > 0) {
+            lastNonZeroRecordTick         = tick;
+            lastNonZeroRecordCount        = records;
+            lastNonZeroActiveImpactCount  = activeImpacts;
+            lastNonZeroSustainedCount     = sustained;
+        }
     }
 
     // Canonical pair key: min(idA,idB)<<32 | max(idA,idB) (matches ImpactRecord contract)

@@ -573,6 +573,78 @@ class SableImpactCaptureTest {
         assertEquals(0, stats.lastRecordCount());
     }
 
+    // -- lastNonZero* counters ----------------------------------------------------
+
+    @Test
+    void lastNonZero_fields_updated_when_records_produced() {
+        // substepDt=0.025, force=300 -> J=7.5/contact > 5.0 -> ACTIVE_IMPACT
+        Map<Integer, BodySnapshot> snaps = Map.of(
+                10, snap(10, 5.0),
+                20, snap(20, 8.0));
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 42L, 2, snaps, Map.of());
+
+        SableImpactCapture.RuntimeStats s = SableImpactCapture.stats();
+        assertEquals(42L, s.lastNonZeroRecordTick(),
+                "lastNonZeroRecordTick must be set to the tick that produced records");
+        assertEquals(1, s.lastNonZeroRecordCount());
+        assertEquals(1, s.lastNonZeroActiveImpactCount());
+        assertEquals(0, s.lastNonZeroSustainedCount());
+    }
+
+    @Test
+    void lastNonZero_fields_not_overwritten_by_zero_record_tick() {
+        Map<Integer, BodySnapshot> snaps = Map.of(
+                10, snap(10, 5.0),
+                20, snap(20, 8.0));
+
+        // tick 50: impact -> sets lastNonZero* to tick=50, records=1
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 50L, 2, snaps, Map.of());
+
+        // tick 51: no active-vs-active contact -> records=0
+        SableImpactCapture.process(new double[0], 51L, 2, Map.of(), Map.of());
+
+        // tick 52: world-only contact -> records=0
+        SableImpactCapture.process(oneContact(10, 99, 100.0), 52L, 2,
+                Map.of(10, snap(10, 5.0)), Map.of());
+
+        SableImpactCapture.RuntimeStats s = SableImpactCapture.stats();
+
+        // lastTick must reflect the most recent call (tick 52)
+        assertEquals(52L, s.lastTick());
+        assertEquals(0, s.lastRecordCount());
+
+        // lastNonZero* must still reflect tick 50 -- not overwritten by zero-record ticks
+        assertEquals(50L, s.lastNonZeroRecordTick(),
+                "zero-record ticks must not overwrite lastNonZeroRecordTick");
+        assertEquals(1, s.lastNonZeroRecordCount(),
+                "zero-record ticks must not overwrite lastNonZeroRecordCount");
+        assertEquals(1, s.lastNonZeroActiveImpactCount());
+        assertEquals(0, s.lastNonZeroSustainedCount());
+    }
+
+    @Test
+    void lastNonZero_fields_updated_to_latest_nonzero_tick() {
+        // Two separate impact ticks; lastNonZero* should reflect the second one.
+        Map<Integer, BodySnapshot> snaps = Map.of(
+                10, snap(10, 5.0),
+                20, snap(20, 8.0));
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 60L, 2, snaps, Map.of());
+
+        // A zero-record tick in between
+        SableImpactCapture.process(new double[0], 61L, 2, Map.of(), Map.of());
+
+        // Second impact tick (now SUSTAINED: force=100 -> J=2.5/contact < 5.0)
+        SableImpactCapture.process(oneContact(10, 20, 100.0), 62L, 2, snaps, Map.of());
+
+        SableImpactCapture.RuntimeStats s = SableImpactCapture.stats();
+        assertEquals(62L, s.lastNonZeroRecordTick(),
+                "lastNonZeroRecordTick must advance to the second non-zero tick");
+        assertEquals(1, s.lastNonZeroRecordCount());
+        assertEquals(0, s.lastNonZeroActiveImpactCount(),
+                "second impact was SUSTAINED (low impulse), not ACTIVE_IMPACT");
+        assertEquals(1, s.lastNonZeroSustainedCount());
+    }
+
     @Test
     void resetCounters_clears_runtime_stats() {
         Map<Integer, BodySnapshot> snaps = Map.of(
@@ -582,13 +654,18 @@ class SableImpactCaptureTest {
 
         SableImpactCapture.resetCounters();
 
-        SableImpactCapture.RuntimeStats stats = SableImpactCapture.stats();
-        assertEquals(0L, stats.totalProcessCalls());
-        assertEquals(0L, stats.totalRawContactsSeen());
-        assertEquals(0L, stats.totalImpactRecordsCreated());
-        assertEquals(-1L, stats.lastTick());
-        assertEquals(0, stats.lastRecordCount());
-        assertEquals(0, stats.lastActiveImpactCount());
-        assertEquals(0, stats.lastSustainedCount());
+        SableImpactCapture.RuntimeStats s = SableImpactCapture.stats();
+        assertEquals(0L,  s.totalProcessCalls());
+        assertEquals(0L,  s.totalRawContactsSeen());
+        assertEquals(0L,  s.totalImpactRecordsCreated());
+        assertEquals(-1L, s.lastTick());
+        assertEquals(0,   s.lastRecordCount());
+        assertEquals(0,   s.lastActiveImpactCount());
+        assertEquals(0,   s.lastSustainedCount());
+        assertEquals(-1L, s.lastNonZeroRecordTick(),
+                "resetCounters must set lastNonZeroRecordTick to -1");
+        assertEquals(0, s.lastNonZeroRecordCount());
+        assertEquals(0, s.lastNonZeroActiveImpactCount());
+        assertEquals(0, s.lastNonZeroSustainedCount());
     }
 }
