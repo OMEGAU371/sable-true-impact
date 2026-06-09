@@ -29,7 +29,13 @@ public final class SableEventBridge {
     /** Previous PRE_STEP positions for T-7 comparison. Cleared by clearState(). */
     private static final Map<Integer, double[]> prevPrePos = new HashMap<>();
 
-    /** Most recent POST_STEP snapshots, keyed by runtimeId, used by T-3/T-6 in ContactLogger. */
+    /**
+     * Most recent POST_STEP snapshots, keyed by runtimeId.
+     * Populated UNCONDITIONALLY every substep: damage pipeline (SableImpactCapture)
+     * needs this to identify active sub-levels regardless of whether diagnostic
+     * logging is enabled. ContactLogger (T-3/T-6) also reads from this map.
+     * Cleared by clearState().
+     */
     private static final Map<Integer, BodySnapshot> lastPostSnaps = new HashMap<>();
 
     /**
@@ -39,7 +45,11 @@ public final class SableEventBridge {
      */
     private static final Map<Integer, double[]> tickStartVelById = new HashMap<>();
 
-    /** Returns an unmodifiable view of the last POST_STEP snapshots for contact correlation. */
+    /**
+     * Returns an unmodifiable view of the last POST_STEP snapshots for contact correlation.
+     * Always populated each substep regardless of diagnostic flags.
+     * Empty before the first POST_STEP fires or after clearState().
+     */
     public static Map<Integer, BodySnapshot> getLastPostSnapshots() {
         return java.util.Collections.unmodifiableMap(lastPostSnaps);
     }
@@ -135,13 +145,20 @@ public final class SableEventBridge {
     /**
      * Called from DiagnosticPhysicsStepMixin after Rapier3D.step() + updateAllPoses().
      *
-     * T-4 pending is consumed here regardless of ENABLED or LOG_BODY_SNAPSHOTS.
-     * Body snapshots (SNAP / T-7) still require ENABLED=true.
+     * Two unconditional paths:
+     *   1. Post-step snapshot collection into lastPostSnaps -- always runs.
+     *      Required by damage pipeline (SableImpactCapture). No diagnostic flag gate.
+     *   2. T-4 pending measurement -- always runs when a pending entry exists.
+     *
+     * One gated path:
+     *   3. Diagnostic log output (SNAP, T-7) -- only when ENABLED + LOG_BODY_SNAPSHOTS.
      */
     public static void onPostStep(SubLevelPhysicsSystem system) {
         boolean hasPending = !T4ApplyForceExperiment.pendingByKey.isEmpty();
-        // T-4 must run even when ENABLED=false. Body snapshots still require ENABLED.
-        if (!hasPending && !DiagnosticConfig.ENABLED) return;
+        // Always run: lastPostSnaps collection is required by the damage pipeline
+        // (SableImpactCapture must identify active bodies unconditionally).
+        // T-4 measurement also runs unconditionally when pending.
+        // Only log output (SNAP, T-7) is gated on DiagnosticConfig flags below.
 
         long tick = system.getLevel().getGameTime();
         int substep = SableBodyReader.substepIndex(system);
@@ -152,7 +169,7 @@ public final class SableEventBridge {
         ServerSubLevelContainer container = SubLevelContainer.getContainer(system.getLevel());
         if (container == null) {
             if (hasPending) {
-                ExperimentLog.warn("[T-4] DIAG tick={} levelKey='{}' container=null — cannot iterate sublevels. pendingKeys={}",
+                ExperimentLog.warn("[T-4] DIAG tick={} levelKey='{}' container=null -- cannot iterate sublevels. pendingKeys={}",
                         tick, levelKey, T4ApplyForceExperiment.pendingByKey.keySet());
             }
             return;
@@ -175,10 +192,14 @@ public final class SableEventBridge {
                 handleT4PostStep(sl, system, t4, t4Key, dt, tick);
             }
 
-            // Body snapshots (T-7 included) — still gated on ENABLED
+            // Always collect post-step snapshot -- required by damage pipeline.
+            // SableImpactCapture uses lastPostSnaps to identify active bodies
+            // regardless of whether diagnostic logging is enabled.
+            BodySnapshot snap = SableBodyReader.snapshot(sl, system, tick, substep, SnapshotPhase.POST_STEP);
+            lastPostSnaps.put(rid, snap);
+
+            // Diagnostic log output only -- gated on ENABLED + LOG_BODY_SNAPSHOTS.
             if (DiagnosticConfig.ENABLED && DiagnosticConfig.LOG_BODY_SNAPSHOTS) {
-                BodySnapshot snap = SableBodyReader.snapshot(sl, system, tick, substep, SnapshotPhase.POST_STEP);
-                lastPostSnaps.put(rid, snap);
                 logSnap(snap);
                 if (DiagnosticConfig.LOG_T7_VELOCITY_RATIO) {
                     logT7(rid, snap, dt, tick, substep, substepCount);
@@ -186,7 +207,7 @@ public final class SableEventBridge {
             }
         }
 
-        // ── T-4 diagnostics: log when pending exists but no match was found ─────
+        // -- T-4 diagnostics: log when pending exists but no match was found ------
         if (hasPending && !t4MatchedThisPass && tick != lastT4DiagLogTick) {
             lastT4DiagLogTick = tick;
             String ids = (visitedIds != null && visitedIds.length() > 0)
@@ -197,7 +218,7 @@ public final class SableEventBridge {
                     tick, levelKey, T4ApplyForceExperiment.pendingByKey.keySet(), ids);
         }
 
-        // ── T-4 timeout: clear stuck pending after PENDING_TIMEOUT_TICKS ────────
+        // -- T-4 timeout: clear stuck pending after PENDING_TIMEOUT_TICKS ---------
         if (!T4ApplyForceExperiment.pendingByKey.isEmpty()) {
             T4ApplyForceExperiment.pendingByKey.entrySet().removeIf(entry -> {
                 long age = tick - entry.getValue().tickApplied();
@@ -213,7 +234,7 @@ public final class SableEventBridge {
         }
     }
 
-    // ── T-4 post-step measurement ────────────────────────────────────────
+    // -- T-4 post-step measurement -----------------------------------------------
 
     private static void handleT4PostStep(
             ServerSubLevel sl, SubLevelPhysicsSystem system,
@@ -253,7 +274,7 @@ public final class SableEventBridge {
         double inMag = Math.sqrt(p.fx()*p.fx() + p.fy()*p.fy() + p.fz()*p.fz());
         double nx = p.fx()/inMag, ny = p.fy()/inMag, nz = p.fz()/inMag;
 
-        // [C1-audit] Vector projection: deltaVAlongInput = Δv · normalize(input)
+        // [C1-audit] Vector projection: deltaVAlongInput = dv * normalize(input)
         double deltaVAlongInput = dvx*nx + dvy*ny + dvz*nz;
         double measuredMomentumAlongInput = p.massKpg() * deltaVAlongInput;
 
@@ -261,18 +282,18 @@ public final class SableEventBridge {
         double ratio = (Math.abs(measuredMomentumAlongInput) > 1e-12)
                 ? inMag / measuredMomentumAlongInput : Double.NaN;
 
-        // Gravity error estimate (kpg·block/s per substep, g ≈ 0.08 block/s² default)
+        // Gravity error estimate (kpg*block/s per substep, g ~= 0.08 block/s^2 default)
         double gravityErrorEst = p.massKpg() * 0.08 * dt;
         double avMag = Math.sqrt(avx*avx + avy*avy + avz*avz);
 
         ExperimentLog.info("[T-4] RESULT id={} variant={} M={}kpg input=({},{},{}) |input|={} dt={}s" +
                 " vBefore=({},{},{}) vAfter=({},{},{})" +
-                " Δv=({},{},{}) |Δv|={}" +
+                " dv=({},{},{}) |dv|={}" +
                 " deltaVAlongInput={} measuredMomentumAlongInput={}" +
-                " input/(M·deltaVAlongInput)={}" +
-                " [~1=impulse, ~1/dt=force — NOT AUTO-CONCLUDED]" +
-                " angVelAfter=({},{},{}) |ω|={}" +
-                " gravityErrorEst={}kpg·block/s [contact/isolation NOT confirmed]",
+                " input/(M*deltaVAlongInput)={}" +
+                " [~1=impulse, ~1/dt=force -- NOT AUTO-CONCLUDED]" +
+                " angVelAfter=({},{},{}) |omega|={}" +
+                " gravityErrorEst={}kpg*block/s [contact/isolation NOT confirmed]",
                 p.runtimeId(),
                 p.variant(),
                 fmt(p.massKpg()),
@@ -287,7 +308,7 @@ public final class SableEventBridge {
                 fmt(gravityErrorEst));
     }
 
-    // ── T-7 ─────────────────────────────────────────────────────────────────
+    // -- T-7 ---------------------------------------------------------------------
 
     private static void logT7(int id, BodySnapshot post, double dt,
                                long tick, int substep, int substepCount) {
@@ -304,13 +325,13 @@ public final class SableEventBridge {
                 + post.linVelY()*post.linVelY() + post.linVelZ()*post.linVelZ());
         double ratio = (linMag > 1e-9) ? posDelta / (linMag * dt) : Double.NaN;
         ExperimentLog.info("[T-7] tick={} sub={} id={} substeps={} dt={}" +
-                " posDelta={} linVelMag={} ratio=posDelta/(linVelMag·dt)={} [unit UNCONFIRMED]",
+                " posDelta={} linVelMag={} ratio=posDelta/(linVelMag*dt)={} [unit UNCONFIRMED]",
                 tick, substep, id, substepCount,
                 fmt5(dt), fmt6(posDelta), fmt6(linMag),
                 Double.isNaN(ratio) ? "NaN(vel~0)" : fmt4(ratio));
     }
 
-    // ── snapshot log ─────────────────────────────────────────────────────────
+    // -- snapshot log ------------------------------------------------------------
 
     private static void logSnap(BodySnapshot s) {
         String comStr = s.comValid() ? fmt(s.comX())+","+fmt(s.comY())+","+fmt(s.comZ()) : "invalid";
@@ -323,7 +344,7 @@ public final class SableEventBridge {
                 fmt(s.oriX()), fmt(s.oriY()), fmt(s.oriZ()), fmt(s.oriW()));
     }
 
-    // ── format helpers ───────────────────────────────────────────────────────
+    // -- format helpers ----------------------------------------------------------
 
     private static String fmt(double v)  { return String.format("%.4f", v); }
     private static String fmt4(double v) { return String.format("%.4f", v); }

@@ -110,4 +110,13 @@ public class FoundationArchTest {
             noClasses().that().resideInAPackage("..damage..")
                     .should().dependOnClassesThat()
                     .resideInAPackage("net.minecraft.client..");
+
+    // R13: SableImpactCapture (Stage 1 damage pipeline) must not depend on DiagnosticConfig.
+    // The capture layer must run unconditionally; it must never check a diagnostic flag
+    // to decide whether to produce ImpactRecords. Gating belongs in the mixin caller only.
+    @ArchTest
+    static final ArchRule capture_must_not_depend_on_diagnostic_config =
+            noClasses().that().haveSimpleName("SableImpactCapture")
+                    .should().dependOnClassesThat()
+                    .haveSimpleName("DiagnosticConfig");
 }

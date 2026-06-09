@@ -368,6 +368,47 @@ class SableImpactCaptureTest {
         assertEquals(0.0, result.get(0).impulseAlongNormalJ(), 1e-9);
     }
 
+    // -- debug-off scenario -------------------------------------------------------
+
+    /**
+     * SableImpactCapture.process() must produce ImpactRecords whenever lastPostSnaps
+     * is populated with active sub-levels, regardless of any DiagnosticConfig state.
+     *
+     * This test represents the "all diagnostics off" production path:
+     *   - DiagnosticConfig.ENABLED = false (default)
+     *   - DiagnosticConfig.LOG_RAW_CONTACTS = false (default)
+     *   - DiagnosticConfig.LOG_BODY_SNAPSHOTS = false (default)
+     *
+     * SableEventBridge now populates lastPostSnaps unconditionally, so snaps will be
+     * present here. SableImpactCapture must not gate on any diagnostic flag.
+     */
+    @Test
+    void produces_records_with_all_diagnostics_off() {
+        // Verify defaults: all diagnostic flags must be off at test start.
+        // If they were on, this would not be a "debug-off" test.
+        assertFalse(io.github.omegau371.trueimpact.observation.DiagnosticConfig.ENABLED,
+                "DiagnosticConfig.ENABLED must default to false");
+        assertFalse(io.github.omegau371.trueimpact.observation.DiagnosticConfig.LOG_RAW_CONTACTS,
+                "LOG_RAW_CONTACTS must default to false");
+        assertFalse(io.github.omegau371.trueimpact.observation.DiagnosticConfig.LOG_BODY_SNAPSHOTS,
+                "LOG_BODY_SNAPSHOTS must default to false");
+
+        // Simulate what SableEventBridge.onPostStep() now provides unconditionally:
+        // populated lastPostSnaps with two active sub-levels.
+        Map<Integer, BodySnapshot> snaps = Map.of(
+                10, snap(10, 5.0),
+                20, snap(20, 8.0));
+
+        // process() must work and produce a record -- no diagnostic gate should block it.
+        List<ImpactRecord> result = SableImpactCapture.process(
+                oneContact(10, 20, 300.0), 99L, 2, snaps, Map.of());
+
+        assertEquals(1, result.size(),
+                "active-vs-active pair must produce ImpactRecord even when all diagnostics are off");
+        assertEquals(ContactType.ACTIVE_IMPACT, result.get(0).contactType());
+        assertEquals(300.0 * (0.05 / 2), result.get(0).totalImpulseJ(), 1e-9);
+    }
+
     // -- pipeline gate independence -----------------------------------------------
 
     @Test
