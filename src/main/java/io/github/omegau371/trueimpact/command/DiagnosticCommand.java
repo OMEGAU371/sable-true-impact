@@ -218,6 +218,39 @@ public final class DiagnosticCommand {
                     + kineticLine;
             ctx.getSource().sendSuccess(() -> Component.literal(t8Full), false);
         }
+
+        // Line 8: Unit audit -- candidate energy formulas vs kDelta.
+        // Exposes rawSumForce so we can test whether:
+        //   E_current = (rawSum*substepDt)^2/(2mEff)  [current: forceAmountRaw is force]
+        //   E_noDt    = rawSum^2/(2mEff)              [candidate: rawSum is already impulse]
+        // The formula whose E is closest to kDelta identifies the correct unit interpretation.
+        // See docs/phase-1c-damage-model.md T-8 unit audit section.
+        if (impact == null) {
+            ctx.getSource().sendSuccess(() -> Component.literal(
+                    "[TI capture T8-audit] none"), false);
+        } else {
+            double rawSum  = impact.rawSumForce();
+            double subDt   = impact.substepDtUsed();
+            double mEff    = impact.effectiveMassKpg();
+            double kDelta  = impact.kineticDeltaMagnitudeJ();
+            // E_current = J^2/(2mEff) where J = rawSum*substepDt (same as impactEnergyJ)
+            double eCurrent = impact.impactEnergyJ();
+            // E_noDt = rawSum^2/(2mEff) -- candidate if rawSum is already the impulse
+            double eNoDt   = (Double.isFinite(rawSum) && Double.isFinite(mEff) && mEff > 0)
+                    ? (rawSum * rawSum) / (2.0 * mEff) : Double.NaN;
+            final String auditLine = "[TI capture T8-audit] tick=" + impact.serverTick()
+                    + " rawSum=" + fmt(rawSum)
+                    + " substepDt=" + fmt(subDt)
+                    + " contactCount=" + impact.contactCount()
+                    + " J=rawSum*substepDt=" + fmt(impact.totalImpulseJ())
+                    + " E_current=J^2/(2mEff)=" + fmt(eCurrent)
+                    + " E_noDt=rawSum^2/(2mEff)=" + fmt(eNoDt)
+                    + " kDelta=" + (Double.isNaN(kDelta) ? "NaN" : fmt(kDelta))
+                    + " ratio_current=" + fmtRatio(kDelta, eCurrent)
+                    + " ratio_noDt=" + fmtRatio(kDelta, eNoDt)
+                    + " [target: ratio~1.0 for correct formula]";
+            ctx.getSource().sendSuccess(() -> Component.literal(auditLine), false);
+        }
         return 1;
     }
 

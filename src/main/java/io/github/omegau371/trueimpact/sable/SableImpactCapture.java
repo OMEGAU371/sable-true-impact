@@ -433,6 +433,11 @@ public final class SableImpactCapture {
         double kineticDelta  = (Double.isNaN(kineticBefore) || Double.isNaN(kineticAfter))
                 ? Double.NaN : Math.abs(kineticBefore - kineticAfter);
 
+        // Unit audit: expose rawSumForce so DiagnosticCommand can compare candidate formulas.
+        // rawSumForce = totalImpulseJ / substepDt (= sum of forceAmountRaw values for this pair).
+        double substepDt   = record.substepDt();
+        double rawSumForce = (substepDt > 0) ? record.totalImpulseJ() / substepDt : Double.NaN;
+
         return new ImpactMetrics(
                 record.serverTick(),
                 record.bodyPairKey(),
@@ -456,7 +461,10 @@ public final class SableImpactCapture {
                 deltaRelSpeed,
                 kineticBefore,
                 kineticAfter,
-                kineticDelta);
+                kineticDelta,
+                record.contactCount(),
+                rawSumForce,
+                substepDt);
     }
 
     // Canonical pair key: min(idA,idB)<<32 | max(idA,idB) (matches ImpactRecord contract)

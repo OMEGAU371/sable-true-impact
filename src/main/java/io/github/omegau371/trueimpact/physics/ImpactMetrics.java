@@ -18,6 +18,7 @@ package io.github.omegau371.trueimpact.physics;
  *   T-8 -- velocity availability flags (explicit; never inferred from other values)
  *   T-8 -- 3D relative speed (no normal projection; T-6 independent)
  *   T-8 -- kinetic energy comparison
+ *   Unit audit -- raw inputs for candidate formula comparison
  *
  * T-8 design note:
  *   The canonical impulse energy E=J^2/(2*mEff) is validated by comparing it with the
@@ -75,6 +76,16 @@ public record ImpactMetrics(
         //   << 1.0 or >> 1.0 -> systematic offset (gravity contamination, timing mismatch, etc.)
         double kineticBeforeJ,          // 0.5*mEff*relBefore^2; NaN if start vels unavail
         double kineticAfterJ,           // 0.5*mEff*relAfter^2; NaN if post vels unavail
-        double kineticDeltaMagnitudeJ   // |kBefore - kAfter|; NaN if either unavail
+        double kineticDeltaMagnitudeJ,  // |kBefore - kAfter|; NaN if either unavail
+
+        // -- unit audit: raw inputs for candidate formula comparison --
+        // rawSumForce and substepDtUsed let the diagnostic command reconstruct and compare
+        // multiple energy candidate formulas against kineticDeltaMagnitudeJ:
+        //   E_current  = (rawSumForce * substepDtUsed)^2 / (2*mEff) == impactEnergyJ
+        //   E_noDt     = rawSumForce^2 / (2*mEff)  [if rawSum were already the impulse]
+        // Whichever E is closest to kDelta identifies the correct unit interpretation.
+        int    contactCount,            // raw Rapier contact entries for this pair this tick
+        double rawSumForce,             // sum of forceAmountRaw before x substepDtUsed
+        double substepDtUsed            // 0.05 / substepsPerTick; used to produce totalImpulseJ
 
 ) {}

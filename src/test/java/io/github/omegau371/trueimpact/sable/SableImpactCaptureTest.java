@@ -1121,6 +1121,86 @@ class SableImpactCaptureTest {
         assertEquals(expectedE,    m.impactEnergyJ(),    1e-9, "E=J^2/(2mEff)");
     }
 
+    // -- unit audit fields (rawSumForce, substepDtUsed, contactCount) -----------------
+
+    @Test
+    void unit_audit_rawSumForce_is_totalImpulseJ_divided_by_substepDt() {
+        // rawSumForce = sum of forceAmountRaw values = totalImpulseJ / substepDt
+        // substepCount=2 -> substepDt=0.025; forceRaw=300 -> sumForce=300 -> J=7.5
+        // rawSumForce = 7.5 / 0.025 = 300.0
+        Map<Integer, BodySnapshot> snaps = Map.of(
+                10, snap(10, 5.0),
+                20, snap(20, 10.0));
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 700L, 2, snaps, Map.of());
+
+        ImpactMetrics m = SableImpactCapture.stats().lastActiveImpactMetrics();
+        assertNotNull(m);
+        double expectedJ    = 300.0 * (0.05 / 2);   // 7.5
+        double expectedSubDt = 0.05 / 2;             // 0.025
+        double expectedRaw  = expectedJ / expectedSubDt; // 300.0
+        assertEquals(expectedSubDt, m.substepDtUsed(), 1e-9, "substepDtUsed");
+        assertEquals(expectedRaw,   m.rawSumForce(),   1e-9, "rawSumForce = J/substepDt");
+        assertEquals(expectedJ,     m.totalImpulseJ(), 1e-9, "totalImpulseJ round-trip");
+    }
+
+    @Test
+    void unit_audit_contactCount_matches_aggregated_entry_count() {
+        // 3 contact entries for the same pair -> contactCount=3 in ImpactMetrics
+        Map<Integer, BodySnapshot> snaps = Map.of(
+                10, snap(10, 5.0),
+                20, snap(20, 10.0));
+        double[] data = concat(
+                oneContact(10, 20, 300.0),
+                oneContact(10, 20, 300.0),
+                oneContact(10, 20, 300.0));
+        SableImpactCapture.process(data, 701L, 2, snaps, Map.of());
+
+        ImpactMetrics m = SableImpactCapture.stats().lastRecordMetrics();
+        assertNotNull(m);
+        assertEquals(3, m.contactCount(), "contactCount must equal raw entry count for pair");
+        // rawSumForce = 3 contacts * 300 force = 900; J = 900 * 0.025 = 22.5
+        double expectedRaw = 900.0;
+        double expectedJ   = 900.0 * (0.05 / 2);
+        assertEquals(expectedRaw, m.rawSumForce(),   1e-9, "rawSumForce = sumForce (3*300)");
+        assertEquals(expectedJ,   m.totalImpulseJ(), 1e-9, "totalImpulseJ = sumForce*substepDt");
+    }
+
+    @Test
+    void unit_audit_substepDt_consistent_with_substepCount() {
+        // substepCount=4 -> substepDt=0.05/4=0.0125; force=600 -> J=7.5/contact > 5.0 -> IMPACT
+        Map<Integer, BodySnapshot> snaps = Map.of(
+                10, snap(10, 5.0),
+                20, snap(20, 10.0));
+        SableImpactCapture.process(oneContact(10, 20, 600.0), 702L, 4, snaps, Map.of());
+
+        ImpactMetrics m = SableImpactCapture.stats().lastActiveImpactMetrics();
+        assertNotNull(m, "force=600, substepCount=4 -> J/contact=7.5 > 5.0 -> ACTIVE_IMPACT");
+        double expectedSubDt = 0.05 / 4;
+        assertEquals(expectedSubDt, m.substepDtUsed(), 1e-9, "substepDtUsed for substepCount=4");
+        double expectedJ   = 600.0 * expectedSubDt;
+        double expectedRaw = 600.0;
+        assertEquals(expectedJ,   m.totalImpulseJ(), 1e-9);
+        assertEquals(expectedRaw, m.rawSumForce(),   1e-9, "rawSumForce = 600.0 (single force entry)");
+    }
+
+    @Test
+    void unit_audit_fields_propagated_for_sustained_as_well() {
+        // ACTIVE_SUSTAINED records also get rawSumForce/substepDtUsed/contactCount in lastRecordMetrics
+        Map<Integer, BodySnapshot> snaps = Map.of(
+                10, snap(10, 5.0),
+                20, snap(20, 10.0));
+        SableImpactCapture.process(oneContact(10, 20, 100.0), 703L, 2, snaps, Map.of());
+
+        ImpactMetrics m = SableImpactCapture.stats().lastRecordMetrics();
+        assertNotNull(m, "ACTIVE_SUSTAINED still sets lastRecordMetrics");
+        assertEquals(io.github.omegau371.trueimpact.physics.ContactType.ACTIVE_SUSTAINED,
+                m.contactType());
+        assertEquals(1, m.contactCount());
+        assertEquals(0.025, m.substepDtUsed(), 1e-9);
+        double expectedRaw = 100.0;
+        assertEquals(expectedRaw, m.rawSumForce(), 1e-9, "rawSumForce for ACTIVE_SUSTAINED");
+    }
+
     @Test
     void high_energy_metric_sets_exceedsThreshold_but_resolver_still_NONE() {
         Map<Integer, BodySnapshot> snaps = Map.of(
