@@ -791,6 +791,98 @@ class SableImpactCaptureTest {
     }
 
     @Test
+    void t8_stats_invariant_min_le_avg_le_max() {
+        // Fundamental invariant: for any non-empty sample set, min <= avg <= max.
+        // Uses two different velocity pairs to produce two distinct ratios.
+        Map<Integer, double[]> sv = startVels(0.0, 0.0);
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 500L, 2, velSnaps(2.0, -1.0), sv);
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 501L, 2, velSnaps(10.0, -5.0), sv);
+
+        SableImpactCapture.T8Stats t8 = SableImpactCapture.stats().t8Stats();
+        assertEquals(2, t8.sampleCount());
+        assertTrue(t8.minRatio() <= t8.averageRatio(),
+                "invariant violated: min=" + t8.minRatio() + " avg=" + t8.averageRatio());
+        assertTrue(t8.averageRatio() <= t8.maxRatio(),
+                "invariant violated: avg=" + t8.averageRatio() + " max=" + t8.maxRatio());
+    }
+
+    @Test
+    void t8_stats_invariant_min_le_p50_le_max() {
+        // Fundamental invariant: for any non-empty sample set, min <= p50 <= max.
+        Map<Integer, double[]> sv = startVels(0.0, 0.0);
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 510L, 2, velSnaps(2.0, -1.0), sv);
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 511L, 2, velSnaps(10.0, -5.0), sv);
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 512L, 2, velSnaps(5.0, -2.0), sv);
+
+        SableImpactCapture.T8Stats t8 = SableImpactCapture.stats().t8Stats();
+        assertEquals(3, t8.sampleCount());
+        assertTrue(t8.minRatio() <= t8.p50Ratio(),
+                "invariant violated: min=" + t8.minRatio() + " p50=" + t8.p50Ratio());
+        assertTrue(t8.p50Ratio() <= t8.maxRatio(),
+                "invariant violated: p50=" + t8.p50Ratio() + " max=" + t8.maxRatio());
+    }
+
+    @Test
+    void t8_stats_lastRatio_finite_when_samples_exist() {
+        Map<Integer, BodySnapshot> snaps = velSnaps(3.0, -1.0);
+        Map<Integer, double[]> sv = startVels(0.0, 0.0);
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 520L, 2, snaps, sv);
+
+        SableImpactCapture.T8Stats t8 = SableImpactCapture.stats().t8Stats();
+        assertTrue(t8.hasSamples());
+        assertTrue(Double.isFinite(t8.lastRatio()),
+                "lastRatio must be finite when sampleCount > 0, got: " + t8.lastRatio());
+        assertTrue(Double.isFinite(t8.minRatio()),  "minRatio must be finite");
+        assertTrue(Double.isFinite(t8.maxRatio()),  "maxRatio must be finite");
+        assertTrue(Double.isFinite(t8.averageRatio()), "averageRatio must be finite");
+        assertTrue(Double.isFinite(t8.p50Ratio()),  "p50Ratio must be finite");
+    }
+
+    @Test
+    void t8_stats_p50_from_last_32_not_first_8() {
+        // Insert 8 large-ratio samples then 32 small-ratio samples (40 total).
+        // After 40 samples the circular window (capacity 32) contains only the 32 small ones.
+        // p50 must reflect the small group. max must still reflect the large group (tracked overall).
+        double mEff       = 1.0 / (1.0 / 4.0 + 1.0 / 8.0);
+        double J          = 300.0 * 0.025;
+        double impE       = (J * J) / (2.0 * mEff);
+        double ratioLarge = (0.5 * mEff * 100.0 * 100.0) / impE;  // relAfter=100
+        double ratioSmall = (0.5 * mEff * 1.0 * 1.0)     / impE;  // relAfter=1
+
+        Map<Integer, double[]> sv = startVels(0.0, 0.0);
+
+        // 8 large-ratio samples: vA=50, vB=-50 -> relAfter=100
+        for (int i = 0; i < 8; i++) {
+            SableImpactCapture.process(oneContact(10, 20, 300.0), 600L + i, 2,
+                    velSnaps(50.0, -50.0), sv);
+        }
+        // 32 small-ratio samples: vA=0.5, vB=-0.5 -> relAfter=1
+        for (int i = 0; i < 32; i++) {
+            SableImpactCapture.process(oneContact(10, 20, 300.0), 608L + i, 2,
+                    velSnaps(0.5, -0.5), sv);
+        }
+
+        SableImpactCapture.T8Stats t8 = SableImpactCapture.stats().t8Stats();
+        assertEquals(40, t8.sampleCount(), "total samples = 8 + 32");
+
+        // p50 from last 32 samples (all small): ratioSmall
+        assertEquals(ratioSmall, t8.p50Ratio(), 1e-9,
+                "p50 must come from the last 32 window samples (small group), not first 8 (large)");
+        // max tracks ALL 40 samples: ratioLarge
+        assertEquals(ratioLarge, t8.maxRatio(), 1e-9,
+                "max must reflect all-time max across all 40 samples");
+        // min tracks ALL 40 samples: ratioSmall (since ratioSmall < ratioLarge)
+        assertEquals(ratioSmall, t8.minRatio(), 1e-9,
+                "min must reflect all-time min across all 40 samples");
+
+        // Invariants must hold even with mismatched window vs overall tracking
+        assertTrue(t8.minRatio() <= t8.p50Ratio(),    "min <= p50");
+        assertTrue(t8.p50Ratio() <= t8.maxRatio(),    "p50 <= max");
+        assertTrue(t8.minRatio() <= t8.averageRatio(), "min <= avg");
+        assertTrue(t8.averageRatio() <= t8.maxRatio(), "avg <= max");
+    }
+
+    @Test
     void t8_stats_reset_clears_all_fields() {
         Map<Integer, BodySnapshot> snaps = velSnaps(3.0, -1.0);
         Map<Integer, double[]> sv = startVels(0.0, 0.0);

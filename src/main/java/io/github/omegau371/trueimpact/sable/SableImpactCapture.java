@@ -152,6 +152,7 @@ public final class SableImpactCapture {
         t8SumRatio     = 0.0;
         t8WindowHead   = 0;
         t8WindowSize   = 0;
+        Arrays.fill(t8RatioWindow, 0.0);
     }
 
     /**
@@ -344,8 +345,16 @@ public final class SableImpactCapture {
             return new T8Stats(0, Double.NaN, Double.NaN, Double.NaN, Double.NaN, Double.NaN);
         }
         double avg = t8SumRatio / t8SampleCount;
-        // p50 from circular window (last up-to-T8_WINDOW samples)
-        double[] copy = Arrays.copyOf(t8RatioWindow, t8WindowSize);
+        // Extract last t8WindowSize samples in insertion order from the circular buffer.
+        // t8WindowHead points to the NEXT write slot, so the oldest retained sample is at
+        // (t8WindowHead - t8WindowSize + T8_WINDOW) % T8_WINDOW.
+        // Arrays.copyOf(window, size) is WRONG after wrapping: it reads positions [0..size-1]
+        // which are no longer the last 'size' entries when the head has wrapped past T8_WINDOW.
+        double[] copy = new double[t8WindowSize];
+        for (int i = 0; i < t8WindowSize; i++) {
+            int idx = (t8WindowHead - t8WindowSize + i + T8_WINDOW) % T8_WINDOW;
+            copy[i] = t8RatioWindow[idx];
+        }
         Arrays.sort(copy);
         int mid = t8WindowSize / 2;
         double p50 = (t8WindowSize % 2 == 0)
