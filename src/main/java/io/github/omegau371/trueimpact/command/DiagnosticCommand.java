@@ -251,6 +251,37 @@ public final class DiagnosticCommand {
                     + " [target: ratio~1.0 for correct formula]";
             ctx.getSource().sendSuccess(() -> Component.literal(auditLine), false);
         }
+
+        // Line 9: Phase 1C canonical -- velocity-derived kinetic energy.
+        // This is the primary damage energy metric after the T-8 unit audit showed
+        // forceAmount-derived energy is ~1000x off.  Source=velocity requires
+        // 'debug contacts on' for tick-start vels; post vels always available.
+        if (impact == null) {
+            ctx.getSource().sendSuccess(() -> Component.literal(
+                    "[TI capture canonical] none"), false);
+        } else {
+            boolean velFull = impact.hasStartVelA() && impact.hasStartVelB()
+                    && impact.hasPostVelA()  && impact.hasPostVelB();
+            boolean velPartial = !velFull && (impact.hasPostVelA() || impact.hasPostVelB());
+            String sourceTag = velFull ? "velocity-full"
+                    : velPartial ? "velocity-partial [enable 'debug contacts on' for start vels]"
+                    : "unavailable [enable 'debug contacts on']";
+            String kImpactStr = Double.isNaN(impact.kineticImpactEnergyJ())
+                    ? "NaN" : fmt(impact.kineticImpactEnergyJ());
+            String velImpStr  = Double.isNaN(impact.velocityDerivedImpulseJ())
+                    ? "NaN [all 4 vels required]" : fmt(impact.velocityDerivedImpulseJ());
+            final String canonLine = "[TI capture canonical] tick=" + impact.serverTick()
+                    + " source=" + sourceTag
+                    + " kImpact=abs(kBefore-kAfter)=" + kImpactStr
+                    + " kBefore=" + (Double.isNaN(impact.kineticBeforeJ())  ? "NaN" : fmt(impact.kineticBeforeJ()))
+                    + " kAfter="  + (Double.isNaN(impact.kineticAfterJ())   ? "NaN" : fmt(impact.kineticAfterJ()))
+                    + " kDelta="  + (Double.isNaN(impact.kineticDeltaMagnitudeJ()) ? "NaN" : fmt(impact.kineticDeltaMagnitudeJ()))
+                    + " dVRel3D=" + (Double.isNaN(impact.deltaRelativeSpeedMagnitude()) ? "NaN" : fmt(impact.deltaRelativeSpeedMagnitude()))
+                    + " velImpulse=mEff*dVRel3D=" + velImpStr
+                    + " exceeds=" + b(impact.exceedsThreshold())
+                    + " threshold=" + fmt(impact.materialThresholdJ());
+            ctx.getSource().sendSuccess(() -> Component.literal(canonLine), false);
+        }
         return 1;
     }
 

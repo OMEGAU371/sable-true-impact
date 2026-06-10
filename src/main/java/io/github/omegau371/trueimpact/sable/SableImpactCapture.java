@@ -386,9 +386,7 @@ public final class SableImpactCapture {
         double contactPressureProxy = (record.contactCount() > 0)
                 ? record.totalImpulseJ() / record.contactCount()
                 : Double.NaN;
-        double candidateStress = impactEnergyJ;
-        double threshold       = PHASE_1C_PLACEHOLDER_MATERIAL_THRESHOLD_J;
-        boolean exceeds        = Double.isFinite(candidateStress) && candidateStress > threshold;
+        double threshold = PHASE_1C_PLACEHOLDER_MATERIAL_THRESHOLD_J;
 
         // T-8: explicit velocity availability -- tracked independently for each body/direction.
         int idA = record.idA(), idB = record.idB();
@@ -433,8 +431,30 @@ public final class SableImpactCapture {
         double kineticDelta  = (Double.isNaN(kineticBefore) || Double.isNaN(kineticAfter))
                 ? Double.NaN : Math.abs(kineticBefore - kineticAfter);
 
+        // Phase 1C canonical: velocity-derived kinetic impact energy.
+        // kineticImpactEnergyJ = abs(kBefore - kAfter) = kineticDelta (same value, canonical role).
+        // Uses abs() not max(0,...): Rapier spring model + gravity can make kAfter > kBefore
+        // in genuine impacts, so max(0,...) would give 0 when we need a non-zero signal.
+        double kineticImpactEnergyJ = kineticDelta;
+
+        // velocityDerivedImpulseJ = mEff * ||deltaVRel_3D||.
+        // deltaVRel = (vA_after - vA_before) - (vB_after - vB_before): change in relative velocity
+        // using 3D vectors for all four readings. Requires all four velocity availability flags.
+        double velocityDerivedImpulseJ = Double.NaN;
+        if (hasStartVelA && hasStartVelB && hasPostVelA && hasPostVelB && mEffValid) {
+            double dvRelX = (snapA.linVelX() - startVelA[0]) - (snapB.linVelX() - startVelB[0]);
+            double dvRelY = (snapA.linVelY() - startVelA[1]) - (snapB.linVelY() - startVelB[1]);
+            double dvRelZ = (snapA.linVelZ() - startVelA[2]) - (snapB.linVelZ() - startVelB[2]);
+            double dvRelMag = Math.sqrt(dvRelX*dvRelX + dvRelY*dvRelY + dvRelZ*dvRelZ);
+            velocityDerivedImpulseJ = mEff * dvRelMag;
+        }
+
+        // Canonical threshold comparison now uses velocity-derived energy.
+        // NaN when velocity data unavailable (debug contacts off) -> exceeds = false (no spurious damage).
+        double candidateStress = kineticImpactEnergyJ;
+        boolean exceeds = Double.isFinite(candidateStress) && candidateStress > threshold;
+
         // Unit audit: expose rawSumForce so DiagnosticCommand can compare candidate formulas.
-        // rawSumForce = totalImpulseJ / substepDt (= sum of forceAmountRaw values for this pair).
         double substepDt   = record.substepDt();
         double rawSumForce = (substepDt > 0) ? record.totalImpulseJ() / substepDt : Double.NaN;
 
@@ -464,7 +484,9 @@ public final class SableImpactCapture {
                 kineticDelta,
                 record.contactCount(),
                 rawSumForce,
-                substepDt);
+                substepDt,
+                kineticImpactEnergyJ,
+                velocityDerivedImpulseJ);
     }
 
     // Canonical pair key: min(idA,idB)<<32 | max(idA,idB) (matches ImpactRecord contract)

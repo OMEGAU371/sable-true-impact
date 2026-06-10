@@ -9,26 +9,40 @@ package io.github.omegau371.trueimpact.physics;
  *   - contactCount remains diagnostic-only and must not become a damage multiplier
  *   - computed for ALL active-vs-active ImpactRecords (ACTIVE_IMPACT and ACTIVE_SUSTAINED)
  *
- * Field groups (see inline comments for calibration status):
+ * Phase 1C canonical energy: velocity-derived kinetic metric
+ *   T-8 unit audit (0.4.4-phase1c) showed that the Sable forceAmountRaw formula
+ *   (E = J^2/(2*mEff) where J = rawSumForce*substepDt) produces values ~1000x larger than
+ *   the measured kinetic energy change.  Neither E_current nor E_noDt (= rawSum^2/(2*mEff))
+ *   approach kDelta.  Conclusion: Sable forceAmountRaw is a solver/contact diagnostic value,
+ *   NOT a direct physical impulse that can feed the damage formula.
+ *
+ *   The Phase 1C canonical damage energy is now:
+ *     kineticImpactEnergyJ = abs(kBefore - kAfter)  [velocity-derived; NaN when vels unavail]
+ *   with supporting field:
+ *     velocityDerivedImpulseJ = mEff * ||deltaVRel_3D||  [momentum change proxy]
+ *
+ *   forceAmountRaw / impactEnergyJ / rawSumForce are retained as SOLVER DIAGNOSTIC ONLY
+ *   and must NOT enter any damage formula branch.
+ *
+ * kineticImpactEnergyJ uses abs() not max(0,...):
+ *   Rapier's spring contact model and the tick-window timing (kBefore = substep-0 PRE_STEP,
+ *   kAfter = final POST_STEP) mean kAfter can exceed kBefore even during genuine impacts
+ *   (gravity + restitution overshoot).  Using abs() gives a non-zero signal in all impact cases.
+ *   The sign question is deferred to Phase 1D.  When kineticImpactEnergyJ is NaN (velocity
+ *   data unavailable because 'debug contacts on' is off), candidateStressEstimate = NaN and
+ *   exceedsThreshold = false -- no false positives.
+ *
+ * Field groups:
  *
  *   Identification
- *   Canonical energy formula (T-3 confirmed)
- *   Threshold comparison (diagnostic only)
- *   T-6 UNCONFIRMED -- normal-projected fields (separate from T-8)
- *   T-8 -- velocity availability flags (explicit; never inferred from other values)
- *   T-8 -- 3D relative speed (no normal projection; T-6 independent)
- *   T-8 -- kinetic energy comparison
+ *   Solver diagnostic (NOT canonical energy; forceAmount-based; ~1000x off from kDelta)
+ *   Threshold comparison (diagnostic only; now driven by velocity-derived canonical)
+ *   T-6 UNCONFIRMED -- normal-projected fields
+ *   T-8 velocity availability flags
+ *   T-8 3D relative speed
+ *   T-8 kinetic energy comparison
  *   Unit audit -- raw inputs for candidate formula comparison
- *
- * T-8 design note:
- *   The canonical impulse energy E=J^2/(2*mEff) is validated by comparing it with the
- *   OBSERVED kinetic energy change kineticDeltaMagnitudeJ = |kBefore - kAfter|.
- *   Both are computed WITHOUT projecting onto the contact normal, so the comparison is
- *   independent of T-6 (normal direction convention).
- *   If ratio = kineticDelta / impulseEnergy ~= 1.0, the formula is consistent with
- *   the measured velocity change.
- *   Timing caveat: relBefore uses tick-start velocity (substep 0 PRE_STEP), which
- *   includes gravity and other forces over the full tick -- not purely the contact impulse.
+ *   Phase 1C canonical -- velocity-derived kinetic energy
  */
 public record ImpactMetrics(
 
@@ -37,21 +51,26 @@ public record ImpactMetrics(
         long        bodyPairKey,
         ContactType contactType,
 
-        // -- canonical energy formula (T-3 confirmed) --
-        double totalImpulseJ,           // from ImpactRecord; primary formula input
-        double effectiveMassKpg,        // 1/(1/mA+1/mB); formula denominator
+        // -- solver diagnostic: forceAmount-derived (NOT canonical damage energy) --
+        // T-8 audit showed these are ~1000x larger than measured kDelta.
+        // Retained for contact-strength classification (ACTIVE_IMPACT vs ACTIVE_SUSTAINED)
+        // and for future investigation into the Rapier JNI unit conventions.
+        // Do NOT use impactEnergyJ or rawSumForce in any damage formula branch.
+        double totalImpulseJ,           // rawSumForce * substepDtUsed [SOLVER DIAGNOSTIC]
+        double effectiveMassKpg,        // 1/(1/mA+1/mB); used by both solver and velocity paths
         double massAKpg,
         double massBKpg,
-        double impactEnergyJ,           // J^2/(2*mEff) [PRIMARY; T-3 canonical]
+        double impactEnergyJ,           // J^2/(2*mEff) [SOLVER DIAGNOSTIC -- ~1000x off]
 
         // -- threshold comparison (diagnostic only) --
-        double  candidateStressEstimate, // = impactEnergyJ [no geometry yet]
+        // candidateStressEstimate now = kineticImpactEnergyJ (velocity-derived).
+        // NaN when velocity data unavailable -- exceedsThreshold will be false in that case.
+        double  candidateStressEstimate, // = kineticImpactEnergyJ [velocity-derived canonical]
         double  materialThresholdJ,      // placeholder [T-9 calibration pending]
         boolean exceedsThreshold,        // diagnostic; NEVER triggers game effect
 
         // -- T-6 UNCONFIRMED: normal-projected fields --
         // Normal direction convention not verified. Do NOT use as primary formula input.
-        // Kept for T-6 validation when that experiment runs.
         double normalImpulseJ,          // impulseAlongNormalJ [T-6 UC; abs applied]
         double contactPressureProxy,    // J/contactCount [area UC]
 
@@ -65,27 +84,34 @@ public record ImpactMetrics(
         // -- T-8 kinetic: 3D relative speed magnitude (no normal projection) --
         // velBefore = tickStartVels (substep-0 PRE_STEP); velAfter = lastPostSnaps (final substep).
         // NaN when the corresponding availability flag(s) are false.
-        // Timing note: relBefore covers the full tick, including gravity and other forces.
         double relativeSpeedBeforeMagnitude,  // ||vA_start - vB_start||
         double relativeSpeedAfterMagnitude,   // ||vA_post - vB_post||
         double deltaRelativeSpeedMagnitude,   // |relBefore - relAfter|; NaN if either unavail
 
-        // -- T-8 kinetic: energy comparison --
-        // T-8 calibration: ratio = kineticDeltaMagnitudeJ / impactEnergyJ
-        //   ~1.0 -> formula consistent with measured velocity change
-        //   << 1.0 or >> 1.0 -> systematic offset (gravity contamination, timing mismatch, etc.)
+        // -- T-8 kinetic: energy comparison (raw measurement) --
         double kineticBeforeJ,          // 0.5*mEff*relBefore^2; NaN if start vels unavail
         double kineticAfterJ,           // 0.5*mEff*relAfter^2; NaN if post vels unavail
         double kineticDeltaMagnitudeJ,  // |kBefore - kAfter|; NaN if either unavail
 
         // -- unit audit: raw inputs for candidate formula comparison --
-        // rawSumForce and substepDtUsed let the diagnostic command reconstruct and compare
-        // multiple energy candidate formulas against kineticDeltaMagnitudeJ:
-        //   E_current  = (rawSumForce * substepDtUsed)^2 / (2*mEff) == impactEnergyJ
-        //   E_noDt     = rawSumForce^2 / (2*mEff)  [if rawSum were already the impulse]
-        // Whichever E is closest to kDelta identifies the correct unit interpretation.
         int    contactCount,            // raw Rapier contact entries for this pair this tick
         double rawSumForce,             // sum of forceAmountRaw before x substepDtUsed
-        double substepDtUsed            // 0.05 / substepsPerTick; used to produce totalImpulseJ
+        double substepDtUsed,           // 0.05 / substepsPerTick; used to produce totalImpulseJ
+
+        // -- Phase 1C canonical: velocity-derived kinetic energy --
+        // These fields are the primary Phase 1C damage energy candidates.
+        // Both require velocity snapshots (debug contacts on); NaN when unavailable.
+        //
+        // kineticImpactEnergyJ = abs(kBefore - kAfter):
+        //   Uses abs() not max(0,...) because Rapier's spring contact model + gravity over
+        //   the tick window can make kAfter > kBefore even in real impacts.
+        //   Equals kineticDeltaMagnitudeJ in value; exposed separately as the canonical field.
+        //
+        // velocityDerivedImpulseJ = mEff * ||deltaVRel_3D||:
+        //   3D relative velocity change between tick-start and post-last-substep.
+        //   deltaVRel = (vA_after - vA_before) - (vB_after - vB_before) in world space.
+        //   Requires all 4 body velocity readings; NaN if any missing.
+        double kineticImpactEnergyJ,    // abs(kBefore-kAfter); Phase 1C canonical; NaN if unavail
+        double velocityDerivedImpulseJ  // mEff*||deltaVRel_3D||; NaN if any vel missing
 
 ) {}

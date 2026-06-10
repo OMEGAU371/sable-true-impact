@@ -934,11 +934,15 @@ class SableImpactCaptureTest {
         assertEquals(5.0, rec.massAKpg(), 1e-9);
         assertEquals(10.0, rec.massBKpg(), 1e-9);
 
-        // Canonical energy formula
+        // Solver diagnostic energy (impactEnergyJ stays but is no longer canonical)
         assertEquals(expectedEnergy, rec.impactEnergyJ(), 1e-9);
-        assertEquals(expectedEnergy, rec.candidateStressEstimate(), 1e-9);
+        // candidateStressEstimate is now kineticImpactEnergyJ (velocity-derived).
+        // No velocity data in this test -> kineticImpactEnergyJ = NaN -> exceedsThreshold = false.
+        assertTrue(Double.isNaN(rec.candidateStressEstimate()),
+                "candidateStressEstimate is now velocity-derived; NaN when no velocity data");
         assertEquals(50.0, rec.materialThresholdJ(), 1e-9);
-        assertFalse(rec.exceedsThreshold());
+        assertFalse(rec.exceedsThreshold(),
+                "exceedsThreshold = false when candidateStress = NaN (velocity unavailable)");
 
         // Secondary fields
         assertEquals(0.0, rec.normalImpulseJ(), 1e-9);
@@ -1203,17 +1207,29 @@ class SableImpactCaptureTest {
 
     @Test
     void high_energy_metric_sets_exceedsThreshold_but_resolver_still_NONE() {
+        // candidateStressEstimate = kineticImpactEnergyJ (velocity-derived).
+        // Use snapWithVel + startVels to provide velocity data so kImpact can be computed.
+        // Body A: start=(6,0,0), after=(0,0,0); Body B: start=(0,0,0), after=(0,0,0)
+        // relBefore = 6.0; mEff=1/(1/5+1/10)=10/3; kBefore=0.5*(10/3)*36=60J > threshold 50J
+        // relAfter = 0.0; kAfter = 0; kDelta = 60J -> exceedsThreshold = true
         Map<Integer, BodySnapshot> snaps = Map.of(
-                10, snap(10, 5.0),
-                20, snap(20, 10.0));
+                10, snapWithVel(10, 5.0,  0.0, 0.0, 0.0),
+                20, snapWithVel(20, 10.0, 0.0, 0.0, 0.0));
+        Map<Integer, double[]> startVels = new java.util.HashMap<>();
+        startVels.put(10, new double[]{6.0, 0.0, 0.0});
+        startVels.put(20, new double[]{0.0, 0.0, 0.0});
 
         List<ImpactRecord> records = SableImpactCapture.process(
-                oneContact(10, 20, 1000.0), 73L, 2, snaps, Map.of());
+                oneContact(10, 20, 300.0), 73L, 2, snaps, startVels);
 
         ImpactMetrics m = SableImpactCapture.stats().lastActiveImpactMetrics();
         assertNotNull(m);
+        assertTrue(Double.isFinite(m.kineticImpactEnergyJ()),
+                "kineticImpactEnergyJ must be finite when velocity data is available");
+        assertTrue(m.kineticImpactEnergyJ() > 50.0,
+                "kImpact > threshold 50J (kBefore=60J, kAfter=0, kDelta=60J)");
         assertTrue(m.exceedsThreshold(),
-                "Phase 1C threshold comparison is diagnostic-only but should be visible");
+                "Phase 1C threshold comparison uses velocity-derived energy; should exceed 50J");
         assertEquals(io.github.omegau371.trueimpact.damage.DamageResolver.DamageEvent.NONE,
                 io.github.omegau371.trueimpact.damage.DamageResolver.resolve(records.get(0)),
                 "Phase 1C metrics must not enable damage yet");
@@ -1245,5 +1261,125 @@ class SableImpactCaptureTest {
         assertNull(s.lastActiveImpactMetrics(), "resetCounters must clear lastActiveImpactMetrics");
         // verify T-8 fields don't linger after reset
         assertNull(s.lastActiveImpactMetrics()); // already checked above, but explicit
+    }
+
+    // -- Phase 1C canonical velocity-derived fields ------------------------------------
+
+    @Test
+    void canonical_kineticImpactEnergyJ_equals_kineticDeltaMagnitude_when_vels_present() {
+        // kineticImpactEnergyJ = abs(kBefore-kAfter) = kineticDeltaMagnitudeJ (same value).
+        // Both are non-NaN when all four velocities are present.
+        Map<Integer, BodySnapshot> snaps = Map.of(
+                10, snapWithVel(10, 4.0,  3.0, 0.0, 0.0),
+                20, snapWithVel(20, 8.0, -1.0, 0.0, 0.0));
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 800L, 2, snaps, startVels(0.0, 0.0));
+
+        ImpactMetrics m = SableImpactCapture.stats().lastActiveImpactMetrics();
+        assertNotNull(m);
+        assertTrue(Double.isFinite(m.kineticImpactEnergyJ()),
+                "kineticImpactEnergyJ must be finite when velocity data present");
+        assertEquals(m.kineticDeltaMagnitudeJ(), m.kineticImpactEnergyJ(), 1e-9,
+                "kineticImpactEnergyJ == kineticDeltaMagnitudeJ (both = abs(kBefore-kAfter))");
+    }
+
+    @Test
+    void canonical_kineticImpactEnergyJ_nan_when_vels_missing() {
+        // snap() has no valid velocity -> kineticImpactEnergyJ = NaN
+        Map<Integer, BodySnapshot> snaps = Map.of(
+                10, snap(10, 5.0),
+                20, snap(20, 10.0));
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 801L, 2, snaps, Map.of());
+
+        ImpactMetrics m = SableImpactCapture.stats().lastActiveImpactMetrics();
+        assertNotNull(m);
+        assertTrue(Double.isNaN(m.kineticImpactEnergyJ()),
+                "kineticImpactEnergyJ = NaN when velocity data unavailable");
+        assertFalse(m.exceedsThreshold(),
+                "exceedsThreshold = false when canonical energy is NaN (no spurious damage)");
+        assertTrue(Double.isNaN(m.candidateStressEstimate()),
+                "candidateStressEstimate = kineticImpactEnergyJ = NaN");
+    }
+
+    @Test
+    void canonical_velocityDerivedImpulseJ_computed_from_3D_relative_velocity_change() {
+        // Body A: start=(10,0,0), after=(-5,0,0) -> dvA = (-15,0,0)
+        // Body B: start=(-10,0,0), after=(5,0,0) -> dvB = (15,0,0)
+        // deltaVRel_3D = dvA - dvB = (-30,0,0), ||deltaVRel|| = 30
+        // mEff = 1/(1/4+1/8) = 8/3
+        // velocityDerivedImpulseJ = (8/3) * 30 = 80.0
+        Map<Integer, BodySnapshot> snaps = Map.of(
+                10, snapWithVel(10, 4.0, -5.0, 0.0, 0.0),
+                20, snapWithVel(20, 8.0,  5.0, 0.0, 0.0));
+        Map<Integer, double[]> sv = new java.util.HashMap<>();
+        sv.put(10, new double[]{ 10.0, 0.0, 0.0});
+        sv.put(20, new double[]{-10.0, 0.0, 0.0});
+
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 802L, 2, snaps, sv);
+
+        ImpactMetrics m = SableImpactCapture.stats().lastActiveImpactMetrics();
+        assertNotNull(m);
+        assertTrue(m.hasStartVelA()); assertTrue(m.hasStartVelB());
+        assertTrue(m.hasPostVelA());  assertTrue(m.hasPostVelB());
+
+        double mEff     = 1.0 / (1.0 / 4.0 + 1.0 / 8.0);
+        double expected = mEff * 30.0;  // ||dvA - dvB|| = 30
+        assertEquals(expected, m.velocityDerivedImpulseJ(), 1e-9,
+                "velocityDerivedImpulseJ = mEff * ||deltaVRel_3D||");
+    }
+
+    @Test
+    void canonical_velocityDerivedImpulseJ_nan_when_start_vels_missing() {
+        // post vels only (no tick-start vels) -> velocityDerivedImpulseJ = NaN
+        Map<Integer, BodySnapshot> snaps = Map.of(
+                10, snapWithVel(10, 4.0, -5.0, 0.0, 0.0),
+                20, snapWithVel(20, 8.0,  5.0, 0.0, 0.0));
+
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 803L, 2, snaps, Map.of());
+
+        ImpactMetrics m = SableImpactCapture.stats().lastActiveImpactMetrics();
+        assertNotNull(m);
+        assertFalse(m.hasStartVelA()); assertFalse(m.hasStartVelB());
+        assertTrue(Double.isNaN(m.velocityDerivedImpulseJ()),
+                "velocityDerivedImpulseJ = NaN when start vels missing (requires all 4)");
+    }
+
+    @Test
+    void canonical_candidateStress_is_kineticImpactEnergy_not_forceAmount_energy() {
+        // With velocity data: candidateStress = kineticImpactEnergyJ (not impactEnergyJ).
+        // The two values are very different: impactEnergyJ >> kineticImpactEnergyJ.
+        Map<Integer, BodySnapshot> snaps = Map.of(
+                10, snapWithVel(10, 4.0, 0.0, 0.0, 0.0),
+                20, snapWithVel(20, 8.0, 0.0, 0.0, 0.0));
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 804L, 2, snaps, startVels(5.0, -5.0));
+
+        ImpactMetrics m = SableImpactCapture.stats().lastActiveImpactMetrics();
+        assertNotNull(m);
+        // impactEnergyJ (solver diagnostic) is NOT candidateStressEstimate
+        assertNotEquals(m.impactEnergyJ(), m.candidateStressEstimate(),
+                "impactEnergyJ (solver diagnostic) must NOT equal candidateStressEstimate");
+        // candidateStressEstimate == kineticImpactEnergyJ (velocity-derived canonical)
+        assertEquals(m.kineticImpactEnergyJ(), m.candidateStressEstimate(), 1e-9,
+                "candidateStressEstimate == kineticImpactEnergyJ");
+    }
+
+    @Test
+    void canonical_resolver_still_NONE_regardless_of_canonical_energy() {
+        // Ensure DamageResolver.NONE regardless of whether threshold is exceeded.
+        Map<Integer, BodySnapshot> snaps = Map.of(
+                10, snapWithVel(10, 5.0,  0.0, 0.0, 0.0),
+                20, snapWithVel(20, 10.0, 0.0, 0.0, 0.0));
+        Map<Integer, double[]> sv = new java.util.HashMap<>();
+        sv.put(10, new double[]{10.0, 0.0, 0.0});
+        sv.put(20, new double[]{0.0,  0.0, 0.0});
+
+        List<ImpactRecord> records = SableImpactCapture.process(
+                oneContact(10, 20, 300.0), 805L, 2, snaps, sv);
+
+        ImpactMetrics m = SableImpactCapture.stats().lastActiveImpactMetrics();
+        assertNotNull(m);
+        assertTrue(m.exceedsThreshold(), "threshold exceeded with high kImpact; prereq for this test");
+        assertEquals(io.github.omegau371.trueimpact.damage.DamageResolver.DamageEvent.NONE,
+                io.github.omegau371.trueimpact.damage.DamageResolver.resolve(records.get(0)),
+                "DamageResolver must always return NONE in Phase 1C regardless of canonical energy");
     }
 }

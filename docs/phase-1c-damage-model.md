@@ -8,13 +8,36 @@ No block is cracked, accumulated, or destroyed in this phase.
 
 ---
 
+## T-8 Unit Audit Result (0.4.4-phase1c) -- CANONICAL FORMULA PIVOT
+
+T-8 audit (manual test, 2026-06-10) proved the forceAmount-derived formula is invalid:
+
+  J = rawSumForce * substepDt = 49.390 (kpg*block/s)
+  E_current = J^2/(2*mEff) = 4061  (kpg*block^2/s^2)
+  kDelta = abs(kBefore - kAfter) = 4.009
+  ratio = kDelta / E_current = 0.0008  [target: ~1.0]
+
+The ratio is ~0.0008, meaning E_current is ~1250x larger than the measured kinetic energy
+change. E_noDt (treating rawSum as impulse directly) = 7.8M -- even worse.
+
+Root cause: Sable forceAmountRaw is a solver/contact diagnostic value whose physical
+units in the JNI layer are not consistent with a direct impulse measurement.  The Java
+T-3 calibration confirmed forceAmountRaw scales as force (not impulse) but the absolute
+magnitude is still ~1000x off from what velocity measurements indicate.
+
+Resolution: Phase 1C canonical damage energy switches to velocity-derived kinetic metric.
+forceAmountRaw / impactEnergyJ / rawSumForce are retained as SOLVER DIAGNOSTIC ONLY
+and must NOT enter any damage formula branch.
+
+---
+
 ## Inputs available from Phase 1B (ImpactRecord)
 
 | field | status | use in Phase 1C |
 |---|---|---|
-| `totalImpulseJ` | T-3 CONFIRMED | PRIMARY -- all Phase 1C formulas derive from this |
-| `effectiveMassKpg` | derived, ready | PRIMARY -- reduces to a single mass for energy formula |
-| `massAKpg`, `massBKpg` | available | secondary; needed if asymmetric formulas are added later |
+| `totalImpulseJ` | T-3 CONFIRMED for scale | SOLVER DIAGNOSTIC ONLY -- ~1000x off from kDelta |
+| `effectiveMassKpg` | derived, ready | Used by both solver and velocity-derived paths |
+| `massAKpg`, `massBKpg` | available | secondary; needed if asymmetric formulas are added |
 | `contactType` | diagnostic tag | split last-record vs last-impact diagnostics |
 | `contactCount` | UNCONFIRMED as area proxy | diagnostic metadata ONLY; not in any formula |
 | `impulseAlongNormalJ` | T-6 UNCONFIRMED | secondary diagnostic; not primary input |
@@ -22,25 +45,43 @@ No block is cracked, accumulated, or destroyed in this phase.
 
 ---
 
-## Canonical physics model
+## Phase 1C Canonical Physics Model (post T-8 pivot)
 
-### Why J^2/(2*m_eff) and not 0.5*m_eff*v_rel^2
+### Velocity-derived kinetic energy
 
-Both forms are equivalent, but `J` is the directly measured quantity.
-`v_rel_pre` (pre-impact relative velocity along normal) is not directly available:
-  - Post-step closing velocity is near zero (solver resolved the gap constraint).
-  - Tick-start velocity reconstruction gives a proxy but not the true pre-impact value.
+After the T-8 unit audit, the canonical Phase 1C damage energy is:
 
-Using J avoids this unknown. The conversion is:
+  kineticImpactEnergyJ = abs(kBefore - kAfter)
+                       = abs(0.5*mEff*relBefore^2 - 0.5*mEff*relAfter^2)
 
-  J = m_eff * v_rel_pre           (impulse-momentum, restitution e=0 approximation)
-  E = 0.5 * m_eff * v_rel_pre^2
-    = 0.5 * m_eff * (J / m_eff)^2
-    = J^2 / (2 * m_eff)
+where:
+  relBefore = ||vA_start - vB_start||   (tick-start PRE_STEP velocities; requires contacts on)
+  relAfter  = ||vA_post  - vB_post||    (last substep POST_STEP velocities; always available)
+  mEff = 1/(1/mA + 1/mB)
 
-Restitution note: Sable appears to use near-zero restitution for rigid body collisions
-based on T-3 observations (bodies do not bounce after collision). The e=0 approximation
-is conservative and appropriate until T-8 validates the energy scale.
+Uses abs() not max(0,...): Rapier's spring contact model + gravity over the tick window
+can make kAfter > kBefore even during genuine impacts (energy gain from bounce + gravity).
+Using abs() preserves the signal; the sign question is deferred to Phase 1D.
+
+Supporting field:
+  velocityDerivedImpulseJ = mEff * ||deltaVRel_3D||
+  where deltaVRel_3D = (vA_after-vA_before) - (vB_after-vB_before)
+  This is the 3D relative velocity change magnitude * mEff, approximating impulse.
+  Requires all 4 body velocity readings.
+
+### Limitation: tick-window gravity contamination
+
+kBefore uses tick-START velocities (PRE_STEP substep 0). This includes gravity and any
+forces that acted on the bodies BEFORE the current contact. For falling blocks, kBefore
+is inflated by pre-impact gravity. This introduces a systematic overestimate that will
+need correction in Phase 1D (e.g., using per-substep pre/post pairs or normal projection).
+
+### Solver diagnostic retained (NOT canonical)
+
+impactEnergyJ = J^2/(2*mEff) where J = rawSumForce * substepDt
+  retained for: contact-strength classification (IMPACT vs SUSTAINED threshold)
+  retired from: canonical damage energy formula
+  unit status: unknown -- forceAmountRaw JNI units unresolved
 
 ---
 
@@ -48,17 +89,37 @@ is conservative and appropriate until T-8 validates the energy scale.
 
 All five are computed from ImpactRecord fields. None triggers any game effect in Phase 1C.
 
-### 1. impactEnergyJ
+### 0. kineticImpactEnergyJ [Phase 1C CANONICAL]
+
+```
+kineticImpactEnergyJ = abs(kBefore - kAfter)
+                     = kineticDeltaMagnitudeJ
+```
+
+Physical meaning: magnitude of kinetic energy change in the relative reference frame.
+This is the Phase 1C canonical damage input after the T-8 unit audit.
+NaN when velocity snapshots unavailable (contacts debug off); exceedsThreshold = false.
+
+### 0b. velocityDerivedImpulseJ [Phase 1C canonical supporting field]
+
+```
+velocityDerivedImpulseJ = mEff * ||deltaVRel_3D||
+```
+
+Physical meaning: effective mass times the 3D relative velocity change magnitude.
+Approximates the net momentum transfer at the contact.
+NaN when any of the 4 velocity readings is missing.
+
+### 1. impactEnergyJ [SOLVER DIAGNOSTIC -- NOT canonical]
 
 ```
 impactEnergyJ = totalImpulseJ^2 / (2 * effectiveMassKpg)
 ```
 
-Physical meaning: kinetic energy transferred at the contact pair this tick.
-This is the primary candidate for the Phase 1D damage input.
-Unit: kpg * (block/s)^2 (Sable unit system; absolute value TBD by T-8).
-
-Validity: effectiveMassKpg must be > 0 and finite. If NaN, impactEnergyJ = NaN (propagate).
+Physical meaning: UNKNOWN -- forceAmountRaw unit in Sable JNI unresolved.
+T-8 unit audit showed this is ~1000x larger than measured kDelta.
+Use: retained for ACTIVE_IMPACT classification (contact strength); must NOT enter formula.
+Unit: kpg * (block/s)^2 (Sable unit system; scale factor unresolved).
 
 ### 2. normalImpulseJ
 
@@ -82,28 +143,28 @@ Status: contactCount ~ contact area correlation UNCONFIRMED (needs dedicated exp
 Use: diagnostic metadata only. Must NOT appear in any formula until the area experiment passes.
 Output marker: "(area unconfirmed)" label in all diagnostic output.
 
-### 4. candidateStressEstimate
+### 4. candidateStressEstimate [now velocity-derived]
 
 ```
-candidateStressEstimate = impactEnergyJ   [Phase 1C: no geometry scaling yet]
+candidateStressEstimate = kineticImpactEnergyJ   [Phase 1C: velocity-derived, no geometry scaling]
 ```
 
 Physical meaning: placeholder for the stress calculation that will eventually factor in
 block geometry, contact area, and material properties.
-In Phase 1C, this equals impactEnergyJ because no geometry model or area estimate exists.
+In Phase 1C, this equals kineticImpactEnergyJ (velocity-derived canonical).
+NaN when velocity data unavailable -- exceedsThreshold = false in that case.
 Phase 1D will scale this by effective contact area once the area experiment (T-10) passes.
-Output marker: "(no geometry scaling)" label.
 
 ### 5. materialThresholdJ and exceedsThreshold
 
 ```
-materialThresholdJ  = PLACEHOLDER_HARDNESS_FACTOR * CALIBRATION_CONST
-exceedsThreshold    = (impactEnergyJ > materialThresholdJ)
+materialThresholdJ  = PLACEHOLDER (50.0; calibrate in T-9)
+exceedsThreshold    = (kineticImpactEnergyJ > materialThresholdJ)
 ```
 
-Physical meaning: comparison between impact energy and a material-derived fracture threshold.
-Phase 1C status: BlockHardnessProfile not yet implemented. Use a hardcoded test value for
-one reference block type (e.g., stone: hardness=1.5, threshold to be calibrated by T-9).
+Physical meaning: comparison between velocity-derived impact energy and a material fracture threshold.
+Phase 1C status: BlockHardnessProfile not yet implemented. Placeholder 50.0.
+exceedsThreshold = false when kineticImpactEnergyJ is NaN (contacts debug off).
 
 PLACEHOLDER value for Phase 1C diagnostic: materialThresholdJ = 50.0 (arbitrary; calibrate in T-9).
 
@@ -166,33 +227,23 @@ must not overwrite it.
 
 ## Phase 1C experiment sequence
 
-### T-8: impactEnergyJ scale validation
+### T-8: impactEnergyJ scale validation -- CONCLUDED (FAILED; canonical pivot complete)
 
 Goal: confirm impactEnergyJ = J^2/(2*m_eff) is proportional to observable velocity change.
 
-Method:
-  - Enable `/trueimpact debug contacts on` so tick-start velocities are captured.
-  - Compare impulse energy with 3D relative-speed kinetic change:
-    `kineticDeltaMagnitudeJ = abs(0.5*mEff*relBefore^2 - 0.5*mEff*relAfter^2)`.
-  - T-8 ratio is `kineticDeltaMagnitudeJ / impactEnergyJ`.
-  - This comparison deliberately does NOT project onto the contact normal because T-6
-    normal direction convention is still unconfirmed.
+Result (0.4.4-phase1c manual test):
+  ratio = kDelta / E_current = 0.0008  [~1000x off; T-8 FAILED]
 
-Expected status output:
+Conclusion: forceAmountRaw-derived energy is NOT a valid physical impulse energy for
+damage purposes. Phase 1C canonical switched to velocity-derived kineticImpactEnergyJ.
+The T-8 rolling stats remain in place to monitor the ratio for diagnostic reference,
+but the formula is no longer the canonical damage energy.
 
+Status output after pivot:
 ```
-[TI capture T8-stats] n=N last=L min=MIN avg=AVG p50=P50 max=MAX
-[TI capture T8-impact] ... E=J^2/(2mEff)=X velAvail=[startA:T startB:T postA:T postB:T] kBefore=A kAfter=B kDelta=C ratio=kDelta/E=R
+[TI capture T8-audit] rawSum=X substepDt=Y contactCount=N J=Z E_current=C E_noDt=D kDelta=K ratio_current=R ratio_noDt=S
+[TI capture canonical] source=velocity-full kImpact=K kBefore=B kAfter=A kDelta=D dVRel3D=V velImpulse=I exceeds=T/F threshold=50.000
 ```
-
-T8-stats samples only ACTIVE_IMPACT records where both impactEnergyJ and
-kineticDeltaMagnitudeJ are finite. `p50` is the median of the last 32 valid samples;
-`avg/min/max` are over all valid samples since reset.
-
-External sanity check:
-  - For controlled drops, compare impactEnergyJ with m*g*H as a secondary check.
-  - This is not the primary T-8 ratio because world gravity, solver losses, and contact
-    timing can contaminate one-tick velocity snapshots.
 
 ### T-9: materialThresholdJ calibration
 
