@@ -273,6 +273,7 @@ public final class DiagnosticCommand {
             final String canonLine = "[TI capture canonical] tick=" + impact.serverTick()
                     + " source=" + sourceTag
                     + " kImpact=abs(kBefore-kAfter)=" + kImpactStr
+                    + " kBand=" + KImpactBand.of(impact.kineticImpactEnergyJ())
                     + " kBefore=" + (Double.isNaN(impact.kineticBeforeJ())  ? "NaN" : fmt(impact.kineticBeforeJ()))
                     + " kAfter="  + (Double.isNaN(impact.kineticAfterJ())   ? "NaN" : fmt(impact.kineticAfterJ()))
                     + " kDelta="  + (Double.isNaN(impact.kineticDeltaMagnitudeJ()) ? "NaN" : fmt(impact.kineticDeltaMagnitudeJ()))
@@ -286,6 +287,7 @@ public final class DiagnosticCommand {
     }
 
     private static String b(boolean v) { return v ? "T" : "F"; }
+
 
     private static String fmtRatio(double num, double den) {
         if (!Double.isFinite(num) || !Double.isFinite(den) || den == 0) return "NaN";

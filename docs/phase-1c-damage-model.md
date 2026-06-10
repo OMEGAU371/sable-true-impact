@@ -225,6 +225,33 @@ must not overwrite it.
 
 ---
 
+## kBand calibration labels (temporary, display-only)
+
+kBand is a human-readable label shown in `[TI capture canonical]` alongside kineticImpactEnergyJ.
+It exists ONLY to help manual calibration sessions -- watching the label while triggering impacts
+of different intensities and recording whether the label matches intuition.
+
+**These are NOT material thresholds.** They must never enter a damage formula, a threshold
+comparison, or a resolver branch. They are deleted or revised once T-9 establishes real values.
+
+| kBand  | kImpact range (kpg*block^2/s^2) | Intended intuition |
+|--------|----------------------------------|--------------------|
+| NONE   | NaN (velocity data unavailable)  | No measurement     |
+| TOUCH  | [0, 1)                           | Barely touching     |
+| LIGHT  | [1, 5)                           | Light contact       |
+| MEDIUM | [5, 20)                          | Moderate impact     |
+| HEAVY  | [20, 50)                         | Hard impact         |
+| SEVERE | [50, inf)                        | Very hard impact    |
+
+The boundary values (1, 5, 20, 50) are initial guesses based on the first test observation
+(kImpact=13.898 → MEDIUM for a moderate block collision). They will be revised after
+several calibration sessions using different mass, height, and material combinations.
+
+Boundary interpretation: lower bound is inclusive, upper bound is exclusive.
+e.g. kImpact=5.000 → MEDIUM (not LIGHT); kImpact=4.999 → LIGHT.
+
+---
+
 ## Phase 1C experiment sequence
 
 ### T-8: impactEnergyJ scale validation -- CONCLUDED (FAILED; canonical pivot complete)
