@@ -14,8 +14,8 @@ package io.github.omegau371.trueimpact.command;
  *   TOUCH  [0, 1)
  *   LIGHT  [1, 5)
  *   MEDIUM [5, 20)
- *   HEAVY  [20, 50)
- *   SEVERE [50, inf)
+ *   HEAVY  [20, 80)
+ *   SEVERE [80, inf)
  *
  * No Minecraft imports -- safe to unit-test without the game runtime.
  */
@@ -28,7 +28,7 @@ final class KImpactBand {
         if (kImpact <  1.0) return "TOUCH";
         if (kImpact <  5.0) return "LIGHT";
         if (kImpact < 20.0) return "MEDIUM";
-        if (kImpact < 50.0) return "HEAVY";
+        if (kImpact < 80.0) return "HEAVY";
         return "SEVERE";
     }
 }

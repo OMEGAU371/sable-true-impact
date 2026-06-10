@@ -240,12 +240,17 @@ comparison, or a resolver branch. They are deleted or revised once T-9 establish
 | TOUCH  | [0, 1)                           | Barely touching     |
 | LIGHT  | [1, 5)                           | Light contact       |
 | MEDIUM | [5, 20)                          | Moderate impact     |
-| HEAVY  | [20, 50)                         | Hard impact         |
-| SEVERE | [50, inf)                        | Very hard impact    |
+| HEAVY  | [20, 80)                         | Hard impact         |
+| SEVERE | [80, inf)                        | Very hard impact    |
 
-The boundary values (1, 5, 20, 50) are initial guesses based on the first test observation
-(kImpact=13.898 → MEDIUM for a moderate block collision). They will be revised after
-several calibration sessions using different mass, height, and material combinations.
+Calibration data collected (2026-06-11):
+  kImpact ~0.016 -> TOUCH (very light contact)
+  kImpact ~13.9  -> MEDIUM (moderate block collision)
+  kImpact ~156   -> SEVERE (hard impact)
+
+Boundary revision history:
+  v0.4.6: HEAVY [20,50), SEVERE >=50  (initial guesses)
+  v0.4.7: HEAVY [20,80), SEVERE >=80  (raised after kImpact=156 at hard impact; 50 was too sensitive)
 
 Boundary interpretation: lower bound is inclusive, upper bound is exclusive.
 e.g. kImpact=5.000 → MEDIUM (not LIGHT); kImpact=4.999 → LIGHT.

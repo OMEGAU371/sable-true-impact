@@ -15,8 +15,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  *   TOUCH  = [0, 1)
  *   LIGHT  = [1, 5)
  *   MEDIUM = [5, 20)
- *   HEAVY  = [20, 50)
- *   SEVERE = [50, inf)
+ *   HEAVY  = [20, 80)
+ *   SEVERE = [80, inf)
  */
 class KImpactBandTest {
 
@@ -93,17 +93,22 @@ class KImpactBandTest {
     }
 
     @Test
-    void just_below_50_produces_HEAVY() {
-        assertEquals("HEAVY", KImpactBand.of(49.9999));
+    void fifty_produces_HEAVY() {
+        assertEquals("HEAVY", KImpactBand.of(50.0));
     }
 
     @Test
-    void exactly_50_produces_SEVERE() {
-        assertEquals("SEVERE", KImpactBand.of(50.0));
+    void just_below_80_produces_HEAVY() {
+        assertEquals("HEAVY", KImpactBand.of(79.9999));
+    }
+
+    @Test
+    void exactly_80_produces_SEVERE() {
+        assertEquals("SEVERE", KImpactBand.of(80.0));
     }
 
     @Test
     void eighty_produces_SEVERE() {
-        assertEquals("SEVERE", KImpactBand.of(80.0));
+        assertEquals("SEVERE", KImpactBand.of(156.0));
     }
 }
