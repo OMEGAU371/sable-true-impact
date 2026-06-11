@@ -67,7 +67,11 @@ public abstract class DiagnosticContactCaptureMixin {
         Map<Integer, double[]>    tickStartVels = SableEventBridge.getTickStartVels();
         long tick                      = level.getGameTime();
 
-        // PATH A: damage pipeline -- MUST remain outside any diagnostic gate.
+        // PATH A: Phase 1C gate -- pause capture when all diagnostics off (DamageResolver=NONE).
+        // SableImpactCapture checks its own captureGate flag (not DiagnosticConfig directly, R13 safe).
+        // REMOVE this gate in Phase 2 when DamageResolver produces real effects and
+        // PATH A must run unconditionally to power production damage.
+        SableImpactCapture.setCaptureGate(DiagnosticConfig.ENABLED);
         SableImpactCapture.process(data, tick, substepCount, snaps, tickStartVels);
 
         // PATH B: diagnostic logging -- gated on LOG_RAW_CONTACTS.

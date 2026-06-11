@@ -443,16 +443,15 @@ class SableImpactCaptureTest {
     // -- debug-off scenario -------------------------------------------------------
 
     /**
-     * SableImpactCapture.process() must produce ImpactRecords whenever lastPostSnaps
-     * is populated with active sub-levels, regardless of any DiagnosticConfig state.
+     * SableImpactCapture.process() works correctly when called directly regardless of
+     * DiagnosticConfig state or the captureGate flag, as long as the gate is active.
      *
-     * This test represents the "all diagnostics off" production path:
-     *   - DiagnosticConfig.ENABLED = false (default)
-     *   - DiagnosticConfig.LOG_RAW_CONTACTS = false (default)
-     *   - DiagnosticConfig.LOG_BODY_SNAPSHOTS = false (default)
+     * In production, DiagnosticContactCaptureMixin sets captureGate = DiagnosticConfig.ENABLED
+     * before each clearCollisions() call. In these unit tests, process() is called directly
+     * (bypassing the mixin); the gate defaults to true after @BeforeEach resetCounters().
      *
-     * SableEventBridge now populates lastPostSnaps unconditionally, so snaps will be
-     * present here. SableImpactCapture must not gate on any diagnostic flag.
+     * This test verifies the internal pipeline logic, not the mixin gate behavior.
+     * See capture_returns_empty_when_gate_inactive() for gate behavior.
      */
     @Test
     void produces_records_with_all_diagnostics_off() {
@@ -1259,8 +1258,81 @@ class SableImpactCaptureTest {
         assertEquals(0, s.lastNonZeroSustainedCount());
         assertNull(s.lastRecordMetrics(),       "resetCounters must clear lastRecordMetrics");
         assertNull(s.lastActiveImpactMetrics(), "resetCounters must clear lastActiveImpactMetrics");
+        assertTrue(s.captureActive(),
+                "resetCounters must restore captureGate to true (active) for test isolation");
         // verify T-8 fields don't linger after reset
         assertNull(s.lastActiveImpactMetrics()); // already checked above, but explicit
+    }
+
+    // -- Part B: capture gate (performance) ----------------------------------------
+
+    @Test
+    void capture_returns_empty_and_no_counters_when_gate_inactive() {
+        // Gate inactive: process() must be a no-op -- no counter increments, no records.
+        // In production, DiagnosticContactCaptureMixin sets gate=false when ENABLED=false.
+        // Tests simulate this by calling setCaptureGate(false) directly.
+        Map<Integer, BodySnapshot> snaps = Map.of(
+                10, snap(10, 5.0),
+                20, snap(20, 8.0));
+
+        SableImpactCapture.setCaptureGate(false);
+        List<io.github.omegau371.trueimpact.physics.ImpactRecord> result =
+                SableImpactCapture.process(oneContact(10, 20, 300.0), 900L, 2, snaps, Map.of());
+
+        assertTrue(result.isEmpty(), "gate inactive -> empty list");
+        SableImpactCapture.RuntimeStats s = SableImpactCapture.stats();
+        assertEquals(0L, s.totalProcessCalls(),      "gate inactive -> no call counted");
+        assertEquals(0L, s.totalRawContactsSeen(),   "gate inactive -> no contacts counted");
+        assertEquals(0L, s.totalImpactRecordsCreated(), "gate inactive -> no records counted");
+        assertFalse(s.captureActive(),               "captureActive reflects gate state");
+    }
+
+    @Test
+    void capture_resumes_after_gate_reactivated() {
+        SableImpactCapture.setCaptureGate(false);
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 901L, 2,
+                Map.of(10, snap(10, 5.0), 20, snap(20, 8.0)), Map.of());
+        assertEquals(0L, SableImpactCapture.stats().totalProcessCalls(),
+                "still 0 while gate is inactive");
+
+        SableImpactCapture.setCaptureGate(true);
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 902L, 2,
+                Map.of(10, snap(10, 5.0), 20, snap(20, 8.0)), Map.of());
+        assertEquals(1L, SableImpactCapture.stats().totalProcessCalls(),
+                "gate reactivated -> call is counted");
+        assertTrue(SableImpactCapture.stats().captureActive());
+    }
+
+    @Test
+    void resetCounters_restores_gate_to_active() {
+        SableImpactCapture.setCaptureGate(false);
+        assertFalse(SableImpactCapture.isCaptureActive(), "gate is inactive before reset");
+
+        SableImpactCapture.resetCounters();
+
+        assertTrue(SableImpactCapture.isCaptureActive(),
+                "resetCounters() must restore gate to true for test isolation");
+        assertTrue(SableImpactCapture.stats().captureActive());
+    }
+
+    @Test
+    void gate_inactive_does_not_affect_subsequent_active_session() {
+        // Simulate: all-off → all-on → impact occurs → counters correct
+        SableImpactCapture.setCaptureGate(false);
+        for (int i = 0; i < 5; i++) {
+            SableImpactCapture.process(oneContact(10, 20, 300.0), 910L + i, 2,
+                    Map.of(10, snap(10, 5.0), 20, snap(20, 8.0)), Map.of());
+        }
+        assertEquals(0L, SableImpactCapture.stats().totalProcessCalls(),
+                "5 calls while inactive -> still 0");
+
+        SableImpactCapture.setCaptureGate(true);
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 915L, 2,
+                Map.of(10, snap(10, 5.0), 20, snap(20, 8.0)), Map.of());
+
+        assertEquals(1L, SableImpactCapture.stats().totalProcessCalls(),
+                "exactly 1 call after reactivation");
+        assertEquals(1L, SableImpactCapture.stats().totalImpactRecordsCreated());
     }
 
     // -- Phase 1C canonical velocity-derived fields ------------------------------------

@@ -184,6 +184,13 @@ public final class SableEventBridge {
             return;
         }
 
+        // Phase 1C: skip expensive sub-level iteration when all diagnostics are off
+        // and no T-4 measurement is pending. lastPostSnaps stays empty (already cleared);
+        // SableImpactCapture.captureGate is also false (mixin sets it from ENABLED),
+        // so process() skips contact array parsing too -- no wasted CPU after all-off.
+        // REMOVE this gate in Phase 2 when DamageResolver produces real effects.
+        if (!DiagnosticConfig.ENABLED && !hasPending) return;
+
         List<ServerSubLevel> subLevels = container.getAllSubLevels();
         boolean t4MatchedThisPass = false;
         StringBuilder visitedIds = hasPending ? new StringBuilder() : null;

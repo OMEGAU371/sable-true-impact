@@ -8,8 +8,10 @@ import io.github.omegau371.trueimpact.damage.MaterialThresholdProfile;
 import io.github.omegau371.trueimpact.diagnostic.T4ApplyForceExperiment;
 import io.github.omegau371.trueimpact.observation.DiagnosticConfig;
 import io.github.omegau371.trueimpact.observation.DiagnosticStateManager;
+import io.github.omegau371.trueimpact.physics.ContactType;
 import io.github.omegau371.trueimpact.physics.ImpactMetrics;
 import io.github.omegau371.trueimpact.sable.SableImpactCapture;
+import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
@@ -116,85 +118,109 @@ public final class DiagnosticCommand {
     private static int status(CommandContext<CommandSourceStack> ctx) {
         int t4Pending = T4ApplyForceExperiment.pendingByKey.size();
         SableImpactCapture.RuntimeStats stats = SableImpactCapture.stats();
-        ctx.getSource().sendSuccess(() -> Component.literal(
-                "[TI diag] enabled=" + DiagnosticConfig.ENABLED
+        boolean captureActive = stats.captureActive();
+
+        // Line 1: [TI diag] flag summary.
+        // GRAY when enabled; DARK_GRAY when disabled (nothing is logging).
+        ChatFormatting diagColor = DiagnosticConfig.ENABLED ? ChatFormatting.GRAY : ChatFormatting.DARK_GRAY;
+        String diagText = "[TI diag] enabled=" + DiagnosticConfig.ENABLED
                 + " bodies=" + DiagnosticConfig.LOG_BODY_SNAPSHOTS
                 + " contacts=" + DiagnosticConfig.LOG_RAW_CONTACTS
                 + " callbacks_t1t2=" + DiagnosticConfig.LOG_T1_CALLBACK_THREAD
                 + " t7=" + DiagnosticConfig.LOG_T7_VELOCITY_RATIO
-                + " t4Pending=" + t4Pending), false);
-        ctx.getSource().sendSuccess(() -> Component.literal(
-                "[TI capture] calls=" + stats.totalProcessCalls()
-                + " rawContacts=" + stats.totalRawContactsSeen()
-                + " records=" + stats.totalImpactRecordsCreated()
-                + " lastTick=" + stats.lastTick()
-                + " lastRecords=" + stats.lastRecordCount()
-                + " lastActiveImpact=" + stats.lastActiveImpactCount()
-                + " lastSustained=" + stats.lastSustainedCount()), false);
-        ctx.getSource().sendSuccess(() -> Component.literal(
-                "[TI capture last-hit] tick=" + stats.lastNonZeroRecordTick()
-                + " records=" + stats.lastNonZeroRecordCount()
-                + " activeImpact=" + stats.lastNonZeroActiveImpactCount()
-                + " sustained=" + stats.lastNonZeroSustainedCount()), false);
+                + " t4Pending=" + t4Pending;
+        ctx.getSource().sendSuccess(() -> Component.literal(diagText).withStyle(diagColor), false);
+
+        // Lines 2-3: capture counters.
+        // DARK_GRAY when capture is paused (all diagnostics off -- enable any flag to resume).
+        // AQUA when capture is active.
+        if (!captureActive) {
+            ctx.getSource().sendSuccess(() -> Component.literal(
+                    "[TI capture] PAUSED -- enable any /trueimpact debug flag to resume capture")
+                    .withStyle(ChatFormatting.DARK_GRAY), false);
+            ctx.getSource().sendSuccess(() -> Component.literal(
+                    "[TI capture last-hit] PAUSED")
+                    .withStyle(ChatFormatting.DARK_GRAY), false);
+        } else {
+            String captureLine = "[TI capture] calls=" + stats.totalProcessCalls()
+                    + " rawContacts=" + stats.totalRawContactsSeen()
+                    + " records=" + stats.totalImpactRecordsCreated()
+                    + " lastTick=" + stats.lastTick()
+                    + " lastRecords=" + stats.lastRecordCount()
+                    + " lastActiveImpact=" + stats.lastActiveImpactCount()
+                    + " lastSustained=" + stats.lastSustainedCount();
+            ctx.getSource().sendSuccess(() -> Component.literal(captureLine)
+                    .withStyle(ChatFormatting.AQUA), false);
+            String lastHitLine = "[TI capture last-hit] tick=" + stats.lastNonZeroRecordTick()
+                    + " records=" + stats.lastNonZeroRecordCount()
+                    + " activeImpact=" + stats.lastNonZeroActiveImpactCount()
+                    + " sustained=" + stats.lastNonZeroSustainedCount();
+            ctx.getSource().sendSuccess(() -> Component.literal(lastHitLine)
+                    .withStyle(ChatFormatting.AQUA), false);
+        }
         // Line 4: most recent record of any ContactType (ACTIVE_IMPACT or ACTIVE_SUSTAINED).
+        // GOLD for ACTIVE_IMPACT, YELLOW for ACTIVE_SUSTAINED, DARK_GRAY for none.
         ImpactMetrics rec = stats.lastRecordMetrics();
         if (rec == null) {
             ctx.getSource().sendSuccess(() -> Component.literal(
-                    "[TI capture last-record-metrics] none"), false);
+                    "[TI capture last-record-metrics] none").withStyle(ChatFormatting.DARK_GRAY), false);
         } else {
-            ctx.getSource().sendSuccess(() -> Component.literal(
-                    "[TI capture last-record-metrics] tick=" + rec.serverTick()
+            ChatFormatting recColor = rec.contactType() == ContactType.ACTIVE_IMPACT
+                    ? ChatFormatting.GOLD : ChatFormatting.YELLOW;
+            String recText = "[TI capture last-record-metrics] tick=" + rec.serverTick()
                     + " type=" + rec.contactType()
                     + " energyJ=" + fmt(rec.impactEnergyJ())
                     + " normalJ=" + fmt(rec.normalImpulseJ())
                     + " pressureProxy=" + fmt(rec.contactPressureProxy())
                     + " stress=" + fmt(rec.candidateStressEstimate())
                     + " thresholdJ=" + fmt(rec.materialThresholdJ())
-                    + " exceeds=" + rec.exceedsThreshold()), false);
+                    + " exceeds=" + rec.exceedsThreshold();
+            ctx.getSource().sendSuccess(() -> Component.literal(recText).withStyle(recColor), false);
         }
 
         // Line 5: most recent ACTIVE_IMPACT record only (null if none since last reset).
+        // GOLD when present (always ACTIVE_IMPACT), DARK_GRAY for none.
         ImpactMetrics impact = stats.lastActiveImpactMetrics();
         if (impact == null) {
             ctx.getSource().sendSuccess(() -> Component.literal(
-                    "[TI capture last-impact-metrics] none"), false);
+                    "[TI capture last-impact-metrics] none").withStyle(ChatFormatting.DARK_GRAY), false);
         } else {
-            ctx.getSource().sendSuccess(() -> Component.literal(
-                    "[TI capture last-impact-metrics] tick=" + impact.serverTick()
+            String impText = "[TI capture last-impact-metrics] tick=" + impact.serverTick()
                     + " type=" + impact.contactType()
                     + " energyJ=" + fmt(impact.impactEnergyJ())
                     + " normalJ=" + fmt(impact.normalImpulseJ()) + "(T6-UC)"
                     + " pressureProxy=" + fmt(impact.contactPressureProxy()) + "(areaUC)"
                     + " stress=" + fmt(impact.candidateStressEstimate())
                     + " thresholdJ=" + fmt(impact.materialThresholdJ())
-                    + " exceeds=" + impact.exceedsThreshold()), false);
+                    + " exceeds=" + impact.exceedsThreshold();
+            ctx.getSource().sendSuccess(() -> Component.literal(impText).withStyle(ChatFormatting.GOLD), false);
         }
 
-        // Line 6: T-8 rolling calibration stats (kineticDelta/impulseEnergy ratio)
+        // Line 6: T-8 rolling calibration stats.
+        // LIGHT_PURPLE when samples present, DARK_GRAY when empty.
         SableImpactCapture.T8Stats t8 = stats.t8Stats();
         if (!t8.hasSamples()) {
             ctx.getSource().sendSuccess(() -> Component.literal(
                     "[TI capture T8-stats] n=0 [no valid T-8 samples yet;"
                     + " need ACTIVE_IMPACT with finite kineticDelta"
-                    + " -- enable 'debug contacts on']"), false);
+                    + " -- enable 'debug contacts on']").withStyle(ChatFormatting.DARK_GRAY), false);
         } else {
-            ctx.getSource().sendSuccess(() -> Component.literal(
-                    "[TI capture T8-stats] n=" + t8.sampleCount()
+            String t8StatText = "[TI capture T8-stats] n=" + t8.sampleCount()
                     + " last=" + fmt(t8.lastRatio())
                     + " min="  + fmt(t8.minRatio())
                     + " avg="  + fmt(t8.averageRatio())
                     + " p50="  + fmt(t8.p50Ratio())
-                    + " max="  + fmt(t8.maxRatio())), false);
+                    + " max="  + fmt(t8.maxRatio());
+            ctx.getSource().sendSuccess(() -> Component.literal(t8StatText)
+                    .withStyle(ChatFormatting.LIGHT_PURPLE), false);
         }
 
         // Line 7: T-8 kinetic validation for the last ACTIVE_IMPACT.
-        // Shows formula trace (J, mEff, mA, mB, E) and 3D kinetic energy comparison.
-        // velAvail shows per-body availability; NaN fields indicate missing data.
+        // LIGHT_PURPLE when present, DARK_GRAY for none.
         if (impact == null) {
             ctx.getSource().sendSuccess(() -> Component.literal(
-                    "[TI capture T8-impact] none"), false);
+                    "[TI capture T8-impact] none").withStyle(ChatFormatting.DARK_GRAY), false);
         } else {
-            // Availability summary: explicit per-body flags
             String velAvail = "startA:" + b(impact.hasStartVelA())
                     + " startB:" + b(impact.hasStartVelB())
                     + " postA:"  + b(impact.hasPostVelA())
@@ -217,28 +243,23 @@ public final class DiagnosticCommand {
                     + " E=J^2/(2mEff)=" + fmt(impact.impactEnergyJ())
                     + " velAvail=[" + velAvail + "]"
                     + kineticLine;
-            ctx.getSource().sendSuccess(() -> Component.literal(t8Full), false);
+            ctx.getSource().sendSuccess(() -> Component.literal(t8Full)
+                    .withStyle(ChatFormatting.LIGHT_PURPLE), false);
         }
 
-        // Line 8: Unit audit -- candidate energy formulas vs kDelta.
-        // Exposes rawSumForce so we can test whether:
-        //   E_current = (rawSum*substepDt)^2/(2mEff)  [current: forceAmountRaw is force]
-        //   E_noDt    = rawSum^2/(2mEff)              [candidate: rawSum is already impulse]
-        // The formula whose E is closest to kDelta identifies the correct unit interpretation.
-        // See docs/phase-1c-damage-model.md T-8 unit audit section.
+        // Line 8: Unit audit (solver diagnostic -- forceAmount-based; NOT canonical).
+        // GRAY -- audit/reference data, not primary calibration signal.
         if (impact == null) {
             ctx.getSource().sendSuccess(() -> Component.literal(
-                    "[TI capture T8-audit] none"), false);
+                    "[TI capture T8-audit] none").withStyle(ChatFormatting.DARK_GRAY), false);
         } else {
-            double rawSum  = impact.rawSumForce();
-            double subDt   = impact.substepDtUsed();
-            double mEff    = impact.effectiveMassKpg();
-            double kDelta  = impact.kineticDeltaMagnitudeJ();
-            // E_current = J^2/(2mEff) where J = rawSum*substepDt (same as impactEnergyJ)
+            double rawSum   = impact.rawSumForce();
+            double subDt    = impact.substepDtUsed();
+            double mEff8    = impact.effectiveMassKpg();
+            double kDelta8  = impact.kineticDeltaMagnitudeJ();
             double eCurrent = impact.impactEnergyJ();
-            // E_noDt = rawSum^2/(2mEff) -- candidate if rawSum is already the impulse
-            double eNoDt   = (Double.isFinite(rawSum) && Double.isFinite(mEff) && mEff > 0)
-                    ? (rawSum * rawSum) / (2.0 * mEff) : Double.NaN;
+            double eNoDt    = (Double.isFinite(rawSum) && Double.isFinite(mEff8) && mEff8 > 0)
+                    ? (rawSum * rawSum) / (2.0 * mEff8) : Double.NaN;
             final String auditLine = "[TI capture T8-audit] tick=" + impact.serverTick()
                     + " rawSum=" + fmt(rawSum)
                     + " substepDt=" + fmt(subDt)
@@ -246,24 +267,26 @@ public final class DiagnosticCommand {
                     + " J=rawSum*substepDt=" + fmt(impact.totalImpulseJ())
                     + " E_current=J^2/(2mEff)=" + fmt(eCurrent)
                     + " E_noDt=rawSum^2/(2mEff)=" + fmt(eNoDt)
-                    + " kDelta=" + (Double.isNaN(kDelta) ? "NaN" : fmt(kDelta))
-                    + " ratio_current=" + fmtRatio(kDelta, eCurrent)
-                    + " ratio_noDt=" + fmtRatio(kDelta, eNoDt)
+                    + " kDelta=" + (Double.isNaN(kDelta8) ? "NaN" : fmt(kDelta8))
+                    + " ratio_current=" + fmtRatio(kDelta8, eCurrent)
+                    + " ratio_noDt=" + fmtRatio(kDelta8, eNoDt)
                     + " [target: ratio~1.0 for correct formula]";
-            ctx.getSource().sendSuccess(() -> Component.literal(auditLine), false);
+            ctx.getSource().sendSuccess(() -> Component.literal(auditLine)
+                    .withStyle(ChatFormatting.GRAY), false);
         }
 
         // Line 9: Phase 1C canonical -- velocity-derived kinetic energy.
-        // This is the primary damage energy metric after the T-8 unit audit showed
-        // forceAmount-derived energy is ~1000x off.  Source=velocity requires
-        // 'debug contacts on' for tick-start vels; post vels always available.
+        // LIGHT_PURPLE for velocity-full source, YELLOW for partial, DARK_GRAY for none/unavailable.
         if (impact == null) {
             ctx.getSource().sendSuccess(() -> Component.literal(
-                    "[TI capture canonical] none"), false);
+                    "[TI capture canonical] none").withStyle(ChatFormatting.DARK_GRAY), false);
         } else {
-            boolean velFull = impact.hasStartVelA() && impact.hasStartVelB()
-                    && impact.hasPostVelA()  && impact.hasPostVelB();
+            boolean velFull    = impact.hasStartVelA() && impact.hasStartVelB()
+                    && impact.hasPostVelA() && impact.hasPostVelB();
             boolean velPartial = !velFull && (impact.hasPostVelA() || impact.hasPostVelB());
+            ChatFormatting canonColor = velFull    ? ChatFormatting.LIGHT_PURPLE
+                    : velPartial ? ChatFormatting.YELLOW
+                    : ChatFormatting.DARK_GRAY;
             String sourceTag = velFull ? "velocity-full"
                     : velPartial ? "velocity-partial [enable 'debug contacts on' for start vels]"
                     : "unavailable [enable 'debug contacts on']";
@@ -282,23 +305,21 @@ public final class DiagnosticCommand {
                     + " velImpulse=mEff*dVRel3D=" + velImpStr
                     + " exceeds=" + b(impact.exceedsThreshold())
                     + " threshold=" + fmt(impact.materialThresholdJ());
-            ctx.getSource().sendSuccess(() -> Component.literal(canonLine), false);
+            ctx.getSource().sendSuccess(() -> Component.literal(canonLine).withStyle(canonColor), false);
         }
 
         // Line 10: T-9 diagnostic material threshold.
-        // Phase 1C: no victim block detected -- always shows GENERIC.
-        // Phase 1D will replace GENERIC with the actual block under the contact point
-        // via BlockHardnessProfile. wouldExceed is diagnostic-only; DamageResolver = NONE.
+        // RED when wouldExceed=true (impact candidate), GRAY when false, DARK_GRAY for none.
         if (impact == null) {
             ctx.getSource().sendSuccess(() -> Component.literal(
-                    "[TI capture threshold] none"), false);
+                    "[TI capture threshold] none").withStyle(ChatFormatting.DARK_GRAY), false);
         } else {
-            // No victim block info available yet -- use GENERIC placeholder.
             MaterialThresholdProfile.MaterialClass matClass =
                     MaterialThresholdProfile.MaterialClass.GENERIC;
             double matThreshold = MaterialThresholdProfile.threshold(matClass);
             double kImpact      = impact.kineticImpactEnergyJ();
             boolean wouldExceed = MaterialThresholdProfile.wouldExceed(kImpact, matClass);
+            ChatFormatting threshColor = wouldExceed ? ChatFormatting.RED : ChatFormatting.GRAY;
             final String threshLine = "[TI capture threshold]"
                     + " materialClass=" + matClass
                     + " threshold=" + fmt(matThreshold)
@@ -307,7 +328,7 @@ public final class DiagnosticCommand {
                     + " wouldExceed=" + wouldExceed
                     + " note=diagnostic-only"
                     + " [victim block unknown; Phase 1D: BlockHardnessProfile]";
-            ctx.getSource().sendSuccess(() -> Component.literal(threshLine), false);
+            ctx.getSource().sendSuccess(() -> Component.literal(threshLine).withStyle(threshColor), false);
         }
         return 1;
     }

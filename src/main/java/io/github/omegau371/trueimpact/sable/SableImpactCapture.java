@@ -45,6 +45,22 @@ public final class SableImpactCapture {
     static final double IMPACT_IMPULSE_PER_CONTACT_THRESHOLD = 5.0;
     static final double PHASE_1C_PLACEHOLDER_MATERIAL_THRESHOLD_J = 50.0;
 
+    // -- Phase 1C capture gate --------------------------------------------------
+    // When false, process() is a no-op: returns empty list, no counter increments.
+    // Controlled externally by DiagnosticContactCaptureMixin (sets it based on
+    // DiagnosticConfig.ENABLED before each clearCollisions() call).
+    // This class does NOT import DiagnosticConfig (R13 preserved).
+    //
+    // CONTRACT: Remove this gate in Phase 2 when DamageResolver produces real effects.
+    // Until then, running the capture pipeline with DamageResolver=NONE wastes CPU.
+    private static volatile boolean captureGate = true;  // default true for test isolation
+
+    /** Set by DiagnosticContactCaptureMixin. true = active; false = paused. */
+    public static synchronized void setCaptureGate(boolean active) { captureGate = active; }
+
+    /** Returns true when the capture pipeline is currently active. */
+    public static boolean isCaptureActive() { return captureGate; }
+
     private static long totalProcessCalls;
     private static long totalRawContactsSeen;
     private static long totalImpactRecordsCreated;
@@ -110,7 +126,8 @@ public final class SableImpactCapture {
             int  lastNonZeroSustainedCount,
             ImpactMetrics lastRecordMetrics,         // any ContactType, most recent record
             ImpactMetrics lastActiveImpactMetrics,   // ACTIVE_IMPACT only; null if none since reset
-            T8Stats       t8Stats                    // rolling calibration stats
+            T8Stats       t8Stats,                   // rolling calibration stats
+            boolean       captureActive              // false when gate is closed (all diagnostics off)
     ) {}
 
     public static synchronized RuntimeStats stats() {
@@ -128,7 +145,8 @@ public final class SableImpactCapture {
                 lastNonZeroSustainedCount,
                 lastRecordMetrics,
                 lastActiveImpactMetrics,
-                snapshotT8Stats());
+                snapshotT8Stats(),
+                captureGate);
     }
 
     public static synchronized void resetCounters() {
@@ -145,6 +163,7 @@ public final class SableImpactCapture {
         lastNonZeroSustainedCount    = 0;
         lastRecordMetrics        = null;
         lastActiveImpactMetrics  = null;
+        captureGate    = true;  // restore to active so subsequent enable works
         t8SampleCount  = 0;
         t8LastRatio    = Double.NaN;
         t8MinRatio     = Double.NaN;
@@ -171,6 +190,14 @@ public final class SableImpactCapture {
             int substepCount,
             Map<Integer, BodySnapshot> lastPostSnaps,
             Map<Integer, double[]> tickStartVels) {
+
+        // Phase 1C gate: skip all processing when capture is paused (all diagnostics off).
+        // captureGate is set by DiagnosticContactCaptureMixin based on DiagnosticConfig.ENABLED.
+        // No counters are incremented when gated -- callers see a stable stats() after all-off.
+        // REMOVE this gate in Phase 2 when DamageResolver produces real effects.
+        if (!captureGate) {
+            return List.of();
+        }
 
         int count = (data != null) ? data.length / 15 : 0;
         if (count <= 0) {
