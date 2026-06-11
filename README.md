@@ -3,9 +3,9 @@
 Physics-based impact damage for Sable physical structures.  
 NeoForge 1.21.1 · Java 21 · Mod ID: `true_impact`
 
-> **Status: Phase 0 — Foundation (Gate 0 passed 2026-06-05)**  
-> No physics features are active yet.  
-> Establishes project scaffold, test infrastructure, and `/trueimpact status` diagnostics.
+> **Status: Phase 1C — Damage Calculation Diagnostics (automated gate passed 2026-06-12)**  
+> Phase 1C is diagnostic-only: DamageResolver always returns NONE. No block is cracked, accumulated, or destroyed.  
+> See `docs/phase-1c-damage-model.md` for the canonical model and `docs/acceptance-gates.md` for the gate checklist.
 
 ## Requirements
 
@@ -21,11 +21,22 @@ NeoForge 1.21.1 · Java 21 · Mod ID: `true_impact`
 /trueimpact status
 ```
 
-Prints:
-- Mod version (read from live `ModContainer`, always matches the deployed JAR)
-- Minecraft / NeoForge version
-- Sable detection status and version
-- Runtime environment (Client / Dedicated Server)
+Prints mod version, Minecraft/NeoForge version, Sable detection status, and runtime environment.
+
+### Diagnostics (Phase 1C)
+
+```
+/trueimpact debug status
+/trueimpact debug contacts on|off
+/trueimpact debug all off
+```
+
+`debug status` shows 10 color-coded lines covering: capture counters, last-record metrics,
+T-8 rolling ratio stats, Phase 1C canonical `kineticImpactEnergyJ` + `kBand`, and T-9
+material threshold comparison. **All output is read-only diagnostic only — no game effects.**
+
+`contacts on` is required for velocity-derived `kineticImpactEnergyJ` (tick-start velocities).
+Without it, `kImpact=NaN` and `exceedsThreshold=false`.
 
 ## Building
 

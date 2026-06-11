@@ -178,18 +178,53 @@ After active-vs-active collision (bodies allowed to collide freely):
 
 ---
 
-## Gate 1C -- Phase 1C Damage Calculation (Diagnostics Only) *(in progress)*
+## Gate 1C -- Phase 1C Damage Calculation (Diagnostics Only) -- AUTOMATED PASSED (2026-06-12)
 
-See `docs/phase-1c-damage-model.md` for design.
+**Objective:** First quantitative pass through the damage pipeline. All outputs diagnostic-only.
 DamageResolver remains NONE throughout Phase 1C.
 
-- [x] `ImpactMetrics` record defined in physics/ with all five calculation outputs
-- [x] SableImpactCapture computes ImpactMetrics for every active-vs-active ImpactRecord
+See `docs/phase-1c-damage-model.md` for design and experiment results.
+
+### Build verification (automated)
+
+| check | result |
+|---|---|
+| `.\gradlew.bat build` | PASS -- all tests pass, ArchUnit 0 violations |
+| ArchUnit R9: physics/ no TI internal deps | PASS |
+| ArchUnit R11: damage/ no diagnostic/observation deps | PASS |
+| ArchUnit R13: SableImpactCapture no DiagnosticConfig dep | PASS |
+| KImpactBandTest: 18 cases | PASS |
+| MaterialThresholdProfileTest: 34 cases | PASS |
+| SableImpactCaptureTest: 30+ cases (T8Stats invariants, canonical velocity, gate) | PASS |
+| DamageResolverTest: resolver always NONE | PASS |
+
+### Implementation checklist
+
+- [x] `ImpactMetrics` record defined in `physics/` with 28 fields (solver diagnostic, velocity-derived canonical, T-8 velocity, threshold, unit audit groups)
+- [x] `SableImpactCapture.computeMetrics()` computes ImpactMetrics for every active-vs-active ImpactRecord
 - [x] `/trueimpact debug status` outputs last-record and last-impact ImpactMetrics (no gameplay effect)
-- [x] `/trueimpact debug status` outputs T-8 rolling ratio stats (n/last/min/avg/p50/max)
-- [ ] T-8: impactEnergyJ = J^2/(2*m_eff) validated against 3D relative kinetic delta
-- [ ] materialThresholdJ placeholder calibrated against one known-fragile block type
-- [x] DamageResolver still returns NONE; exceedsThreshold is logged only
+- [x] `/trueimpact debug status` outputs T-8 rolling ratio stats (n/last/min/avg/p50/max); circular buffer bug fixed (0.4.1)
+- [x] T-8 experiment concluded: `E_current = J^2/(2mEff)` is ~1000x off from `kDelta`; forceAmountRaw-derived energy retired from canonical; pivot to velocity-derived complete
+- [x] `kineticImpactEnergyJ = abs(kBefore - kAfter)` established as Phase 1C canonical damage energy
+- [x] `KImpactBand` display labels (TOUCH/LIGHT/MEDIUM/HEAVY/SEVERE) added; calibrated against observed data; SEVERE boundary raised 50->80 (0.4.7)
+- [x] `MaterialThresholdProfile` T-9 diagnostic infrastructure in `damage/` (SOFT_SOIL/WOOD/STONE/METAL/HIGH_STRENGTH/GENERIC; placeholder thresholds 5/20/50/120/300); no Minecraft imports
+- [x] Capture gate P0 fix: O(n) contact loop and sub-level loop skipped when `DiagnosticConfig.ENABLED=false`
+- [x] Colored `/trueimpact debug status` output (P1): 10 lines with per-category ChatFormatting colors
+- [x] DamageResolver still returns NONE; `exceedsThreshold` is logged only, no game effect
+
+### Manual calibration pending
+
+- [ ] T-9: Drop sub-levels onto target block types; record `kImpact` per material class; adjust
+  `MaterialThresholdProfile` thresholds until visible impacts exceed threshold and gentle contacts
+  do not. Current values are placeholder (SOFT_SOIL=5, WOOD=20, STONE=50, METAL=120, HIGH_STRENGTH=300).
+
+### Phase 1C architectural guarantees established
+
+- `kineticImpactEnergyJ` and `kBand` flow to diagnostic output only; never enter `DamageResolver`
+- `contactCount` not used in any formula (diagnostic metadata only)
+- `impulseAlongNormalJ` not primary input (T-6 unconfirmed)
+- `captureGate` is R13-safe (no `DiagnosticConfig` import in `SableImpactCapture`)
+- Phase 1C performance gates marked for removal in Phase 2 when DamageResolver produces real effects
 
 ---
 

@@ -6,7 +6,7 @@ Guidance for Claude Code when working in this repository.
 
 **True Impact (Rewrite)** -- NeoForge 1.21.1 / Java 21 mod adding physics-based impact damage
 on top of the Sable physics engine.
-Mod ID: `true_impact` | Package root: `io.github.omegau371.trueimpact` | Current phase: `0.3.0-phase1b`
+Mod ID: `true_impact` | Package root: `io.github.omegau371.trueimpact` | Current phase: `0.4.9-phase1c`
 
 > This is a from-scratch rewrite. The legacy codebase lives in
 > `C:\Users\l\Desktop\Projects\TI\archived\pr-4-test` (read-only reference).
@@ -59,16 +59,19 @@ io.github.omegau371.trueimpact
 |   +-- DistInfo            -- dist detection, Sable presence, mod version queries
 |-- command/
 |   |-- StatusCommand       -- /trueimpact status implementation
-|   +-- DiagnosticCommand   -- /trueimpact debug and experiment subcommands
+|   |-- DiagnosticCommand   -- /trueimpact debug and experiment subcommands
+|   +-- KImpactBand         -- kBand label logic (no Minecraft imports; extracted for unit-test safety)
 |-- observation/            -- read-only state snapshots; no physics side effects
 |-- diagnostic/             -- experiment logging (T-1 through T-7); rate-limited output
 |-- sable/                  -- Sable bridge: body reader, event bridge, T-4 commands
 |-- mixin/                  -- SpongeMixin hooks for Sable physics pipeline
-|-- physics/                -- Phase 1B: damage input contract (pure data, no side effects)
+|-- physics/                -- damage input contract + metrics (pure data, no side effects)
 |   |-- ContactType.java    -- enum: ACTIVE_IMPACT / ACTIVE_SUSTAINED (active-vs-active only)
-|   +-- ImpactRecord.java   -- immutable record: the damage input contract
-+-- damage/                 -- Phase 1B skeleton; Phase 1C+ resolver/accumulator/hardness
-    +-- DamageResolver.java -- skeleton: always returns NONE (Phase 1B)
+|   |-- ImpactRecord.java   -- immutable record: the damage input contract
+|   +-- ImpactMetrics.java  -- 28-field record: Phase 1C diagnostic + canonical outputs
++-- damage/                 -- resolver skeleton + Phase 1C threshold profiles
+    |-- DamageResolver.java -- skeleton: always returns NONE
+    +-- MaterialThresholdProfile.java -- T-9 material classes + placeholder thresholds (no Minecraft imports)
 ```
 
 ArchUnit layer rules (enforced at build time -- see FoundationArchTest.java):
@@ -85,8 +88,8 @@ ArchUnit layer rules (enforced at build time -- see FoundationArchTest.java):
   observation/ must NOT depend on damage/ (R5).
   All production packages: no net.minecraft.client.* references.
 
-Future packages (Phase 1C+):
-- `damage/BlockHardnessProfile`  -- single source for vanilla hardness reads
+Future packages (Phase 1D+):
+- `damage/BlockHardnessProfile`  -- single source for vanilla hardness reads; real victim block detection
 - `damage/DamageAccumulator`     -- per-block crack state
 - `damage/ImpactBreakQueue`      -- deferred destroyBlock (never inside Rapier step)
 - `compat/`                      -- Create integration, etc.
