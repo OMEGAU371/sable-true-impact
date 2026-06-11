@@ -4,6 +4,7 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.context.CommandContext;
+import io.github.omegau371.trueimpact.damage.MaterialThresholdProfile;
 import io.github.omegau371.trueimpact.diagnostic.T4ApplyForceExperiment;
 import io.github.omegau371.trueimpact.observation.DiagnosticConfig;
 import io.github.omegau371.trueimpact.observation.DiagnosticStateManager;
@@ -282,6 +283,31 @@ public final class DiagnosticCommand {
                     + " exceeds=" + b(impact.exceedsThreshold())
                     + " threshold=" + fmt(impact.materialThresholdJ());
             ctx.getSource().sendSuccess(() -> Component.literal(canonLine), false);
+        }
+
+        // Line 10: T-9 diagnostic material threshold.
+        // Phase 1C: no victim block detected -- always shows GENERIC.
+        // Phase 1D will replace GENERIC with the actual block under the contact point
+        // via BlockHardnessProfile. wouldExceed is diagnostic-only; DamageResolver = NONE.
+        if (impact == null) {
+            ctx.getSource().sendSuccess(() -> Component.literal(
+                    "[TI capture threshold] none"), false);
+        } else {
+            // No victim block info available yet -- use GENERIC placeholder.
+            MaterialThresholdProfile.MaterialClass matClass =
+                    MaterialThresholdProfile.MaterialClass.GENERIC;
+            double matThreshold = MaterialThresholdProfile.threshold(matClass);
+            double kImpact      = impact.kineticImpactEnergyJ();
+            boolean wouldExceed = MaterialThresholdProfile.wouldExceed(kImpact, matClass);
+            final String threshLine = "[TI capture threshold]"
+                    + " materialClass=" + matClass
+                    + " threshold=" + fmt(matThreshold)
+                    + " kImpact=" + (Double.isNaN(kImpact) ? "NaN" : fmt(kImpact))
+                    + " kBand=" + KImpactBand.of(kImpact)
+                    + " wouldExceed=" + wouldExceed
+                    + " note=diagnostic-only"
+                    + " [victim block unknown; Phase 1D: BlockHardnessProfile]";
+            ctx.getSource().sendSuccess(() -> Component.literal(threshLine), false);
         }
         return 1;
     }

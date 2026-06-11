@@ -277,20 +277,39 @@ Status output after pivot:
 [TI capture canonical] source=velocity-full kImpact=K kBefore=B kAfter=A kDelta=D dVRel3D=V velImpulse=I exceeds=T/F threshold=50.000
 ```
 
-### T-9: materialThresholdJ calibration
+### T-9: materialThresholdJ calibration -- IN PROGRESS (0.4.8-phase1c)
 
-Goal: find a threshold value that separates "clearly visible impact" from "no effect" on
-a chosen reference block (stone, hardness=1.5).
+Goal: find threshold values per material class that separate observable impact from noise.
+Input metric: kineticImpactEnergyJ (velocity-derived; Phase 1C canonical after T-8 pivot).
 
-Method:
-  - Drop sub-levels of increasing mass / height
-  - Record impactEnergyJ at each test
-  - Identify the energy range below which stone is visibly undamaged in legacy testing
-  - This gives a floor estimate for materialThresholdJ for stone
+Phase 1C diagnostic infrastructure (MaterialThresholdProfile):
+  Implemented in damage/MaterialThresholdProfile.java. No Minecraft imports.
 
-Note: the exceedsThreshold diagnostic boolean is the output of this comparison.
-No block is actually broken in Phase 1C -- this is purely a calibration data point
-for the Phase 1D threshold formula.
+  Material classes and temporary placeholder thresholds:
+    SOFT_SOIL   (dirt, grass, gravel, sand)     ->   5.0
+    WOOD        (oak_planks, spruce_planks, ...) ->  20.0
+    STONE       (stone, cobblestone, deepslate)  ->  50.0
+    METAL       (iron_block, gold_block, ...)    -> 120.0
+    HIGH_STRENGTH (obsidian, netherite_block, .) -> 300.0
+    GENERIC     (fallback for unmapped blocks)   ->  50.0
+
+  [TI capture threshold] status line (line 10) shows:
+    materialClass threshold kImpact kBand wouldExceed note=diagnostic-only
+    Currently always shows GENERIC (no victim block detection yet).
+    Phase 1D will resolve the actual block under the contact point.
+
+  wouldExceed = kineticImpactEnergyJ > threshold(materialClass)
+  Returns false when kImpact is NaN (no velocity data) -- no spurious positives.
+  DamageResolver must still return NONE regardless of wouldExceed.
+
+Calibration method (use with 0.4.8+):
+  - Enable '/trueimpact debug contacts on' (required for tick-start vels).
+  - Drop sub-levels of different masses onto reference blocks.
+  - Record kImpact and kBand per impact type.
+  - Adjust thresholds in MaterialThresholdProfile until visible impacts consistently
+    exceed the threshold and gentle contacts do not.
+  - Reference bands from 0.4.7 calibration:
+      kImpact ~0.016 -> TOUCH (very light); ~13.9 -> MEDIUM; ~156 -> SEVERE
 
 ### T-10 (future): contactCount ~ contact area
 
