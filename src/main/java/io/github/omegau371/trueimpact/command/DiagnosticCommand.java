@@ -5,6 +5,7 @@ import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import io.github.omegau371.trueimpact.damage.MaterialThresholdProfile;
+import io.github.omegau371.trueimpact.damage.VictimInfo;
 import io.github.omegau371.trueimpact.diagnostic.T4ApplyForceExperiment;
 import io.github.omegau371.trueimpact.observation.DiagnosticConfig;
 import io.github.omegau371.trueimpact.observation.DiagnosticStateManager;
@@ -308,26 +309,39 @@ public final class DiagnosticCommand {
             ctx.getSource().sendSuccess(() -> Component.literal(canonLine).withStyle(canonColor), false);
         }
 
-        // Line 10: T-9 diagnostic material threshold.
-        // RED when wouldExceed=true (impact candidate), GRAY when false, DARK_GRAY for none.
-        if (impact == null) {
+        // Line 10: Phase 1D victim material threshold.
+        // Shows detected victim block (from BlockSubLevelCollisionCallback) or ACTIVE_SUBLEVEL/UNKNOWN.
+        // kImpact from the last ACTIVE_IMPACT record; threshold from detected victim's material class.
+        // RED when wouldExceed=true, GRAY otherwise, DARK_GRAY when no data at all.
+        VictimInfo victim = stats.lastVictimInfo();
+        if (victim == null && impact == null) {
             ctx.getSource().sendSuccess(() -> Component.literal(
                     "[TI capture threshold] none").withStyle(ChatFormatting.DARK_GRAY), false);
         } else {
-            MaterialThresholdProfile.MaterialClass matClass =
-                    MaterialThresholdProfile.MaterialClass.GENERIC;
-            double matThreshold = MaterialThresholdProfile.threshold(matClass);
-            double kImpact      = impact.kineticImpactEnergyJ();
-            boolean wouldExceed = MaterialThresholdProfile.wouldExceed(kImpact, matClass);
+            VictimInfo displayVictim = (victim != null) ? victim : VictimInfo.unknown();
+            // Use kImpact from last ACTIVE_IMPACT if available; fall back to last record.
+            double kImpact = (impact != null)
+                    ? impact.kineticImpactEnergyJ()
+                    : (rec != null ? rec.kineticImpactEnergyJ() : Double.NaN);
+            double matThreshold = displayVictim.materialThresholdJ();
+            boolean wouldExceed = Double.isFinite(kImpact) && kImpact > matThreshold;
             ChatFormatting threshColor = wouldExceed ? ChatFormatting.RED : ChatFormatting.GRAY;
+            String blockStr = (displayVictim.blockId() != null) ? displayVictim.blockId() : "none";
+            String posStr = displayVictim.hasPos()
+                    ? ("(" + displayVictim.posX() + "," + displayVictim.posY() + "," + displayVictim.posZ() + ")")
+                    : "unknown";
             final String threshLine = "[TI capture threshold]"
-                    + " materialClass=" + matClass
+                    + " victimKind=" + displayVictim.kind()
+                    + " victimBlock=" + blockStr
+                    + " victimPos=" + posStr
+                    + " confidence=" + displayVictim.confidence()
+                    + " source=" + displayVictim.source()
+                    + " materialClass=" + displayVictim.materialClass()
                     + " threshold=" + fmt(matThreshold)
                     + " kImpact=" + (Double.isNaN(kImpact) ? "NaN" : fmt(kImpact))
                     + " kBand=" + KImpactBand.of(kImpact)
                     + " wouldExceed=" + wouldExceed
-                    + " note=diagnostic-only"
-                    + " [victim block unknown; Phase 1D: BlockHardnessProfile]";
+                    + " note=diagnostic-only";
             ctx.getSource().sendSuccess(() -> Component.literal(threshLine).withStyle(threshColor), false);
         }
         return 1;

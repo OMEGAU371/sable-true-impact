@@ -5,7 +5,10 @@ import dev.ryanhcode.sable.api.physics.callback.BlockSubLevelCollisionCallback;
 import io.github.omegau371.trueimpact.diagnostic.ExperimentLog;
 import io.github.omegau371.trueimpact.observation.DiagnosticConfig;
 import io.github.omegau371.trueimpact.sable.SableEventBridge;
+import io.github.omegau371.trueimpact.sable.SableVictimCapture;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.state.BlockState;
 import org.joml.Vector3d;
 import org.spongepowered.asm.mixin.Mixin;
@@ -61,6 +64,19 @@ public abstract class DiagnosticCallbackWrapperMixin {
 
         @Override
         public CollisionResult sable$onCollision(BlockPos pos, Vector3d hitPos, double impactVelocity) {
+            // Phase 1D victim capture: record block type for world-vs-active detection.
+            // Fires during Rapier3D.step() callbacks. Read-only; no world mutation.
+            // pos space is UNCONFIRMED (T-2 pending); posLooksWorld heuristic excludes
+            // embedded-level coords (~4e7 range).
+            if (DiagnosticConfig.ENABLED) {
+                boolean posLooksWorld = Math.abs(pos.getX()) <= 1_000_000
+                        && Math.abs(pos.getZ()) <= 1_000_000;
+                ResourceLocation loc = BuiltInRegistries.BLOCK.getKey(state.getBlock());
+                String blockId = (loc != null) ? loc.toString() : "unknown";
+                SableVictimCapture.captureCallbackBlock(blockId,
+                        pos.getX(), pos.getY(), pos.getZ(), posLooksWorld);
+            }
+
             // T-1: callback thread vs captured server thread
             // Logging gate: LOG_T1_CALLBACK_THREAD; wrapper presence is unconditional
             if (DiagnosticConfig.is(DiagnosticConfig.LOG_T1_CALLBACK_THREAD)) {

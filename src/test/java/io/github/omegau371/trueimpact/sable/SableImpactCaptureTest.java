@@ -23,6 +23,7 @@ class SableImpactCaptureTest {
     @BeforeEach
     void resetCaptureCounters() {
         SableImpactCapture.resetCounters();
+        SableVictimCapture.clearForTick(); // ensure no stale callback data between tests
     }
 
     /** Minimal active snapshot: identity orientation, no valid velocity. */
@@ -1258,6 +1259,7 @@ class SableImpactCaptureTest {
         assertEquals(0, s.lastNonZeroSustainedCount());
         assertNull(s.lastRecordMetrics(),       "resetCounters must clear lastRecordMetrics");
         assertNull(s.lastActiveImpactMetrics(), "resetCounters must clear lastActiveImpactMetrics");
+        assertNull(s.lastVictimInfo(),          "resetCounters must clear lastVictimInfo");
         assertTrue(s.captureActive(),
                 "resetCounters must restore captureGate to true (active) for test isolation");
         // verify T-8 fields don't linger after reset
@@ -1333,6 +1335,69 @@ class SableImpactCaptureTest {
         assertEquals(1L, SableImpactCapture.stats().totalProcessCalls(),
                 "exactly 1 call after reactivation");
         assertEquals(1L, SableImpactCapture.stats().totalImpactRecordsCreated());
+    }
+
+    // -- Phase 1D victim detection -------------------------------------------------
+
+    @Test
+    void active_vs_active_contact_sets_lastVictimInfo_to_ACTIVE_SUBLEVEL() {
+        Map<Integer, BodySnapshot> snaps = Map.of(
+                10, snap(10, 5.0),
+                20, snap(20, 8.0));
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 950L, 2, snaps, Map.of());
+
+        io.github.omegau371.trueimpact.damage.VictimInfo vi =
+                SableImpactCapture.stats().lastVictimInfo();
+        assertNotNull(vi, "active-vs-active must set lastVictimInfo");
+        assertEquals(io.github.omegau371.trueimpact.damage.VictimInfo.Kind.ACTIVE_SUBLEVEL,
+                vi.kind(), "active-vs-active -> ACTIVE_SUBLEVEL, not UNKNOWN");
+        assertEquals(io.github.omegau371.trueimpact.damage.VictimInfo.Confidence.EXACT,
+                vi.confidence(), "active-vs-active kind is definitively known");
+    }
+
+    @Test
+    void world_vs_active_contact_without_callback_sets_UNKNOWN() {
+        // One body (id=99) is NOT in lastPostSnaps -> world-vs-active contact.
+        // No SableVictimCapture data -> VictimInfo.unknown().
+        Map<Integer, BodySnapshot> snaps = Map.of(10, snap(10, 5.0));
+        // contact: id 10 (active) vs id 99 (not in snaps -> world)
+        SableImpactCapture.process(oneContact(10, 99, 300.0), 951L, 2, snaps, Map.of());
+
+        io.github.omegau371.trueimpact.damage.VictimInfo vi =
+                SableImpactCapture.stats().lastVictimInfo();
+        assertNotNull(vi, "world-vs-active contact must still update lastVictimInfo");
+        assertEquals(io.github.omegau371.trueimpact.damage.VictimInfo.Kind.UNKNOWN,
+                vi.kind(),
+                "world-vs-active without callback data -> UNKNOWN (not pretend GENERIC)");
+    }
+
+    @Test
+    void world_vs_active_with_callback_data_sets_WORLD_BLOCK() {
+        // Simulate callback capture before process() is called.
+        SableVictimCapture.captureCallbackBlock("minecraft:stone", 5, 64, 5, true);
+
+        Map<Integer, BodySnapshot> snaps = Map.of(10, snap(10, 5.0));
+        SableImpactCapture.process(oneContact(10, 99, 300.0), 952L, 2, snaps, Map.of());
+
+        io.github.omegau371.trueimpact.damage.VictimInfo vi =
+                SableImpactCapture.stats().lastVictimInfo();
+        assertNotNull(vi);
+        assertEquals(io.github.omegau371.trueimpact.damage.VictimInfo.Kind.WORLD_BLOCK, vi.kind());
+        assertEquals("minecraft:stone", vi.blockId());
+        assertEquals(io.github.omegau371.trueimpact.damage.MaterialThresholdProfile.MaterialClass.STONE,
+                vi.materialClass());
+        assertEquals(50.0, vi.materialThresholdJ(), 0.001);
+    }
+
+    @Test
+    void both_unknown_bodies_do_not_update_lastVictimInfo() {
+        // Both bodies absent from snaps -> should be completely discarded, not update victim
+        Map<Integer, BodySnapshot> snaps = Map.of();
+        SableImpactCapture.process(oneContact(88, 99, 300.0), 953L, 2, snaps, Map.of());
+
+        io.github.omegau371.trueimpact.damage.VictimInfo vi =
+                SableImpactCapture.stats().lastVictimInfo();
+        assertNull(vi, "both-unknown contact must not update lastVictimInfo");
     }
 
     // -- Phase 1C canonical velocity-derived fields ------------------------------------

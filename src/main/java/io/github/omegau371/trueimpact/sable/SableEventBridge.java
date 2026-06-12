@@ -100,17 +100,28 @@ public final class SableEventBridge {
     /**
      * Called from DiagnosticPhysicsStepMixin before Rapier3D.step().
      *
-     * Two independent code paths -- each gated separately:
-     *   needSnapshots  = ENABLED + LOG_BODY_SNAPSHOTS -> body snapshot + T-7 position tracking
-     *   needTickStart  = LOG_RAW_CONTACTS, substep 0 only -> tick-start velocity for T-3-MISS
+     * Unconditional path (substep 0 only, when ENABLED):
+     *   SableVictimCapture.clearForTick() -- clears previous tick's callback capture
+     *   before this tick's BlockSubLevelCollisionCallbacks fire during physicsTick().
+     *
+     * Two gated paths:
+     *   needSnapshots  = ENABLED + LOG_BODY_SNAPSHOTS -> body snapshot + T-7 tracking
+     *   needTickStart  = LOG_RAW_CONTACTS, substep 0 only -> tick-start vels for T-3-MISS
      */
     public static void onPreStep(SubLevelPhysicsSystem system) {
+        int substep = SableBodyReader.substepIndex(system);
+
+        // Phase 1D: clear victim capture buffer at tick start so stale block data from
+        // the previous tick is not carried forward. Runs before callbacks fire.
+        if (substep == 0 && DiagnosticConfig.ENABLED) {
+            SableVictimCapture.clearForTick();
+        }
+
         boolean needSnapshots = DiagnosticConfig.ENABLED && DiagnosticConfig.LOG_BODY_SNAPSHOTS;
         boolean needTickStart = DiagnosticConfig.is(DiagnosticConfig.LOG_RAW_CONTACTS);
         if (!needSnapshots && !needTickStart) return;
 
         long tick = system.getLevel().getGameTime();
-        int substep = SableBodyReader.substepIndex(system);
         ServerSubLevelContainer container = SubLevelContainer.getContainer(system.getLevel());
         if (container == null) return;
 

@@ -1,6 +1,7 @@
 package io.github.omegau371.trueimpact.sable;
 
 import io.github.omegau371.trueimpact.damage.DamageResolver;
+import io.github.omegau371.trueimpact.damage.VictimInfo;
 import io.github.omegau371.trueimpact.observation.BodySnapshot;
 import io.github.omegau371.trueimpact.physics.ContactType;
 import io.github.omegau371.trueimpact.physics.ImpactMetrics;
@@ -86,6 +87,12 @@ public final class SableImpactCapture {
     // null until the first ACTIVE_IMPACT record is produced since last reset.
     private static ImpactMetrics lastActiveImpactMetrics;
 
+    // Phase 1D: most recent victim detection result from any contact event.
+    // Updated when active-vs-active records are produced or when world-vs-active contacts
+    // are detected. Not overwritten by zero-contact ticks (preserves last known info).
+    // null until first contact event since last reset.
+    private static VictimInfo lastVictimInfo;
+
     // -- T-8 rolling stats -------------------------------------------------------
     // Updated only when: ACTIVE_IMPACT AND impactEnergyJ finite > 0 AND kineticDelta finite.
     private static final int T8_WINDOW = 32;
@@ -127,7 +134,8 @@ public final class SableImpactCapture {
             ImpactMetrics lastRecordMetrics,         // any ContactType, most recent record
             ImpactMetrics lastActiveImpactMetrics,   // ACTIVE_IMPACT only; null if none since reset
             T8Stats       t8Stats,                   // rolling calibration stats
-            boolean       captureActive              // false when gate is closed (all diagnostics off)
+            boolean       captureActive,             // false when gate is closed (all diagnostics off)
+            VictimInfo    lastVictimInfo             // Phase 1D: most recent victim detection; null if none
     ) {}
 
     public static synchronized RuntimeStats stats() {
@@ -146,7 +154,8 @@ public final class SableImpactCapture {
                 lastRecordMetrics,
                 lastActiveImpactMetrics,
                 snapshotT8Stats(),
-                captureGate);
+                captureGate,
+                lastVictimInfo);
     }
 
     public static synchronized void resetCounters() {
@@ -163,6 +172,7 @@ public final class SableImpactCapture {
         lastNonZeroSustainedCount    = 0;
         lastRecordMetrics        = null;
         lastActiveImpactMetrics  = null;
+        lastVictimInfo           = null;
         captureGate    = true;  // restore to active so subsequent enable works
         t8SampleCount  = 0;
         t8LastRatio    = Double.NaN;
@@ -208,6 +218,7 @@ public final class SableImpactCapture {
 
         // Aggregate contact records by active-vs-active pair.
         Map<Long, PairAccum> pairMap = new LinkedHashMap<>();
+        boolean sawWorldContact = false;
 
         for (int i = 0; i < count; i++) {
             int base = i * 15;
@@ -219,8 +230,14 @@ public final class SableImpactCapture {
             BodySnapshot snapA = lastPostSnaps.get(idA);
             BodySnapshot snapB = lastPostSnaps.get(idB);
 
-            // Discard: world-vs-active, active-vs-world, or unknown-vs-unknown
-            if (snapA == null || snapB == null) continue;
+            if (snapA == null && snapB == null) continue; // both unknown -- no active body
+            if (snapA == null || snapB == null) {
+                // Phase 1D: world-vs-active or active-vs-world contact detected.
+                // Do NOT create an ImpactRecord (no active-vs-active pair to compute impulse).
+                // Flag for VictimInfo building after the loop.
+                sawWorldContact = true;
+                continue;
+            }
 
             long key = pairKey(idA, idB);
             PairAccum acc = pairMap.computeIfAbsent(key, k -> new PairAccum(idA, idB));
@@ -257,7 +274,11 @@ public final class SableImpactCapture {
         }
 
         if (pairMap.isEmpty()) {
-            recordStats(serverTick, count, 0, 0, 0);
+            // No active-vs-active pairs. Still update VictimInfo if world contact detected.
+            VictimInfo noActiveVictim = sawWorldContact
+                    ? SableVictimCapture.buildWorldVictimInfo()
+                    : null;
+            recordStats(serverTick, count, 0, 0, 0, null, null, noActiveVictim);
             return List.of();
         }
 
@@ -315,20 +336,31 @@ public final class SableImpactCapture {
             DamageResolver.resolve(record);    // Phase 1C: still always NONE
         }
 
+        // Phase 1D: build VictimInfo for this tick.
+        // World contacts take priority when both world and active-vs-active occurred.
+        // Active-vs-active-only -> ACTIVE_SUBLEVEL (definitively no world block involved).
+        VictimInfo tickVictim;
+        if (sawWorldContact) {
+            tickVictim = SableVictimCapture.buildWorldVictimInfo();
+        } else {
+            tickVictim = VictimInfo.activeSublevel();
+        }
+
         recordStats(serverTick, count, result.size(), activeImpactCount, sustainedCount,
-                latestRecordMetrics, latestActiveImpactMetrics);
+                latestRecordMetrics, latestActiveImpactMetrics, tickVictim);
         return result;
     }
 
     private static synchronized void recordStats(long tick, int rawContacts, int records,
                                                   int activeImpacts, int sustained) {
-        recordStats(tick, rawContacts, records, activeImpacts, sustained, null, null);
+        recordStats(tick, rawContacts, records, activeImpacts, sustained, null, null, null);
     }
 
     private static synchronized void recordStats(long tick, int rawContacts, int records,
                                                   int activeImpacts, int sustained,
                                                   ImpactMetrics latestRecordMetrics,
-                                                  ImpactMetrics latestActiveImpactMetrics) {
+                                                  ImpactMetrics latestActiveImpactMetrics,
+                                                  VictimInfo tickVictimInfo) {
         totalProcessCalls++;
         totalRawContactsSeen      += rawContacts;
         totalImpactRecordsCreated += records;
@@ -353,6 +385,11 @@ public final class SableImpactCapture {
         // ACTIVE_SUSTAINED ticks do NOT overwrite this -- it stays at the last impact.
         if (latestActiveImpactMetrics != null) {
             lastActiveImpactMetrics = latestActiveImpactMetrics;
+        }
+        // lastVictimInfo: updated when any contact (world or active-vs-active) was detected.
+        // null tickVictimInfo means no contacts this tick; preserve previous known value.
+        if (tickVictimInfo != null) {
+            lastVictimInfo = tickVictimInfo;
         }
     }
 
