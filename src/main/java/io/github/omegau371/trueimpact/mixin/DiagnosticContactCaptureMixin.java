@@ -7,6 +7,10 @@ import io.github.omegau371.trueimpact.observation.BodySnapshot;
 import io.github.omegau371.trueimpact.observation.DiagnosticConfig;
 import io.github.omegau371.trueimpact.sable.SableEventBridge;
 import io.github.omegau371.trueimpact.sable.SableImpactCapture;
+import io.github.omegau371.trueimpact.sable.SableVictimCapture;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -67,6 +71,18 @@ public abstract class DiagnosticContactCaptureMixin {
         Map<Integer, double[]>    tickStartVels = SableEventBridge.getTickStartVels();
         long tick                      = level.getGameTime();
 
+        // Phase 1D: contact-point block detection for world-vs-active contacts.
+        // BlockSubLevelCollisionCallback fires only for blocks that implement
+        // BlockWithSubLevelCollisionCallback. Most vanilla blocks (stone, dirt, planks,
+        // obsidian ...) have null callbacks and never trigger captureCallbackBlock().
+        // Fall back to transforming the contact point on the active body to world space
+        // and sampling level.getBlockState() at and near that position.
+        // Runs BEFORE process() so SableImpactCapture can read the result from SableVictimCapture.
+        // Skip if PATH A already captured data (callback takes priority as more reliable).
+        if (DiagnosticConfig.ENABLED && !SableVictimCapture.hasCaptureThisTick()) {
+            tryContactPointBlockDetection(data, snaps);
+        }
+
         // PATH A: Phase 1C gate -- pause capture when all diagnostics off (DamageResolver=NONE).
         // SableImpactCapture checks its own captureGate flag (not DiagnosticConfig directly, R13 safe).
         // REMOVE this gate in Phase 2 when DamageResolver produces real effects and
@@ -80,5 +96,101 @@ public abstract class DiagnosticContactCaptureMixin {
         }
 
         return data;
+    }
+
+    // -- Phase 1D: contact-point block detection -----------------------------------
+
+    /**
+     * Scans clearCollisions data for world-vs-active contacts. For each found pair,
+     * transforms the active body's contact point (BODY_COM_LOCAL) to WORLD space,
+     * then samples level.getBlockState() at and around that position.
+     *
+     * Fills SableVictimCapture with the first detected block, source=CONTACT_POINT_SAMPLE.
+     * Only called when no callback data already exists (callback is preferred when available).
+     *
+     * posX/posY/posZ: BodySnapshot.posX/Y/Z = logicalPose().position() = WORLD [SP].
+     * Transform: world = Q * bodyComLocal + position [SP: coordinate-systems.md section 3].
+     * hasChunkAt guard prevents forced chunkgen at embedded-level coords (~4e7).
+     */
+    private void tryContactPointBlockDetection(double[] data, Map<Integer, BodySnapshot> snaps) {
+        if (data == null) return;
+        int count = data.length / 15;
+        for (int i = 0; i < count; i++) {
+            int base = i * 15;
+            int idA = (int) data[base];
+            int idB = (int) data[base + 1];
+            BodySnapshot snapA = snaps.get(idA);
+            BodySnapshot snapB = snaps.get(idB);
+
+            if (snapA == null && snapB == null) continue; // both unknown
+            if (snapA != null && snapB != null) continue; // active-vs-active
+
+            // Exactly one active body; use ITS contact point in ITS local frame
+            BodySnapshot activeSnap = (snapA != null) ? snapA : snapB;
+            double lpX, lpY, lpZ;
+            if (snapA != null) {
+                // A is active; localPointA in offsets 9-11
+                lpX = data[base + 9];
+                lpY = data[base + 10];
+                lpZ = data[base + 11];
+            } else {
+                // B is active; localPointB in offsets 12-14
+                lpX = data[base + 12];
+                lpY = data[base + 13];
+                lpZ = data[base + 14];
+            }
+
+            // Transform body-COM-local -> world
+            double[] wcp = transformLocalToWorld(activeSnap, lpX, lpY, lpZ);
+
+            // Sample block at contact point and adjacent positions
+            BlockPos candidate = sampleNearestSolidBlock(wcp);
+            if (candidate != null) {
+                ResourceLocation loc = BuiltInRegistries.BLOCK
+                        .getKey(level.getBlockState(candidate).getBlock());
+                if (loc != null) {
+                    SableVictimCapture.captureContactPointBlock(loc.toString(),
+                            candidate.getX(), candidate.getY(), candidate.getZ());
+                    return; // first successful detection is sufficient for diagnostics
+                }
+            }
+        }
+    }
+
+    /**
+     * Rotates body-COM-local vector to world space and adds body world position.
+     * Formula: world = Q * local + pos  [SP: RapierPhysicsPipeline.java:254-260]
+     */
+    private static double[] transformLocalToWorld(BodySnapshot s, double lx, double ly, double lz) {
+        double qx = s.oriX(), qy = s.oriY(), qz = s.oriZ(), qw = s.oriW();
+        double tx = 2.0 * (qy * lz - qz * ly);
+        double ty = 2.0 * (qz * lx - qx * lz);
+        double tz = 2.0 * (qx * ly - qy * lx);
+        return new double[]{
+            lx + qw * tx + qy * tz - qz * ty + s.posX(),
+            ly + qw * ty + qz * tx - qx * tz + s.posY(),
+            lz + qw * tz + qx * ty - qy * tx + s.posZ()
+        };
+    }
+
+    /**
+     * Tries to find a non-air block at or adjacent to the given world contact point.
+     * Contact point is on the active body's surface; the victim block is just outside.
+     * Returns null if no solid block found or if hasChunkAt fails for all candidates.
+     */
+    private BlockPos sampleNearestSolidBlock(double[] wcp) {
+        BlockPos center = BlockPos.containing(wcp[0], wcp[1], wcp[2]);
+        BlockPos[] candidates = {
+            center,
+            center.below(),
+            center.north(), center.south(),
+            center.west(), center.east(),
+            center.above()
+        };
+        for (BlockPos pos : candidates) {
+            if (!level.hasChunkAt(pos)) continue;
+            if (!level.getBlockState(pos).isAir()) return pos;
+        }
+        return null;
     }
 }

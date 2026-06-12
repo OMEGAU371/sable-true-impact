@@ -310,9 +310,11 @@ public final class DiagnosticCommand {
         }
 
         // Line 10: Phase 1D victim material threshold.
-        // Shows detected victim block (from BlockSubLevelCollisionCallback) or ACTIVE_SUBLEVEL/UNKNOWN.
-        // kImpact from the last ACTIVE_IMPACT record; threshold from detected victim's material class.
-        // RED when wouldExceed=true, GRAY otherwise, DARK_GRAY when no data at all.
+        // Shows detected victim block (contact-point sampling or callback) or ACTIVE_SUBLEVEL.
+        // Source=NO_CALLBACK: world contact seen but block identification failed
+        //   (callback not fired for that block type AND contact-point sampling found no solid block).
+        // kImpact from last ACTIVE_IMPACT; threshold from detected victim's material class.
+        // RED when wouldExceed=true, YELLOW for NO_CALLBACK, GRAY otherwise, DARK_GRAY when no data.
         VictimInfo victim = stats.lastVictimInfo();
         if (victim == null && impact == null) {
             ctx.getSource().sendSuccess(() -> Component.literal(
@@ -325,11 +327,18 @@ public final class DiagnosticCommand {
                     : (rec != null ? rec.kineticImpactEnergyJ() : Double.NaN);
             double matThreshold = displayVictim.materialThresholdJ();
             boolean wouldExceed = Double.isFinite(kImpact) && kImpact > matThreshold;
-            ChatFormatting threshColor = wouldExceed ? ChatFormatting.RED : ChatFormatting.GRAY;
+            boolean noCallback  = displayVictim.source() == VictimInfo.Source.NO_CALLBACK;
+            ChatFormatting threshColor = wouldExceed ? ChatFormatting.RED
+                    : noCallback ? ChatFormatting.YELLOW
+                    : ChatFormatting.GRAY;
             String blockStr = (displayVictim.blockId() != null) ? displayVictim.blockId() : "none";
             String posStr = displayVictim.hasPos()
-                    ? ("(" + displayVictim.posX() + "," + displayVictim.posY() + "," + displayVictim.posZ() + ")")
+                    ? ("(" + displayVictim.posX() + "," + displayVictim.posY() + ","
+                       + displayVictim.posZ() + ")")
                     : "unknown";
+            String noteStr = noCallback
+                    ? "world contact seen; no block data (no BlockSubLevelCollisionCallback + sampling failed)"
+                    : "diagnostic-only";
             final String threshLine = "[TI capture threshold]"
                     + " victimKind=" + displayVictim.kind()
                     + " victimBlock=" + blockStr
@@ -341,7 +350,7 @@ public final class DiagnosticCommand {
                     + " kImpact=" + (Double.isNaN(kImpact) ? "NaN" : fmt(kImpact))
                     + " kBand=" + KImpactBand.of(kImpact)
                     + " wouldExceed=" + wouldExceed
-                    + " note=diagnostic-only";
+                    + " note=" + noteStr;
             ctx.getSource().sendSuccess(() -> Component.literal(threshLine).withStyle(threshColor), false);
         }
         return 1;

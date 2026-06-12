@@ -195,6 +195,28 @@ class VictimInfoTest {
                 MaterialThresholdProfile.MaterialClass.STONE));
     }
 
+    // -- worldContactNoCallback() --------------------------------------------------
+
+    @Test
+    void worldContactNoCallback_has_NO_CALLBACK_source() {
+        assertEquals(VictimInfo.Source.NO_CALLBACK, VictimInfo.worldContactNoCallback().source());
+    }
+
+    @Test
+    void worldContactNoCallback_has_UNKNOWN_kind() {
+        assertEquals(VictimInfo.Kind.UNKNOWN, VictimInfo.worldContactNoCallback().kind());
+    }
+
+    @Test
+    void worldContactNoCallback_has_GENERIC_threshold() {
+        assertEquals(50.0, VictimInfo.worldContactNoCallback().materialThresholdJ(), 0.001);
+    }
+
+    @Test
+    void worldContactNoCallback_has_no_pos() {
+        assertFalse(VictimInfo.worldContactNoCallback().hasPos());
+    }
+
     // -- confidence and source preserved -------------------------------------------
 
     @Test

@@ -3,23 +3,31 @@ package io.github.omegau371.trueimpact.sable;
 import io.github.omegau371.trueimpact.damage.VictimInfo;
 
 /**
- * Phase 1D: static capture buffer for block-vs-sublevel collision data.
+ * Phase 1D: static capture buffer for world-block collision data.
  *
- * Written by DiagnosticCallbackWrapperMixin (mixin/) during Rapier3D.step() callbacks
- * when DiagnosticConfig.ENABLED is true. Read by SableImpactCapture.process() after all
- * substeps complete (during clearCollisions() processing).
+ * Two capture paths (last-write-wins; callback takes priority over contact-point):
+ *
+ *   PATH A -- callback-based (DiagnosticCallbackWrapperMixin during Rapier3D.step()):
+ *     Only fires for blocks that implement BlockWithSubLevelCollisionCallback.
+ *     Most vanilla blocks (stone, dirt, planks, obsidian ...) have null callbacks and
+ *     DO NOT fire this path. Captured source: CALLBACK_BLOCK_POS.
+ *
+ *   PATH B -- contact-point sampling (DiagnosticContactCaptureMixin after clearCollisions()):
+ *     Scans clearCollisions array for world-vs-active contacts, transforms the active
+ *     body's contact point from BODY_COM_LOCAL to WORLD, samples level.getBlockState()
+ *     at and around that point. Fires for ALL blocks including vanilla stone/dirt.
+ *     Captured source: CONTACT_POINT_SAMPLE.
+ *
+ * PATH B fires only when PATH A has no data yet (hasCaptureThisTick == false before PATH B runs).
  *
  * Lifecycle per tick:
- *   1. clearForTick() -- called by SableEventBridge.onPreStep() at substep 0.
- *      Clears data captured during the PREVIOUS tick before this tick's callbacks fire.
- *   2. captureCallbackBlock(...) -- called zero or more times during substeps.
- *      Last-write-wins; only the most recently struck block is retained per tick.
- *   3. buildWorldVictimInfo() -- called once by SableImpactCapture.process() after all substeps.
- *      Reads the captured data and builds a VictimInfo.
+ *   1. clearForTick() at substep 0 (SableEventBridge.onPreStep).
+ *   2. [Optional] captureCallbackBlock() during substeps (PATH A).
+ *   3. [Optional] captureContactPointBlock() in captureContactData() if PATH A empty (PATH B).
+ *   4. buildWorldVictimInfo() called by SableImpactCapture.process() -- reads capture.
  *
- * Thread safety: all fields are volatile. Writes (during JNI callback) happen-before reads
- * (during post-step processing) because the native Rapier3D.step() completes before
- * clearCollisions() is called. Sufficient for diagnostic-only use (no multi-field atomicity).
+ * Thread safety: volatile fields. PATH A writes from JNI callback thread happen-before
+ * PATH B/4 reads on server thread (after Rapier3D.step() completes). Sufficient for diagnostics.
  *
  * This class does NOT import DiagnosticConfig (R13 preserved for SableImpactCapture callers).
  */
@@ -27,33 +35,63 @@ public final class SableVictimCapture {
 
     private SableVictimCapture() {}
 
-    // Most recent block callback data captured this tick.
-    private static volatile String  lastBlockId;
-    private static volatile int     lastPosX;
-    private static volatile int     lastPosY;
-    private static volatile int     lastPosZ;
-    private static volatile boolean lastPosLooksWorld;
-    private static volatile boolean hasCaptureThisTick;
+    // Most recent block data captured this tick (either path).
+    private static volatile String         lastBlockId;
+    private static volatile int            lastPosX;
+    private static volatile int            lastPosY;
+    private static volatile int            lastPosZ;
+    private static volatile boolean        lastPosLooksWorld;
+    private static volatile VictimInfo.Source lastSource;
+    private static volatile int            captureCount; // total captures this tick (for diagnostics)
+    private static volatile boolean        hasCaptureThisTick;
+
+    // ---- PATH A: BlockSubLevelCollisionCallback ----------------------------------
 
     /**
-     * Records one block-vs-sublevel collision event.
+     * Records a block-vs-sublevel collision from BlockSubLevelCollisionCallback.
      * Called from DiagnosticCallbackWrapperMixin when DiagnosticConfig.ENABLED.
+     * Only fires for blocks that implement BlockWithSubLevelCollisionCallback.
      *
-     * @param blockId        block registry id, e.g. "minecraft:stone"
-     * @param posX,Y,Z       raw block position from callback (T-2 space UNCONFIRMED)
-     * @param posLooksWorld  heuristic: true when |posX| <= 1_000_000 and |posZ| <= 1_000_000.
-     *                       Large values suggest embedded-level coords (~4e7); exclude those.
+     * @param blockId       block registry id, e.g. "minecraft:stone"
+     * @param posX,Y,Z      raw block position from callback (T-2 space UNCONFIRMED)
+     * @param posLooksWorld heuristic: |posX|<=1_000_000 && |posZ|<=1_000_000
      */
     public static void captureCallbackBlock(String blockId,
                                              int posX, int posY, int posZ,
                                              boolean posLooksWorld) {
+        storeCapture(blockId, posX, posY, posZ, posLooksWorld, VictimInfo.Source.CALLBACK_BLOCK_POS);
+    }
+
+    // ---- PATH B: contact-point block sampling ------------------------------------
+
+    /**
+     * Records a world block detected by contact-point sampling.
+     * Called from DiagnosticContactCaptureMixin after clearCollisions(), only when PATH A
+     * has no data (most common case: vanilla blocks lacking BlockSubLevelCollisionCallback).
+     * Position is considered world-space (sampled via level.getBlockState after transform).
+     *
+     * @param blockId   block registry id, e.g. "minecraft:stone"
+     * @param posX,Y,Z  sampled block position in world space
+     */
+    public static void captureContactPointBlock(String blockId, int posX, int posY, int posZ) {
+        storeCapture(blockId, posX, posY, posZ, true, VictimInfo.Source.CONTACT_POINT_SAMPLE);
+    }
+
+    // ---- shared store ------------------------------------------------------------
+
+    private static void storeCapture(String blockId, int posX, int posY, int posZ,
+                                      boolean posLooksWorld, VictimInfo.Source source) {
         lastBlockId        = blockId;
         lastPosX           = posX;
         lastPosY           = posY;
         lastPosZ           = posZ;
         lastPosLooksWorld  = posLooksWorld;
+        lastSource         = source;
+        captureCount++;
         hasCaptureThisTick = true;
     }
+
+    // ---- lifecycle ---------------------------------------------------------------
 
     /**
      * Clears the capture buffer for the upcoming tick.
@@ -65,20 +103,26 @@ public final class SableVictimCapture {
         lastPosY           = 0;
         lastPosZ           = 0;
         lastPosLooksWorld  = false;
+        lastSource         = null;
+        captureCount       = 0;
         hasCaptureThisTick = false;
     }
 
-    /** True if at least one block callback was captured this tick. */
-    public static boolean hasCaptureThisTick() {
-        return hasCaptureThisTick;
-    }
+    // ---- accessors ---------------------------------------------------------------
+
+    /** True if any block data was captured this tick (via callback or contact-point). */
+    public static boolean hasCaptureThisTick() { return hasCaptureThisTick; }
+
+    /** Number of capture events this tick (one per callback or sampling call). */
+    public static int captureCount() { return captureCount; }
 
     /**
-     * Builds a VictimInfo from this tick's captured callback data.
-     * Returns VictimInfo.unknown() if no block callback was captured this tick.
+     * Builds a VictimInfo from this tick's captured data.
+     * Returns VictimInfo.unknown() if no data was captured.
      *
-     * confidence=APPROX because T-2 (callback coordinate space) is unconfirmed.
-     * When T-2 confirms the space, upgrade confidence to EXACT here.
+     * confidence=APPROX for both paths:
+     *   CALLBACK_BLOCK_POS: T-2 coord space unconfirmed.
+     *   CONTACT_POINT_SAMPLE: contact-point transform + nearby block sampling is approximate.
      */
     public static VictimInfo buildWorldVictimInfo() {
         if (!hasCaptureThisTick) {
@@ -88,13 +132,12 @@ public final class SableVictimCapture {
         if (bid == null) {
             return VictimInfo.unknown();
         }
+        VictimInfo.Source src = (lastSource != null) ? lastSource : VictimInfo.Source.NONE;
         if (lastPosLooksWorld) {
             return VictimInfo.worldBlock(bid, lastPosX, lastPosY, lastPosZ,
-                    VictimInfo.Confidence.APPROX, VictimInfo.Source.CALLBACK_BLOCK_POS);
+                    VictimInfo.Confidence.APPROX, src);
         } else {
-            // Pos excluded: heuristic says coords may be embedded-level range, not world
-            return VictimInfo.worldBlockNoPos(bid,
-                    VictimInfo.Confidence.APPROX, VictimInfo.Source.CALLBACK_BLOCK_POS);
+            return VictimInfo.worldBlockNoPos(bid, VictimInfo.Confidence.APPROX, src);
         }
     }
 }

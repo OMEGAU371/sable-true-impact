@@ -275,9 +275,12 @@ public final class SableImpactCapture {
 
         if (pairMap.isEmpty()) {
             // No active-vs-active pairs. Still update VictimInfo if world contact detected.
-            VictimInfo noActiveVictim = sawWorldContact
-                    ? SableVictimCapture.buildWorldVictimInfo()
-                    : null;
+            VictimInfo noActiveVictim = null;
+            if (sawWorldContact) {
+                noActiveVictim = SableVictimCapture.hasCaptureThisTick()
+                        ? SableVictimCapture.buildWorldVictimInfo()
+                        : VictimInfo.worldContactNoCallback();
+            }
             recordStats(serverTick, count, 0, 0, 0, null, null, noActiveVictim);
             return List.of();
         }
@@ -339,9 +342,12 @@ public final class SableImpactCapture {
         // Phase 1D: build VictimInfo for this tick.
         // World contacts take priority when both world and active-vs-active occurred.
         // Active-vs-active-only -> ACTIVE_SUBLEVEL (definitively no world block involved).
+        // World contact without any capture (callback + sampling both failed) -> worldContactNoCallback().
         VictimInfo tickVictim;
         if (sawWorldContact) {
-            tickVictim = SableVictimCapture.buildWorldVictimInfo();
+            tickVictim = SableVictimCapture.hasCaptureThisTick()
+                    ? SableVictimCapture.buildWorldVictimInfo()
+                    : VictimInfo.worldContactNoCallback();
         } else {
             tickVictim = VictimInfo.activeSublevel();
         }

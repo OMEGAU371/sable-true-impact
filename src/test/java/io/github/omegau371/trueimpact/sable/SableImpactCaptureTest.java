@@ -1356,19 +1356,22 @@ class SableImpactCaptureTest {
     }
 
     @Test
-    void world_vs_active_contact_without_callback_sets_UNKNOWN() {
+    void world_vs_active_contact_without_capture_sets_NO_CALLBACK() {
         // One body (id=99) is NOT in lastPostSnaps -> world-vs-active contact.
-        // No SableVictimCapture data -> VictimInfo.unknown().
+        // No SableVictimCapture data -> worldContactNoCallback() with source=NO_CALLBACK.
+        // (Contact-point sampling runs only in the mixin which isn't available in unit tests.)
         Map<Integer, BodySnapshot> snaps = Map.of(10, snap(10, 5.0));
-        // contact: id 10 (active) vs id 99 (not in snaps -> world)
         SableImpactCapture.process(oneContact(10, 99, 300.0), 951L, 2, snaps, Map.of());
 
         io.github.omegau371.trueimpact.damage.VictimInfo vi =
                 SableImpactCapture.stats().lastVictimInfo();
-        assertNotNull(vi, "world-vs-active contact must still update lastVictimInfo");
+        assertNotNull(vi, "world-vs-active contact must update lastVictimInfo");
         assertEquals(io.github.omegau371.trueimpact.damage.VictimInfo.Kind.UNKNOWN,
                 vi.kind(),
-                "world-vs-active without callback data -> UNKNOWN (not pretend GENERIC)");
+                "world contact without capture -> UNKNOWN kind");
+        assertEquals(io.github.omegau371.trueimpact.damage.VictimInfo.Source.NO_CALLBACK,
+                vi.source(),
+                "world contact without capture -> source=NO_CALLBACK (not generic UNKNOWN)");
     }
 
     @Test

@@ -121,6 +121,81 @@ class SableVictimCaptureTest {
         assertEquals(VictimInfo.Kind.UNKNOWN, SableVictimCapture.buildWorldVictimInfo().kind());
     }
 
+    // -- captureContactPointBlock (PATH B) ----------------------------------------
+
+    @Test
+    void captureContactPointBlock_sets_WORLD_BLOCK_with_CONTACT_POINT_SAMPLE_source() {
+        SableVictimCapture.captureContactPointBlock("minecraft:stone", 10, 63, 10);
+        VictimInfo vi = SableVictimCapture.buildWorldVictimInfo();
+        assertEquals(VictimInfo.Kind.WORLD_BLOCK, vi.kind());
+        assertEquals("minecraft:stone", vi.blockId());
+        assertEquals(VictimInfo.Source.CONTACT_POINT_SAMPLE, vi.source(),
+                "contact-point sampling must use CONTACT_POINT_SAMPLE source");
+        assertTrue(vi.hasPos());
+        assertEquals(10, vi.posX());
+        assertEquals(63, vi.posY());
+        assertEquals(10, vi.posZ());
+    }
+
+    @Test
+    void captureContactPointBlock_stone_maps_to_STONE_threshold_50() {
+        SableVictimCapture.captureContactPointBlock("minecraft:stone", 0, 64, 0);
+        VictimInfo vi = SableVictimCapture.buildWorldVictimInfo();
+        assertEquals(MaterialThresholdProfile.MaterialClass.STONE, vi.materialClass());
+        assertEquals(50.0, vi.materialThresholdJ(), 0.001);
+    }
+
+    @Test
+    void captureContactPointBlock_obsidian_maps_to_HIGH_STRENGTH() {
+        SableVictimCapture.captureContactPointBlock("minecraft:obsidian", 0, 64, 0);
+        VictimInfo vi = SableVictimCapture.buildWorldVictimInfo();
+        assertEquals(MaterialThresholdProfile.MaterialClass.HIGH_STRENGTH, vi.materialClass());
+        assertEquals(300.0, vi.materialThresholdJ(), 0.001);
+    }
+
+    @Test
+    void callback_path_overrides_contact_point_path_last_write_wins() {
+        // Callback fires first (during substeps), contact-point sampling runs after.
+        // But in practice contact-point only runs when callback has NO data.
+        // If both somehow fire, last-write-wins.
+        SableVictimCapture.captureCallbackBlock("minecraft:dirt", 0, 64, 0, true);
+        SableVictimCapture.captureContactPointBlock("minecraft:obsidian", 0, 63, 0);
+        // Last write wins -> obsidian
+        VictimInfo vi = SableVictimCapture.buildWorldVictimInfo();
+        assertEquals("minecraft:obsidian", vi.blockId());
+        assertEquals(VictimInfo.Source.CONTACT_POINT_SAMPLE, vi.source());
+    }
+
+    // -- captureCount -------------------------------------------------------------
+
+    @Test
+    void captureCount_is_zero_initially() {
+        assertEquals(0, SableVictimCapture.captureCount());
+    }
+
+    @Test
+    void captureCount_increments_per_callback_capture() {
+        SableVictimCapture.captureCallbackBlock("minecraft:stone", 0, 0, 0, true);
+        assertEquals(1, SableVictimCapture.captureCount());
+        SableVictimCapture.captureCallbackBlock("minecraft:dirt", 0, 0, 0, true);
+        assertEquals(2, SableVictimCapture.captureCount());
+    }
+
+    @Test
+    void captureCount_increments_per_contact_point_capture() {
+        SableVictimCapture.captureContactPointBlock("minecraft:stone", 0, 0, 0);
+        assertEquals(1, SableVictimCapture.captureCount());
+    }
+
+    @Test
+    void clearForTick_resets_captureCount() {
+        SableVictimCapture.captureCallbackBlock("minecraft:stone", 0, 0, 0, true);
+        SableVictimCapture.captureCallbackBlock("minecraft:stone", 0, 0, 0, true);
+        assertEquals(2, SableVictimCapture.captureCount());
+        SableVictimCapture.clearForTick();
+        assertEquals(0, SableVictimCapture.captureCount());
+    }
+
     // -- block classification via capture ------------------------------------------
 
     @Test

@@ -45,8 +45,13 @@ public record VictimInfo(
     /** Which technique produced this VictimInfo. */
     public enum Source {
         CALLBACK_BLOCK_POS,    // BlockSubLevelCollisionCallback(BlockPos, BlockState) -- Phase 1D
-        CONTACT_POINT_SAMPLE,  // contact point transform to world space -- future (Phase 1D+)
-        NONE                   // no data source
+                               // NOTE: only fires for blocks that implement BlockWithSubLevelCollisionCallback.
+                               // Most vanilla blocks (stone, dirt, ...) have null callback -> never fires.
+        CONTACT_POINT_SAMPLE,  // contact point transformed to world space; nearby block sampled -- Phase 1D
+        NO_CALLBACK,           // world contact detected in clearCollisions, but no block data obtained.
+                               // Means: callback didn't fire (block lacks BlockWithSubLevelCollisionCallback)
+                               // AND contact-point sampling found no solid block.
+        NONE                   // no data source (ACTIVE_SUBLEVEL or UNKNOWN with no detected contact)
     }
 
     // -- factories -----------------------------------------------------------------
@@ -84,6 +89,19 @@ public record VictimInfo(
                 Kind.WORLD_BLOCK, blockId, x, y, z, true,
                 confidence, source, mc,
                 MaterialThresholdProfile.threshold(mc));
+    }
+
+    /**
+     * World contact detected in clearCollisions but no block data obtained.
+     * source=NO_CALLBACK: callback never fired (block lacks BlockWithSubLevelCollisionCallback)
+     * AND contact-point sampling did not find a solid block.
+     */
+    public static VictimInfo worldContactNoCallback() {
+        return new VictimInfo(
+                Kind.UNKNOWN, null, 0, 0, 0, false,
+                Confidence.UNKNOWN, Source.NO_CALLBACK,
+                MaterialThresholdProfile.MaterialClass.GENERIC,
+                MaterialThresholdProfile.threshold(MaterialThresholdProfile.MaterialClass.GENERIC));
     }
 
     /**
