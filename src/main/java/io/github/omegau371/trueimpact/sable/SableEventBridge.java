@@ -102,26 +102,26 @@ public final class SableEventBridge {
     /**
      * Called from DiagnosticPhysicsStepMixin before Rapier3D.step().
      *
-     * Unconditional path (substep 0 only, when ENABLED):
+     * Unconditional paths (substep 0 only, regardless of diagnostic flags):
      *   SableVictimCapture.clearForTick() -- clears previous tick's callback capture
-     *   before this tick's BlockSubLevelCollisionCallbacks fire during physicsTick().
+     *   tick-start velocity capture -- required for world kImpact + T-3-MISS
      *
-     * Two gated paths:
-     *   needSnapshots  = ENABLED + LOG_BODY_SNAPSHOTS -> body snapshot + T-7 tracking
-     *   needTickStart  = LOG_RAW_CONTACTS, substep 0 only -> tick-start vels for T-3-MISS
+     * Gated path:
+     *   needSnapshots = ENABLED + LOG_BODY_SNAPSHOTS -> body snapshot + T-7 logging
      */
     public static void onPreStep(SubLevelPhysicsSystem system) {
         int substep = SableBodyReader.substepIndex(system);
 
-        // Phase 1D: clear victim capture buffer at tick start so stale block data from
-        // the previous tick is not carried forward. Runs before callbacks fire.
-        if (substep == 0 && DiagnosticConfig.ENABLED) {
+        // Always clear victim capture at tick start (substep 0) so stale block data
+        // from the previous tick does not carry forward. Independent of diagnostic flags.
+        if (substep == 0) {
             SableVictimCapture.clearForTick();
         }
 
         boolean needSnapshots = DiagnosticConfig.ENABLED && DiagnosticConfig.LOG_BODY_SNAPSHOTS;
-        boolean needTickStart = DiagnosticConfig.ENABLED; // needed for world kImpact + T-3-MISS
-        if (!needSnapshots && !needTickStart) return;
+        // At substep 0, always proceed (tick-start vel capture is unconditional).
+        // At substep > 0, only proceed if snapshot logging is needed.
+        if (!needSnapshots && substep != 0) return;
 
         long tick = system.getLevel().getGameTime();
         ServerSubLevelContainer container = SubLevelContainer.getContainer(system.getLevel());
@@ -129,12 +129,10 @@ public final class SableEventBridge {
 
         List<ServerSubLevel> subLevels = container.getAllSubLevels();
 
-        // Capture tick-start velocity at substep 0.
-        // Required for: T-3-MISS pairwise scan (LOG_RAW_CONTACTS) AND world-vs-active
-        // kImpact estimate (SableImpactCapture.process). Capturing whenever ENABLED
-        // ensures world contacts always have start-vel data regardless of sub-flags.
+        // Always capture tick-start velocity at substep 0.
+        // Required for: world-vs-active kImpact estimate and T-3-MISS pairwise scan.
         // Cleared each substep-0 pass to avoid stale data from the previous tick.
-        if (needTickStart && substep == 0) {
+        if (substep == 0) {
             tickStartVelById.clear();
             for (ServerSubLevel sl : subLevels) {
                 if (sl.isRemoved()) continue;
@@ -148,7 +146,7 @@ public final class SableEventBridge {
             }
         }
 
-        // Body snapshots for SNAP log and T-7.
+        // Body snapshots for SNAP log and T-7 (gated on diagnostic flags).
         if (needSnapshots) {
             for (ServerSubLevel sl : subLevels) {
                 if (sl.isRemoved()) continue;
@@ -200,12 +198,9 @@ public final class SableEventBridge {
             return;
         }
 
-        // Phase 1C: skip expensive sub-level iteration when all diagnostics are off
-        // and no T-4 measurement is pending. lastPostSnaps stays empty (already cleared);
-        // SableImpactCapture.captureGate is also false (mixin sets it from ENABLED),
-        // so process() skips contact array parsing too -- no wasted CPU after all-off.
-        // REMOVE this gate in Phase 2 when DamageResolver produces real effects.
-        if (!DiagnosticConfig.ENABLED && !hasPending) return;
+        // lastPostSnaps is always rebuilt -- required by the production damage pipeline
+        // (SableImpactCapture.process needs body snapshots regardless of diagnostic flags).
+        // Diagnostic log output (SNAP, T-7) remains gated on ENABLED + LOG_BODY_SNAPSHOTS.
 
         List<ServerSubLevel> subLevels = container.getAllSubLevels();
         boolean t4MatchedThisPass = false;

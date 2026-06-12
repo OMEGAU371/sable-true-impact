@@ -121,10 +121,10 @@ public final class DiagnosticCommand {
     private static int status(CommandContext<CommandSourceStack> ctx) {
         int t4Pending = T4ApplyForceExperiment.pendingByKey.size();
         SableImpactCapture.RuntimeStats stats = SableImpactCapture.stats();
-        boolean captureActive = stats.captureActive();
 
         // Line 1: [TI diag] flag summary.
-        // GRAY when enabled; DARK_GRAY when disabled (nothing is logging).
+        // GRAY when diagnostic logging enabled; DARK_GRAY when disabled (no log output).
+        // Note: capture pipeline always runs regardless of diagnostic flags.
         ChatFormatting diagColor = DiagnosticConfig.ENABLED ? ChatFormatting.GRAY : ChatFormatting.DARK_GRAY;
         String diagText = "[TI diag] enabled=" + DiagnosticConfig.ENABLED
                 + " bodies=" + DiagnosticConfig.LOG_BODY_SNAPSHOTS
@@ -134,33 +134,28 @@ public final class DiagnosticCommand {
                 + " t4Pending=" + t4Pending;
         ctx.getSource().sendSuccess(() -> Component.literal(diagText).withStyle(diagColor), false);
 
-        // Lines 2-3: capture counters.
-        // DARK_GRAY when capture is paused (all diagnostics off -- enable any flag to resume).
-        // AQUA when capture is active.
-        if (!captureActive) {
-            ctx.getSource().sendSuccess(() -> Component.literal(
-                    "[TI capture] PAUSED -- enable any /trueimpact debug flag to resume capture")
-                    .withStyle(ChatFormatting.DARK_GRAY), false);
-            ctx.getSource().sendSuccess(() -> Component.literal(
-                    "[TI capture last-hit] PAUSED")
-                    .withStyle(ChatFormatting.DARK_GRAY), false);
-        } else {
-            String captureLine = "[TI capture] calls=" + stats.totalProcessCalls()
-                    + " rawContacts=" + stats.totalRawContactsSeen()
-                    + " records=" + stats.totalImpactRecordsCreated()
-                    + " lastTick=" + stats.lastTick()
-                    + " lastRecords=" + stats.lastRecordCount()
-                    + " lastActiveImpact=" + stats.lastActiveImpactCount()
-                    + " lastSustained=" + stats.lastSustainedCount();
-            ctx.getSource().sendSuccess(() -> Component.literal(captureLine)
-                    .withStyle(ChatFormatting.AQUA), false);
-            String lastHitLine = "[TI capture last-hit] tick=" + stats.lastNonZeroRecordTick()
-                    + " records=" + stats.lastNonZeroRecordCount()
-                    + " activeImpact=" + stats.lastNonZeroActiveImpactCount()
-                    + " sustained=" + stats.lastNonZeroSustainedCount();
-            ctx.getSource().sendSuccess(() -> Component.literal(lastHitLine)
-                    .withStyle(ChatFormatting.AQUA), false);
-        }
+        // Lines 2-3: capture counters (always shown -- pipeline runs regardless of diag flags).
+        // AQUA when diagnostic logging is on (full observability).
+        // GREEN when diagnostic logging is off (pipeline active, logs silent).
+        ChatFormatting captureColor = DiagnosticConfig.ENABLED
+                ? ChatFormatting.AQUA : ChatFormatting.GREEN;
+        String diagNote = DiagnosticConfig.ENABLED ? "" : " [diagnostics=off]";
+        String captureLine = "[TI capture]" + diagNote
+                + " calls=" + stats.totalProcessCalls()
+                + " rawContacts=" + stats.totalRawContactsSeen()
+                + " records=" + stats.totalImpactRecordsCreated()
+                + " lastTick=" + stats.lastTick()
+                + " lastRecords=" + stats.lastRecordCount()
+                + " lastActiveImpact=" + stats.lastActiveImpactCount()
+                + " lastSustained=" + stats.lastSustainedCount();
+        ctx.getSource().sendSuccess(() -> Component.literal(captureLine)
+                .withStyle(captureColor), false);
+        String lastHitLine = "[TI capture last-hit] tick=" + stats.lastNonZeroRecordTick()
+                + " records=" + stats.lastNonZeroRecordCount()
+                + " activeImpact=" + stats.lastNonZeroActiveImpactCount()
+                + " sustained=" + stats.lastNonZeroSustainedCount();
+        ctx.getSource().sendSuccess(() -> Component.literal(lastHitLine)
+                .withStyle(captureColor), false);
         // Line 4: most recent record of any ContactType (ACTIVE_IMPACT or ACTIVE_SUSTAINED).
         // GOLD for ACTIVE_IMPACT, YELLOW for ACTIVE_SUSTAINED, DARK_GRAY for none.
         ImpactMetrics rec = stats.lastRecordMetrics();

@@ -64,18 +64,16 @@ public abstract class DiagnosticCallbackWrapperMixin {
 
         @Override
         public CollisionResult sable$onCollision(BlockPos pos, Vector3d hitPos, double impactVelocity) {
-            // Phase 1D victim capture: record block type for world-vs-active detection.
+            // Victim capture: record block type for world-vs-active detection (unconditional).
             // Fires during Rapier3D.step() callbacks. Read-only; no world mutation.
             // pos space is UNCONFIRMED (T-2 pending); posLooksWorld heuristic excludes
             // embedded-level coords (~4e7 range).
-            if (DiagnosticConfig.ENABLED) {
-                boolean posLooksWorld = Math.abs(pos.getX()) <= 1_000_000
-                        && Math.abs(pos.getZ()) <= 1_000_000;
-                ResourceLocation loc = BuiltInRegistries.BLOCK.getKey(state.getBlock());
-                String blockId = (loc != null) ? loc.toString() : "unknown";
-                SableVictimCapture.captureCallbackBlock(blockId,
-                        pos.getX(), pos.getY(), pos.getZ(), posLooksWorld);
-            }
+            boolean posLooksWorld = Math.abs(pos.getX()) <= 1_000_000
+                    && Math.abs(pos.getZ()) <= 1_000_000;
+            ResourceLocation loc = BuiltInRegistries.BLOCK.getKey(state.getBlock());
+            String blockId = (loc != null) ? loc.toString() : "unknown";
+            SableVictimCapture.captureCallbackBlock(blockId,
+                    pos.getX(), pos.getY(), pos.getZ(), posLooksWorld);
 
             // T-1: callback thread vs captured server thread
             // Logging gate: LOG_T1_CALLBACK_THREAD; wrapper presence is unconditional

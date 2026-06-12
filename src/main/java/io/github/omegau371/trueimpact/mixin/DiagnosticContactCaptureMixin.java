@@ -26,23 +26,17 @@ import java.util.Map;
  *
  * Two independent paths run after clearCollisions() returns:
  *
- *   PATH A -- damage pipeline (SableImpactCapture):
- *     Runs UNCONDITIONALLY on every physics tick.
+ *   PATH A -- damage pipeline (SableImpactCapture + victim detection):
+ *     Runs UNCONDITIONALLY on every physics tick regardless of diagnostic flags.
  *     MUST NOT be placed inside any DiagnosticConfig gate.
- *     Phase 1B: DamageResolver always returns NONE (no block damage).
- *     Phase 1C+: this path produces real DamageEvents; gating it on a debug flag
- *     would make production damage depend on whether debug logging is enabled,
- *     violating the principle that diagnostic state must not influence game behavior.
+ *     Diagnostic flags control only log/chat output, never whether capture runs.
  *
  *   PATH B -- diagnostic logging (ContactLogger):
  *     Runs only when LOG_RAW_CONTACTS is enabled.
  *     Safe to gate; logs have no game-side effects.
  *
- * Dependency note (Phase 1C+ readiness):
- *   snaps (lastPostSnaps) is currently populated only when LOG_BODY_SNAPSHOTS is on.
- *   tickStartVels is currently populated only when LOG_RAW_CONTACTS is on.
- *   SableImpactCapture handles empty maps gracefully (produces zero records).
- *   Phase 1C+ will need these populated unconditionally for reliable damage output.
+ * snaps (lastPostSnaps) and tickStartVels are always populated unconditionally
+ * by SableEventBridge regardless of diagnostic flags.
  *
  * [T-5] clearCollisions is called once after all substeps -- array covers ALL substeps.
  * [C2]  Bodies not found in activeSubLevels -> NON_ACTIVE_SUBLEVEL_BODY, NOT "terrain".
@@ -71,23 +65,18 @@ public abstract class DiagnosticContactCaptureMixin {
         Map<Integer, double[]>    tickStartVels = SableEventBridge.getTickStartVels();
         long tick                      = level.getGameTime();
 
-        // Phase 1D: contact-point block detection for world-vs-active contacts.
-        // BlockSubLevelCollisionCallback fires only for blocks that implement
-        // BlockWithSubLevelCollisionCallback. Most vanilla blocks (stone, dirt, planks,
-        // obsidian ...) have null callbacks and never trigger captureCallbackBlock().
-        // Fall back to transforming the contact point on the active body to world space
-        // and sampling level.getBlockState() at and near that position.
-        // Runs BEFORE process() so SableImpactCapture can read the result from SableVictimCapture.
-        // Skip if PATH A already captured data (callback takes priority as more reliable).
-        if (DiagnosticConfig.ENABLED && !SableVictimCapture.hasCaptureThisTick()) {
+        // Contact-point block detection for world-vs-active contacts (PATH A, unconditional).
+        // BlockSubLevelCollisionCallback fires only for blocks implementing
+        // BlockWithSubLevelCollisionCallback. Most vanilla blocks have null callbacks.
+        // Falls back to transforming the contact point to world space and sampling
+        // level.getBlockState() at and near that position.
+        // Runs BEFORE process() so SableImpactCapture can read SableVictimCapture.
+        // Skip only if callback path already captured data this tick (callback is preferred).
+        if (!SableVictimCapture.hasCaptureThisTick()) {
             tryContactPointBlockDetection(data, snaps);
         }
 
-        // PATH A: Phase 1C gate -- pause capture when all diagnostics off (DamageResolver=NONE).
-        // SableImpactCapture checks its own captureGate flag (not DiagnosticConfig directly, R13 safe).
-        // REMOVE this gate in Phase 2 when DamageResolver produces real effects and
-        // PATH A must run unconditionally to power production damage.
-        SableImpactCapture.setCaptureGate(DiagnosticConfig.ENABLED);
+        // PATH A: damage pipeline -- always runs, no diagnostic gate.
         SableImpactCapture.process(data, tick, substepCount, snaps, tickStartVels);
 
         // PATH B: diagnostic logging -- gated on LOG_RAW_CONTACTS.

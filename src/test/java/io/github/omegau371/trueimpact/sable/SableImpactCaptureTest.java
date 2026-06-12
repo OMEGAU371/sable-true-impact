@@ -442,23 +442,15 @@ class SableImpactCaptureTest {
                 "empty lastPostSnaps (no active bodies) must produce no records");
     }
 
-    // -- debug-off scenario -------------------------------------------------------
+    // -- debug-off: pipeline always runs -----------------------------------------
 
     /**
-     * SableImpactCapture.process() works correctly when called directly regardless of
-     * DiagnosticConfig state or the captureGate flag, as long as the gate is active.
-     *
-     * In production, DiagnosticContactCaptureMixin sets captureGate = DiagnosticConfig.ENABLED
-     * before each clearCollisions() call. In these unit tests, process() is called directly
-     * (bypassing the mixin); the gate defaults to true after @BeforeEach resetCounters().
-     *
-     * This test verifies the internal pipeline logic, not the mixin gate behavior.
-     * See capture_returns_empty_when_gate_inactive() for gate behavior.
+     * process() runs unconditionally regardless of DiagnosticConfig state.
+     * The capture gate was removed in Phase 2A prep -- diagnostic flags control only
+     * log/chat output, not whether the pipeline runs or counters increment.
      */
     @Test
     void produces_records_with_all_diagnostics_off() {
-        // Verify defaults: all diagnostic flags must be off at test start.
-        // If they were on, this would not be a "debug-off" test.
         assertFalse(io.github.omegau371.trueimpact.observation.DiagnosticConfig.ENABLED,
                 "DiagnosticConfig.ENABLED must default to false");
         assertFalse(io.github.omegau371.trueimpact.observation.DiagnosticConfig.LOG_RAW_CONTACTS,
@@ -466,13 +458,10 @@ class SableImpactCaptureTest {
         assertFalse(io.github.omegau371.trueimpact.observation.DiagnosticConfig.LOG_BODY_SNAPSHOTS,
                 "LOG_BODY_SNAPSHOTS must default to false");
 
-        // Simulate what SableEventBridge.onPostStep() now provides unconditionally:
-        // populated lastPostSnaps with two active sub-levels.
         Map<Integer, BodySnapshot> snaps = Map.of(
                 10, snap(10, 5.0),
                 20, snap(20, 8.0));
 
-        // process() must work and produce a record -- no diagnostic gate should block it.
         List<ImpactRecord> result = SableImpactCapture.process(
                 oneContact(10, 20, 300.0), 99L, 2, snaps, Map.of());
 
@@ -482,7 +471,69 @@ class SableImpactCaptureTest {
         assertEquals(300.0 * (0.05 / 2), result.get(0).totalImpulseJ(), 1e-9);
     }
 
-    // -- pipeline gate independence -----------------------------------------------
+    @Test
+    void capture_pipeline_increments_counters_regardless_of_ENABLED() {
+        assertFalse(io.github.omegau371.trueimpact.observation.DiagnosticConfig.ENABLED,
+                "ENABLED must be false (default) -- this test verifies debug-off behavior");
+
+        Map<Integer, BodySnapshot> snaps = Map.of(10, snap(10, 5.0), 20, snap(20, 8.0));
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 1000L, 2, snaps, Map.of());
+
+        SableImpactCapture.RuntimeStats s = SableImpactCapture.stats();
+        assertEquals(1L, s.totalProcessCalls(),
+                "process() must increment counters even with ENABLED=false");
+        assertEquals(1L, s.totalImpactRecordsCreated(),
+                "active-vs-active impact must create record even with ENABLED=false");
+    }
+
+    @Test
+    void world_block_above_threshold_enqueues_with_debug_off() {
+        assertFalse(io.github.omegau371.trueimpact.observation.DiagnosticConfig.ENABLED,
+                "ENABLED must be false -- this test verifies enqueue works without debug");
+
+        SableVictimCapture.captureContactPointBlock("minecraft:dirt", 5, 63, 5);
+        Map<Integer, BodySnapshot> snaps = Map.of(10, snapWithVel(10, 5.0, 2.0, 0.0, 0.0));
+        Map<Integer, double[]> startVels = Map.of(10, new double[]{10.0, 0.0, 0.0});
+        SableImpactCapture.process(oneContact(10, 99, 100.0), 1001L, 2, snaps, startVels);
+
+        assertEquals(1L,
+                io.github.omegau371.trueimpact.damage.DeferredDamageQueue.stats().totalEnqueued(),
+                "DeferredDamageQueue must enqueue even when all diagnostic flags are off");
+    }
+
+    @Test
+    void debug_enabled_state_does_not_change_enqueue_result() {
+        // Run with debug off (default), then with debug on; enqueue count must be identical.
+        SableVictimCapture.captureContactPointBlock("minecraft:dirt", 5, 63, 5);
+        Map<Integer, BodySnapshot> snaps = Map.of(10, snapWithVel(10, 5.0, 2.0, 0.0, 0.0));
+        Map<Integer, double[]> startVels = Map.of(10, new double[]{10.0, 0.0, 0.0});
+
+        // Run 1: debug off (default)
+        assertFalse(io.github.omegau371.trueimpact.observation.DiagnosticConfig.ENABLED);
+        SableImpactCapture.process(oneContact(10, 99, 100.0), 1002L, 2, snaps, startVels);
+        long enqueuedOff = io.github.omegau371.trueimpact.damage.DeferredDamageQueue.stats().totalEnqueued();
+
+        // Reset state
+        io.github.omegau371.trueimpact.damage.DeferredDamageQueue.clear();
+        SableVictimCapture.clearForTick();
+        SableImpactCapture.resetCounters();
+
+        // Run 2: debug on
+        io.github.omegau371.trueimpact.observation.DiagnosticConfig.ENABLED = true;
+        try {
+            SableVictimCapture.captureContactPointBlock("minecraft:dirt", 5, 63, 5);
+            SableImpactCapture.process(oneContact(10, 99, 100.0), 1003L, 2, snaps, startVels);
+            long enqueuedOn = io.github.omegau371.trueimpact.damage.DeferredDamageQueue.stats().totalEnqueued();
+
+            assertEquals(enqueuedOff, enqueuedOn,
+                    "DiagnosticConfig.ENABLED must not change enqueue count: off=" + enqueuedOff
+                    + " on=" + enqueuedOn);
+        } finally {
+            io.github.omegau371.trueimpact.observation.DiagnosticConfig.ENABLED = false;
+        }
+    }
+
+    // -- pipeline independence from DiagnosticConfig ----------------------------------------
 
     @Test
     void process_method_does_not_reference_DiagnosticConfig() {
@@ -1268,82 +1319,11 @@ class SableImpactCaptureTest {
         assertFalse(s.worldHasStartVelLastTick(), "resetCounters must clear worldHasStartVel");
         assertEquals(SableImpactCapture.WorldKImpactStatus.NOT_SEEN,
                 s.worldKImpactStatusLastTick(), "resetCounters must reset worldKImpactStatus to NOT_SEEN");
-        assertTrue(s.captureActive(),
-                "resetCounters must restore captureGate to true (active) for test isolation");
         // verify T-8 fields don't linger after reset
         assertNull(s.lastActiveImpactMetrics()); // already checked above, but explicit
     }
 
-    // -- Part B: capture gate (performance) ----------------------------------------
-
-    @Test
-    void capture_returns_empty_and_no_counters_when_gate_inactive() {
-        // Gate inactive: process() must be a no-op -- no counter increments, no records.
-        // In production, DiagnosticContactCaptureMixin sets gate=false when ENABLED=false.
-        // Tests simulate this by calling setCaptureGate(false) directly.
-        Map<Integer, BodySnapshot> snaps = Map.of(
-                10, snap(10, 5.0),
-                20, snap(20, 8.0));
-
-        SableImpactCapture.setCaptureGate(false);
-        List<io.github.omegau371.trueimpact.physics.ImpactRecord> result =
-                SableImpactCapture.process(oneContact(10, 20, 300.0), 900L, 2, snaps, Map.of());
-
-        assertTrue(result.isEmpty(), "gate inactive -> empty list");
-        SableImpactCapture.RuntimeStats s = SableImpactCapture.stats();
-        assertEquals(0L, s.totalProcessCalls(),      "gate inactive -> no call counted");
-        assertEquals(0L, s.totalRawContactsSeen(),   "gate inactive -> no contacts counted");
-        assertEquals(0L, s.totalImpactRecordsCreated(), "gate inactive -> no records counted");
-        assertFalse(s.captureActive(),               "captureActive reflects gate state");
-    }
-
-    @Test
-    void capture_resumes_after_gate_reactivated() {
-        SableImpactCapture.setCaptureGate(false);
-        SableImpactCapture.process(oneContact(10, 20, 300.0), 901L, 2,
-                Map.of(10, snap(10, 5.0), 20, snap(20, 8.0)), Map.of());
-        assertEquals(0L, SableImpactCapture.stats().totalProcessCalls(),
-                "still 0 while gate is inactive");
-
-        SableImpactCapture.setCaptureGate(true);
-        SableImpactCapture.process(oneContact(10, 20, 300.0), 902L, 2,
-                Map.of(10, snap(10, 5.0), 20, snap(20, 8.0)), Map.of());
-        assertEquals(1L, SableImpactCapture.stats().totalProcessCalls(),
-                "gate reactivated -> call is counted");
-        assertTrue(SableImpactCapture.stats().captureActive());
-    }
-
-    @Test
-    void resetCounters_restores_gate_to_active() {
-        SableImpactCapture.setCaptureGate(false);
-        assertFalse(SableImpactCapture.isCaptureActive(), "gate is inactive before reset");
-
-        SableImpactCapture.resetCounters();
-
-        assertTrue(SableImpactCapture.isCaptureActive(),
-                "resetCounters() must restore gate to true for test isolation");
-        assertTrue(SableImpactCapture.stats().captureActive());
-    }
-
-    @Test
-    void gate_inactive_does_not_affect_subsequent_active_session() {
-        // Simulate: all-off → all-on → impact occurs → counters correct
-        SableImpactCapture.setCaptureGate(false);
-        for (int i = 0; i < 5; i++) {
-            SableImpactCapture.process(oneContact(10, 20, 300.0), 910L + i, 2,
-                    Map.of(10, snap(10, 5.0), 20, snap(20, 8.0)), Map.of());
-        }
-        assertEquals(0L, SableImpactCapture.stats().totalProcessCalls(),
-                "5 calls while inactive -> still 0");
-
-        SableImpactCapture.setCaptureGate(true);
-        SableImpactCapture.process(oneContact(10, 20, 300.0), 915L, 2,
-                Map.of(10, snap(10, 5.0), 20, snap(20, 8.0)), Map.of());
-
-        assertEquals(1L, SableImpactCapture.stats().totalProcessCalls(),
-                "exactly 1 call after reactivation");
-        assertEquals(1L, SableImpactCapture.stats().totalImpactRecordsCreated());
-    }
+    // (capture gate tests removed -- captureGate mechanism removed in Phase 2A prep)
 
     // -- Phase 1D victim detection -------------------------------------------------
 

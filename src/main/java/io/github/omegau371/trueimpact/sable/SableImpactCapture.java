@@ -59,21 +59,11 @@ public final class SableImpactCapture {
         NOT_SEEN             // no world contact this tick
     }
 
-    // -- Phase 1C capture gate --------------------------------------------------
-    // When false, process() is a no-op: returns empty list, no counter increments.
-    // Controlled externally by DiagnosticContactCaptureMixin (sets it based on
-    // DiagnosticConfig.ENABLED before each clearCollisions() call).
-    // This class does NOT import DiagnosticConfig (R13 preserved).
-    //
-    // CONTRACT: Remove this gate in Phase 2 when DamageResolver produces real effects.
-    // Until then, running the capture pipeline with DamageResolver=NONE wastes CPU.
-    private static volatile boolean captureGate = true;  // default true for test isolation
-
-    /** Set by DiagnosticContactCaptureMixin. true = active; false = paused. */
-    public static synchronized void setCaptureGate(boolean active) { captureGate = active; }
-
-    /** Returns true when the capture pipeline is currently active. */
-    public static boolean isCaptureActive() { return captureGate; }
+    // The Phase 1C capture gate (captureGate) has been removed.
+    // process() now runs unconditionally on every physics tick.
+    // Diagnostic flags (DiagnosticConfig) only control log output, not pipeline execution.
+    // The dependency between DiagnosticConfig.ENABLED and capture was the root cause of
+    // world-vs-active impacts never enqueuing in production (debug=off) use.
 
     private static long totalProcessCalls;
     private static long totalRawContactsSeen;
@@ -157,7 +147,6 @@ public final class SableImpactCapture {
             ImpactMetrics lastRecordMetrics,         // any ContactType, most recent record
             ImpactMetrics lastActiveImpactMetrics,   // ACTIVE_IMPACT only; null if none since reset
             T8Stats       t8Stats,                   // rolling calibration stats
-            boolean       captureActive,             // false when gate is closed (all diagnostics off)
             VictimInfo    lastVictimInfo,            // Phase 1D: most recent victim detection; null if none
             // Phase 1E world kImpact diagnostics (always reflects last tick that had a world contact)
             boolean            worldContactSeenLastTick,
@@ -184,7 +173,6 @@ public final class SableImpactCapture {
                 lastRecordMetrics,
                 lastActiveImpactMetrics,
                 snapshotT8Stats(),
-                captureGate,
                 lastVictimInfo,
                 lastWorldContactSeen,
                 lastWorldKImpact,
@@ -209,7 +197,6 @@ public final class SableImpactCapture {
         lastRecordMetrics        = null;
         lastActiveImpactMetrics  = null;
         lastVictimInfo           = null;
-        captureGate    = true;  // restore to active so subsequent enable works
         lastWorldContactSeen   = false;
         lastWorldKImpact       = Double.NaN;
         lastWorldActiveId      = -1;
@@ -242,14 +229,6 @@ public final class SableImpactCapture {
             int substepCount,
             Map<Integer, BodySnapshot> lastPostSnaps,
             Map<Integer, double[]> tickStartVels) {
-
-        // Phase 1C gate: skip all processing when capture is paused (all diagnostics off).
-        // captureGate is set by DiagnosticContactCaptureMixin based on DiagnosticConfig.ENABLED.
-        // No counters are incremented when gated -- callers see a stable stats() after all-off.
-        // REMOVE this gate in Phase 2 when DamageResolver produces real effects.
-        if (!captureGate) {
-            return List.of();
-        }
 
         int count = (data != null) ? data.length / 15 : 0;
         if (count <= 0) {
