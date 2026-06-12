@@ -22,4 +22,12 @@ public final class ImpactRuntimeConfig {
      * Default: true.
      */
     public static volatile boolean APPLY_BLOCK_EFFECTS = true;
+
+    /**
+     * Controls cosmetic damage feedback (particles/sounds) for CRACKED/CRITICAL blocks.
+     * When false: DamageFeedbackTracker.shouldEmit() always returns false.
+     * Rate limiting and state classification still occur; only the MC-side emission is suppressed.
+     * Default: true.
+     */
+    public static volatile boolean ENABLE_DAMAGE_FEEDBACK = true;
 }

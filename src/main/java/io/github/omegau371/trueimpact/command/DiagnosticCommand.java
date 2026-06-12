@@ -6,6 +6,7 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import io.github.omegau371.trueimpact.damage.ApplyOutcome;
 import io.github.omegau371.trueimpact.damage.BlockDamageAccumulator;
+import io.github.omegau371.trueimpact.damage.DamageFeedbackTracker;
 import io.github.omegau371.trueimpact.damage.DamageState;
 import io.github.omegau371.trueimpact.damage.DeferredDamageQueue;
 import io.github.omegau371.trueimpact.damage.DeferredDamageEvent;
@@ -432,9 +433,14 @@ public final class DiagnosticCommand {
         // Color by DamageState: INTACT=GREEN, BRUISED=YELLOW, CRACKED=GOLD, CRITICAL=RED.
         BlockDamageAccumulator.Snapshot lastSnap = BlockDamageAccumulator.lastUpdatedSnapshot();
         int accumEntries = BlockDamageAccumulator.entryCount();
+        boolean feedbackEnabled = ImpactRuntimeConfig.ENABLE_DAMAGE_FEEDBACK;
+        int fdbkLast = DamageFeedbackTracker.lastTickFeedbackCount();
         if (lastSnap == null) {
             ctx.getSource().sendSuccess(() -> Component.literal(
-                    "[TI accumulator] entries=0 [no block impacts accumulated yet]")
+                    "[TI accumulator] entries=0"
+                    + " feedback=" + feedbackEnabled
+                    + " fdbk/tick=" + fdbkLast
+                    + " [no block impacts accumulated yet]")
                     .withStyle(ChatFormatting.DARK_GRAY), false);
         } else {
             ChatFormatting accumColor = switch (lastSnap.damageState()) {
@@ -460,7 +466,9 @@ public final class DiagnosticCommand {
                     + " ratio=" + (Double.isFinite(ratioFinal) ? fmt(ratioFinal) : "NaN")
                     + " state=" + snapFinal.damageState()
                     + " hits=" + snapFinal.hitCount()
-                    + " class=" + snapFinal.materialClass())
+                    + " class=" + snapFinal.materialClass()
+                    + " feedback=" + feedbackEnabled
+                    + " fdbk/tick=" + fdbkLast)
                     .withStyle(accumColor), false);
         }
 
