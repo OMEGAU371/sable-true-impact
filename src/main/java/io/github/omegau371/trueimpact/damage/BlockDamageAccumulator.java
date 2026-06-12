@@ -6,12 +6,15 @@ import java.util.Map;
 /**
  * Per-block cumulative damage accumulator for deferred impact events.
  *
- * Accumulates kinetic impact energy (kImpact) per (levelKey, posX, posY, posZ, victimBlock)
- * key. Damage from different block types at the same position is tracked in separate entries,
- * preventing cross-contamination when a block is replaced or a stale event arrives.
+ * Phase 2C: accumulates bounded effective damage (EffectiveDamageModel) rather than raw
+ * kImpact. Each entry is keyed on (levelKey, posX, posY, posZ, victimBlock) so damage
+ * from different block types at the same position stays in separate entries.
  *
- * Phase 2B scope: accumulation and diagnostics only. No block mutation, no crack overlay.
- * Phase 2C+ will use ratio >= 1.0 to trigger further material effects.
+ * Effective damage = min(rawKImpact, threshold * capMultiplier).
+ * Raw kImpact is preserved per-hit for diagnostic display.
+ * DamageState classifies the ratio (accumulatedEffective / threshold) for status coloring.
+ *
+ * Phase 2C scope: accumulation + diagnostics only. No block mutation for STONE/WOOD/etc.
  *
  * Threading: all operations called on the server thread. No synchronization needed.
  * No Minecraft imports -- safe to unit-test without the game runtime.
@@ -25,48 +28,56 @@ public final class BlockDamageAccumulator {
 
     /** Immutable snapshot of accumulated damage state for a single block. */
     public record Snapshot(
-            AccKey key,
+            AccKey     key,
             MaterialThresholdProfile.MaterialClass materialClass,
-            double accumulatedDamageJ,
-            double thresholdJ,
-            double lastImpactJ,
-            long   lastUpdatedTick,
-            int    hitCount
+            double     accumulatedEffectiveDamageJ,
+            double     thresholdJ,
+            double     lastRawImpactJ,
+            double     lastEffectiveDamageJ,
+            long       lastUpdatedTick,
+            int        hitCount,
+            DamageState damageState
     ) {
-        /** Ratio of accumulated damage to threshold. NaN when threshold is zero. */
+        /** Ratio of accumulated effective damage to threshold. NaN when threshold is zero. */
         public double ratio() {
-            return thresholdJ > 0.0 ? accumulatedDamageJ / thresholdJ : Double.NaN;
+            return thresholdJ > 0.0 ? accumulatedEffectiveDamageJ / thresholdJ : Double.NaN;
         }
     }
 
     private static final class Entry {
         final MaterialThresholdProfile.MaterialClass materialClass;
         final double thresholdJ;
-        double accumulatedDamageJ;
-        double lastImpactJ;
-        long   lastUpdatedTick;
-        int    hitCount;
+        double     accumulatedEffectiveDamageJ;
+        double     lastRawImpactJ;
+        double     lastEffectiveDamageJ;
+        long       lastUpdatedTick;
+        int        hitCount;
+        DamageState damageState;
 
         Entry(MaterialThresholdProfile.MaterialClass mc, double threshold,
-              double firstImpact, long tick) {
-            this.materialClass      = mc;
-            this.thresholdJ         = threshold;
-            this.accumulatedDamageJ = firstImpact;
-            this.lastImpactJ        = firstImpact;
-            this.lastUpdatedTick    = tick;
-            this.hitCount           = 1;
+              double rawImpact, double effectiveDamage, long tick) {
+            this.materialClass              = mc;
+            this.thresholdJ                 = threshold;
+            this.accumulatedEffectiveDamageJ = effectiveDamage;
+            this.lastRawImpactJ             = rawImpact;
+            this.lastEffectiveDamageJ       = effectiveDamage;
+            this.lastUpdatedTick            = tick;
+            this.hitCount                   = 1;
+            this.damageState                = DamageState.of(effectiveDamage / threshold);
         }
 
-        void addImpact(double kImpact, long tick) {
-            accumulatedDamageJ += kImpact;
-            lastImpactJ         = kImpact;
-            lastUpdatedTick     = tick;
+        void addImpact(double rawImpact, double effectiveDamage, long tick) {
+            accumulatedEffectiveDamageJ += effectiveDamage;
+            lastRawImpactJ               = rawImpact;
+            lastEffectiveDamageJ         = effectiveDamage;
+            lastUpdatedTick              = tick;
             hitCount++;
+            damageState = DamageState.of(accumulatedEffectiveDamageJ / thresholdJ);
         }
 
         Snapshot toSnapshot(AccKey key) {
-            return new Snapshot(key, materialClass, accumulatedDamageJ, thresholdJ,
-                    lastImpactJ, lastUpdatedTick, hitCount);
+            return new Snapshot(key, materialClass, accumulatedEffectiveDamageJ, thresholdJ,
+                    lastRawImpactJ, lastEffectiveDamageJ, lastUpdatedTick, hitCount, damageState);
         }
     }
 
@@ -74,24 +85,27 @@ public final class BlockDamageAccumulator {
     private static Snapshot lastUpdatedSnapshot;
 
     /**
-     * Accumulates damage from a drained DeferredDamageEvent.
+     * Accumulates bounded effective damage from a drained DeferredDamageEvent.
      *
+     * Calls EffectiveDamageModel.compute() to cap raw kImpact per material class.
      * Creates a new entry if none exists for this (levelKey, pos, victimBlock) triplet;
-     * otherwise adds kImpact to the running total and updates hit counters.
+     * otherwise adds effectiveDamageJ to the running total.
      *
      * Called from TrueImpactMod.onServerTickPost() before ImpactBlockApplicator.tryApply().
      * DiagnosticConfig state does not affect whether accumulation occurs.
      */
     public static void accumulate(DeferredDamageEvent event) {
+        EffectiveDamageModel.Result eff = EffectiveDamageModel.compute(
+                event.kImpact(), event.materialClass(), event.threshold());
         AccKey key = new AccKey(event.levelKey(),
                 event.posX(), event.posY(), event.posZ(), event.victimBlock());
         Entry entry = entries.get(key);
         if (entry == null) {
             entry = new Entry(event.materialClass(), event.threshold(),
-                    event.kImpact(), event.serverTick());
+                    eff.rawImpactJ(), eff.effectiveDamageJ(), event.serverTick());
             entries.put(key, entry);
         } else {
-            entry.addImpact(event.kImpact(), event.serverTick());
+            entry.addImpact(eff.rawImpactJ(), eff.effectiveDamageJ(), event.serverTick());
         }
         lastUpdatedSnapshot = entry.toSnapshot(key);
     }

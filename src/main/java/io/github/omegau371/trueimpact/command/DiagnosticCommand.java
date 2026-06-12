@@ -6,6 +6,7 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import io.github.omegau371.trueimpact.damage.ApplyOutcome;
 import io.github.omegau371.trueimpact.damage.BlockDamageAccumulator;
+import io.github.omegau371.trueimpact.damage.DamageState;
 import io.github.omegau371.trueimpact.damage.DeferredDamageQueue;
 import io.github.omegau371.trueimpact.damage.DeferredDamageEvent;
 import io.github.omegau371.trueimpact.damage.ImpactRuntimeConfig;
@@ -427,8 +428,8 @@ public final class DiagnosticCommand {
             ctx.getSource().sendSuccess(() -> Component.literal(qLine).withStyle(qColor), false);
         }
 
-        // Line 12: Phase 2B block damage accumulator state.
-        // Color: DARK_GRAY=no data; GREEN=ratio<0.5; GOLD=0.5<=ratio<1.0; RED=ratio>=1.0.
+        // Line 12: Phase 2C block damage accumulator -- effective damage and damage state.
+        // Color by DamageState: INTACT=GREEN, BRUISED=YELLOW, CRACKED=GOLD, CRITICAL=RED.
         BlockDamageAccumulator.Snapshot lastSnap = BlockDamageAccumulator.lastUpdatedSnapshot();
         int accumEntries = BlockDamageAccumulator.entryCount();
         if (lastSnap == null) {
@@ -436,18 +437,15 @@ public final class DiagnosticCommand {
                     "[TI accumulator] entries=0 [no block impacts accumulated yet]")
                     .withStyle(ChatFormatting.DARK_GRAY), false);
         } else {
-            double ratio = lastSnap.ratio();
-            ChatFormatting accumColor;
-            if (!Double.isFinite(ratio) || ratio < 0.5) {
-                accumColor = ChatFormatting.GREEN;
-            } else if (ratio < 1.0) {
-                accumColor = ChatFormatting.GOLD;
-            } else {
-                accumColor = ChatFormatting.RED;
-            }
+            ChatFormatting accumColor = switch (lastSnap.damageState()) {
+                case INTACT   -> ChatFormatting.GREEN;
+                case BRUISED  -> ChatFormatting.YELLOW;
+                case CRACKED  -> ChatFormatting.GOLD;
+                case CRITICAL -> ChatFormatting.RED;
+            };
             final int accumEntriesFinal = accumEntries;
             final BlockDamageAccumulator.Snapshot snapFinal = lastSnap;
-            final double ratioFinal = ratio;
+            final double ratioFinal = lastSnap.ratio();
             ctx.getSource().sendSuccess(() -> Component.literal(
                     "[TI accumulator]"
                     + " entries=" + accumEntriesFinal
@@ -455,12 +453,14 @@ public final class DiagnosticCommand {
                     + " block=" + snapFinal.key().victimBlock()
                     + " pos=(" + snapFinal.key().posX() + "," + snapFinal.key().posY()
                     + "," + snapFinal.key().posZ() + ")"
-                    + " accum=" + fmt(snapFinal.accumulatedDamageJ()) + "J"
+                    + " rawLast=" + fmt(snapFinal.lastRawImpactJ()) + "J"
+                    + " effLast=" + fmt(snapFinal.lastEffectiveDamageJ()) + "J"
+                    + " accumEff=" + fmt(snapFinal.accumulatedEffectiveDamageJ()) + "J"
                     + " threshold=" + fmt(snapFinal.thresholdJ()) + "J"
                     + " ratio=" + (Double.isFinite(ratioFinal) ? fmt(ratioFinal) : "NaN")
+                    + " state=" + snapFinal.damageState()
                     + " hits=" + snapFinal.hitCount()
-                    + " class=" + snapFinal.materialClass()
-                    + " lastHit=" + fmt(snapFinal.lastImpactJ()) + "J")
+                    + " class=" + snapFinal.materialClass())
                     .withStyle(accumColor), false);
         }
 

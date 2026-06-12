@@ -64,7 +64,13 @@ public abstract class DiagnosticContactCaptureMixin {
         Map<Integer, BodySnapshot> snaps        = SableEventBridge.getLastPostSnapshots();
         Map<Integer, double[]>    tickStartVels = SableEventBridge.getTickStartVels();
         long tick                      = level.getGameTime();
-        String levelKey                = level.dimension().location().toString();
+        // Use SubLevelPhysicsSystem.getLevel() for the dimension key.
+        // RapierPhysicsPipeline.level can be a virtual physics level whose dimension()
+        // is not registered in the Minecraft level registry (returns "minecraft:missing").
+        // system.getLevel() is always the real parent ServerLevel (overworld/nether/end).
+        String levelKey = (system != null)
+                ? system.getLevel().dimension().location().toString()
+                : level.dimension().location().toString();
 
         // Contact-point block detection for world-vs-active contacts (PATH A, unconditional).
         // BlockSubLevelCollisionCallback fires only for blocks implementing
