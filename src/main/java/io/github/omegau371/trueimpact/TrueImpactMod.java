@@ -3,6 +3,7 @@ package io.github.omegau371.trueimpact;
 import io.github.omegau371.trueimpact.command.DiagnosticCommand;
 import io.github.omegau371.trueimpact.command.StatusCommand;
 import io.github.omegau371.trueimpact.damage.ApplyOutcome;
+import io.github.omegau371.trueimpact.damage.BlockDamageAccumulator;
 import io.github.omegau371.trueimpact.damage.BlockView;
 import io.github.omegau371.trueimpact.damage.DeferredDamageEvent;
 import io.github.omegau371.trueimpact.damage.DeferredDamageQueue;
@@ -36,6 +37,7 @@ public class TrueImpactMod {
         NeoForge.EVENT_BUS.addListener(this::onServerTick);
         NeoForge.EVENT_BUS.addListener(this::onServerTickPost);
         NeoForge.EVENT_BUS.addListener(this::onServerStopped);
+        DiagnosticStateManager.registerFlushHook(BlockDamageAccumulator::clear);
 
         if (DistInfo.isSableLoaded()) {
             LOGGER.info("True Impact: Sable detected -- diagnostic observation layer ready (mixins applied by plugin)");
@@ -74,6 +76,7 @@ public class TrueImpactMod {
         if (events.isEmpty()) return;
         MinecraftServer server = event.getServer();
         for (DeferredDamageEvent e : events) {
+            BlockDamageAccumulator.accumulate(e);
             ServerLevel level = findLevel(server, e.levelKey());
             ApplyOutcome outcome;
             if (level == null) {
