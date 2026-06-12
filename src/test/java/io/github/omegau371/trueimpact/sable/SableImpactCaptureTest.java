@@ -23,7 +23,8 @@ class SableImpactCaptureTest {
     @BeforeEach
     void resetCaptureCounters() {
         SableImpactCapture.resetCounters();
-        SableVictimCapture.clearForTick(); // ensure no stale callback data between tests
+        SableVictimCapture.clearForTick();
+        io.github.omegau371.trueimpact.damage.DeferredDamageQueue.clear();
     }
 
     /** Minimal active snapshot: identity orientation, no valid velocity. */
@@ -1401,6 +1402,88 @@ class SableImpactCaptureTest {
         io.github.omegau371.trueimpact.damage.VictimInfo vi =
                 SableImpactCapture.stats().lastVictimInfo();
         assertNull(vi, "both-unknown contact must not update lastVictimInfo");
+    }
+
+    // -- Phase 1E deferred damage queue enqueue conditions ----------------------------
+
+    @Test
+    void active_sublevel_contact_does_not_enqueue() {
+        // active-vs-active only -> ACTIVE_SUBLEVEL kind -> must not enqueue
+        Map<Integer, BodySnapshot> snaps = Map.of(10, snap(10, 5.0), 20, snap(20, 8.0));
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 960L, 2, snaps, Map.of());
+
+        assertEquals(0L,
+                io.github.omegau371.trueimpact.damage.DeferredDamageQueue.stats().totalEnqueued(),
+                "active-vs-active contact must not enqueue");
+    }
+
+    @Test
+    void world_contact_below_threshold_does_not_enqueue() {
+        // World contact: active body (id=10) vs world (id=99).
+        // dirt threshold = 5.0; single-body kImpact = 0.5*5*|0-0| = 0 < 5 -> no enqueue
+        SableVictimCapture.captureContactPointBlock("minecraft:dirt", 5, 63, 5);
+        Map<Integer, BodySnapshot> snaps = Map.of(10, snapWithVel(10, 5.0, 0.1, 0.0, 0.0));
+        // start vel also near-zero -> delta near-zero kImpact
+        Map<Integer, double[]> startVels = Map.of(10, new double[]{0.08, 0.0, 0.0});
+        SableImpactCapture.process(oneContact(10, 99, 50.0), 961L, 2, snaps, startVels);
+
+        assertEquals(0L,
+                io.github.omegau371.trueimpact.damage.DeferredDamageQueue.stats().totalEnqueued(),
+                "kImpact below threshold must not enqueue");
+    }
+
+    @Test
+    void world_contact_above_threshold_enqueues() {
+        // Active body: mass=5.0, vBefore=(10,0,0), vAfter=(2,0,0)
+        // kImpact = 0.5 * 5.0 * |100 - 4| = 240 > dirt threshold 5.0 -> enqueue
+        SableVictimCapture.captureContactPointBlock("minecraft:dirt", 5, 63, 5);
+        Map<Integer, BodySnapshot> snaps = Map.of(10, snapWithVel(10, 5.0, 2.0, 0.0, 0.0));
+        Map<Integer, double[]> startVels = Map.of(10, new double[]{10.0, 0.0, 0.0});
+        SableImpactCapture.process(oneContact(10, 99, 100.0), 962L, 2, snaps, startVels);
+
+        assertEquals(1L,
+                io.github.omegau371.trueimpact.damage.DeferredDamageQueue.stats().totalEnqueued(),
+                "WORLD_BLOCK with kImpact > threshold must enqueue");
+    }
+
+    @Test
+    void world_contact_nan_kImpact_does_not_enqueue() {
+        // No start vels -> worldKImpact = NaN -> no enqueue
+        SableVictimCapture.captureContactPointBlock("minecraft:dirt", 5, 63, 5);
+        Map<Integer, BodySnapshot> snaps = Map.of(10, snapWithVel(10, 5.0, 2.0, 0.0, 0.0));
+        SableImpactCapture.process(oneContact(10, 99, 100.0), 963L, 2, snaps, Map.of());
+
+        assertEquals(0L,
+                io.github.omegau371.trueimpact.damage.DeferredDamageQueue.stats().totalEnqueued(),
+                "NaN kImpact (no start vels) must not enqueue");
+    }
+
+    @Test
+    void world_contact_dedup_same_tick_pos_block() {
+        // Two process() calls same tick, same pos/block -> dedup -> only 1 enqueue
+        SableVictimCapture.captureContactPointBlock("minecraft:dirt", 5, 63, 5);
+        Map<Integer, BodySnapshot> snaps = Map.of(10, snapWithVel(10, 5.0, 2.0, 0.0, 0.0));
+        Map<Integer, double[]> startVels = Map.of(10, new double[]{10.0, 0.0, 0.0});
+        SableImpactCapture.process(oneContact(10, 99, 100.0), 964L, 2, snaps, startVels);
+        SableImpactCapture.process(oneContact(10, 99, 100.0), 964L, 2, snaps, startVels);
+
+        assertEquals(1L,
+                io.github.omegau371.trueimpact.damage.DeferredDamageQueue.stats().totalEnqueued(),
+                "same tick/pos/block must be deduped");
+    }
+
+    @Test
+    void world_contact_different_ticks_both_enqueue() {
+        SableVictimCapture.captureContactPointBlock("minecraft:dirt", 5, 63, 5);
+        Map<Integer, BodySnapshot> snaps = Map.of(10, snapWithVel(10, 5.0, 2.0, 0.0, 0.0));
+        Map<Integer, double[]> startVels = Map.of(10, new double[]{10.0, 0.0, 0.0});
+        SableImpactCapture.process(oneContact(10, 99, 100.0), 965L, 2, snaps, startVels);
+        SableVictimCapture.captureContactPointBlock("minecraft:dirt", 5, 63, 5);
+        SableImpactCapture.process(oneContact(10, 99, 100.0), 966L, 2, snaps, startVels);
+
+        assertEquals(2L,
+                io.github.omegau371.trueimpact.damage.DeferredDamageQueue.stats().totalEnqueued(),
+                "different ticks same pos/block must both enqueue");
     }
 
     // -- Phase 1C canonical velocity-derived fields ------------------------------------

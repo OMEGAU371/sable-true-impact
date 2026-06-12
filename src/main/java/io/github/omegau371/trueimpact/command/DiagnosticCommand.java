@@ -4,6 +4,8 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.context.CommandContext;
+import io.github.omegau371.trueimpact.damage.DeferredDamageQueue;
+import io.github.omegau371.trueimpact.damage.DeferredDamageEvent;
 import io.github.omegau371.trueimpact.damage.MaterialThresholdProfile;
 import io.github.omegau371.trueimpact.damage.VictimInfo;
 import io.github.omegau371.trueimpact.diagnostic.T4ApplyForceExperiment;
@@ -353,6 +355,35 @@ public final class DiagnosticCommand {
                     + " note=" + noteStr;
             ctx.getSource().sendSuccess(() -> Component.literal(threshLine).withStyle(threshColor), false);
         }
+        // Line 11: Phase 1E deferred damage queue state.
+        // YELLOW when pending > 0 (events awaiting flush), AQUA when totalEnqueued > 0 but empty
+        // (events have been produced and flushed), DARK_GRAY when no events ever produced.
+        DeferredDamageQueue.QueueStats qStats = DeferredDamageQueue.stats();
+        if (qStats.totalEnqueued() == 0) {
+            ctx.getSource().sendSuccess(() -> Component.literal(
+                    "[TI damage queue] pending=0 totalEnqueued=0 totalFlushed=0"
+                    + " [no WORLD_BLOCK impacts above threshold detected yet]")
+                    .withStyle(ChatFormatting.DARK_GRAY), false);
+        } else {
+            ChatFormatting qColor = (qStats.pending() > 0)
+                    ? ChatFormatting.YELLOW : ChatFormatting.AQUA;
+            DeferredDamageEvent last = qStats.lastFlushed();
+            String lastStr = (last == null) ? "none"
+                    : ("t" + last.serverTick()
+                       + " " + last.victimBlock()
+                       + " (" + last.posX() + "," + last.posY() + "," + last.posZ() + ")"
+                       + " kImpact=" + fmt(last.kImpact())
+                       + " class=" + last.materialClass()
+                       + " src=" + last.source());
+            final String qLine = "[TI damage queue]"
+                    + " pending=" + qStats.pending()
+                    + " totalEnqueued=" + qStats.totalEnqueued()
+                    + " totalFlushed=" + qStats.totalFlushed()
+                    + " last=" + lastStr
+                    + " note=diagnostic-only-no-destroyBlock";
+            ctx.getSource().sendSuccess(() -> Component.literal(qLine).withStyle(qColor), false);
+        }
+
         return 1;
     }
 

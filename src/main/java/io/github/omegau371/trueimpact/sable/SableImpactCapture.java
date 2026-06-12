@@ -1,6 +1,8 @@
 package io.github.omegau371.trueimpact.sable;
 
 import io.github.omegau371.trueimpact.damage.DamageResolver;
+import io.github.omegau371.trueimpact.damage.DeferredDamageEvent;
+import io.github.omegau371.trueimpact.damage.DeferredDamageQueue;
 import io.github.omegau371.trueimpact.damage.VictimInfo;
 import io.github.omegau371.trueimpact.observation.BodySnapshot;
 import io.github.omegau371.trueimpact.physics.ContactType;
@@ -219,6 +221,10 @@ public final class SableImpactCapture {
         // Aggregate contact records by active-vs-active pair.
         Map<Long, PairAccum> pairMap = new LinkedHashMap<>();
         boolean sawWorldContact = false;
+        // Phase 1E: best single-body kImpact estimate from world-vs-active contacts.
+        // Used when no active-vs-active metrics are available (world-only tick).
+        // = 0.5 * massActive * |vBefore^2 - vAfter^2|; NaN when velocity unavailable.
+        double worldKImpact = Double.NaN;
 
         for (int i = 0; i < count; i++) {
             int base = i * 15;
@@ -233,9 +239,26 @@ public final class SableImpactCapture {
             if (snapA == null && snapB == null) continue; // both unknown -- no active body
             if (snapA == null || snapB == null) {
                 // Phase 1D: world-vs-active or active-vs-world contact detected.
-                // Do NOT create an ImpactRecord (no active-vs-active pair to compute impulse).
-                // Flag for VictimInfo building after the loop.
                 sawWorldContact = true;
+
+                // Phase 1E: compute single-body kinetic energy change for world contact.
+                // Active body loses/gains energy due to collision with static world.
+                // mEff for world contact = massActive (world is infinitely massive).
+                BodySnapshot aSnap = (snapA != null) ? snapA : snapB;
+                int aId = (snapA != null) ? idA : idB;
+                if (aSnap.velocityReadValid()) {
+                    double[] vb = tickStartVels.get(aId);
+                    if (vb != null) {
+                        double vbSq = vb[0]*vb[0] + vb[1]*vb[1] + vb[2]*vb[2];
+                        double vaSq = aSnap.linVelX()*aSnap.linVelX()
+                                    + aSnap.linVelY()*aSnap.linVelY()
+                                    + aSnap.linVelZ()*aSnap.linVelZ();
+                        double k = 0.5 * aSnap.massKpg() * Math.abs(vbSq - vaSq);
+                        if (Double.isNaN(worldKImpact) || k > worldKImpact) {
+                            worldKImpact = k;
+                        }
+                    }
+                }
                 continue;
             }
 
@@ -274,12 +297,27 @@ public final class SableImpactCapture {
         }
 
         if (pairMap.isEmpty()) {
-            // No active-vs-active pairs. Still update VictimInfo if world contact detected.
+            // No active-vs-active pairs. Still update VictimInfo + enqueue if world contact.
             VictimInfo noActiveVictim = null;
             if (sawWorldContact) {
                 noActiveVictim = SableVictimCapture.hasCaptureThisTick()
                         ? SableVictimCapture.buildWorldVictimInfo()
                         : VictimInfo.worldContactNoCallback();
+
+                // Phase 1E: enqueue when WORLD_BLOCK + single-body kImpact exceeds threshold.
+                if (noActiveVictim.kind() == VictimInfo.Kind.WORLD_BLOCK
+                        && Double.isFinite(worldKImpact)
+                        && worldKImpact > noActiveVictim.materialThresholdJ()) {
+                    DeferredDamageQueue.enqueue(new DeferredDamageEvent(
+                            serverTick,
+                            noActiveVictim.blockId(),
+                            noActiveVictim.posX(), noActiveVictim.posY(), noActiveVictim.posZ(),
+                            noActiveVictim.materialClass(),
+                            worldKImpact,
+                            noActiveVictim.materialThresholdJ(),
+                            noActiveVictim.source(),
+                            noActiveVictim.confidence()));
+                }
             }
             recordStats(serverTick, count, 0, 0, 0, null, null, noActiveVictim);
             return List.of();
@@ -350,6 +388,27 @@ public final class SableImpactCapture {
                     : VictimInfo.worldContactNoCallback();
         } else {
             tickVictim = VictimInfo.activeSublevel();
+        }
+
+        // Phase 1E: enqueue when WORLD_BLOCK detected + energy exceeds threshold.
+        // Prefer active-vs-active kImpact (full pair measurement if available),
+        // fall back to single-body world estimate (worldKImpact, requires contacts on).
+        if (tickVictim.kind() == VictimInfo.Kind.WORLD_BLOCK) {
+            double kImpact = (latestRecordMetrics != null
+                    && Double.isFinite(latestRecordMetrics.kineticImpactEnergyJ()))
+                    ? latestRecordMetrics.kineticImpactEnergyJ()
+                    : worldKImpact;
+            if (Double.isFinite(kImpact) && kImpact > tickVictim.materialThresholdJ()) {
+                DeferredDamageQueue.enqueue(new DeferredDamageEvent(
+                        serverTick,
+                        tickVictim.blockId(),
+                        tickVictim.posX(), tickVictim.posY(), tickVictim.posZ(),
+                        tickVictim.materialClass(),
+                        kImpact,
+                        tickVictim.materialThresholdJ(),
+                        tickVictim.source(),
+                        tickVictim.confidence()));
+            }
         }
 
         recordStats(serverTick, count, result.size(), activeImpactCount, sustainedCount,

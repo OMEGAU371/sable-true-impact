@@ -2,6 +2,7 @@ package io.github.omegau371.trueimpact;
 
 import io.github.omegau371.trueimpact.command.DiagnosticCommand;
 import io.github.omegau371.trueimpact.command.StatusCommand;
+import io.github.omegau371.trueimpact.damage.DeferredDamageQueue;
 import io.github.omegau371.trueimpact.diagnostic.ExperimentLog;
 import io.github.omegau371.trueimpact.observation.DiagnosticConfig;
 import io.github.omegau371.trueimpact.observation.DiagnosticStateManager;
@@ -24,6 +25,7 @@ public class TrueImpactMod {
         LOGGER.info("True Impact {} initializing", TrueImpactVersion.VERSION);
         NeoForge.EVENT_BUS.addListener(this::onRegisterCommands);
         NeoForge.EVENT_BUS.addListener(this::onServerTick);
+        NeoForge.EVENT_BUS.addListener(this::onServerTickPost);
         NeoForge.EVENT_BUS.addListener(this::onServerStopped);
 
         if (DistInfo.isSableLoaded()) {
@@ -53,6 +55,14 @@ public class TrueImpactMod {
         if (DiagnosticConfig.ENABLED) {
             int dropped = ExperimentLog.logDroppedSummaryIfNeeded();
         }
+    }
+
+    private void onServerTickPost(ServerTickEvent.Post event) {
+        // Phase 1E: flush deferred damage queue each tick.
+        // Fires after all world ticks (safe world-access window; physics step is complete).
+        // Phase 1E flush: count only, no destroyBlock.
+        // Phase 2A will call DamageResolver.resolve() here.
+        DeferredDamageQueue.flush();
     }
 
     private void onServerStopped(ServerStoppedEvent event) {

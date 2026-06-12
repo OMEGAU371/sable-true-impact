@@ -5,6 +5,7 @@ import dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import dev.ryanhcode.sable.sublevel.system.SubLevelPhysicsSystem;
+import io.github.omegau371.trueimpact.damage.DeferredDamageQueue;
 import io.github.omegau371.trueimpact.diagnostic.ExperimentLog;
 import io.github.omegau371.trueimpact.diagnostic.T4ApplyForceExperiment;
 import io.github.omegau371.trueimpact.observation.BodySnapshot;
@@ -74,9 +75,10 @@ public final class SableEventBridge {
     private SableEventBridge() {}
 
     static {
-        // Register cleanup hook so DiagnosticStateManager.clearAll() flushes our state
+        // Register cleanup hooks so DiagnosticStateManager.clearAll() flushes all state
         DiagnosticStateManager.registerFlushHook(SableEventBridge::clearState);
         DiagnosticStateManager.registerFlushHook(T4ApplyForceExperiment::clearAll);
+        DiagnosticStateManager.registerFlushHook(DeferredDamageQueue::clear); // Phase 1E
     }
 
     public static void clearState() {
