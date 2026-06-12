@@ -48,6 +48,17 @@ public final class SableImpactCapture {
     static final double IMPACT_IMPULSE_PER_CONTACT_THRESHOLD = 5.0;
     static final double PHASE_1C_PLACEHOLDER_MATERIAL_THRESHOLD_J = 50.0;
 
+    // -- Phase 1E world kImpact diagnostic status --------------------------------
+    // Reported per tick to explain why worldKImpact is NaN or finite.
+    public enum WorldKImpactStatus {
+        OK,                  // worldKImpact finite and valid
+        NO_ACTIVE_SNAPSHOT,  // active body not found in lastPostSnaps
+        NO_POST_VEL,         // active body velocityReadValid() == false
+        NO_START_VEL,        // no tickStartVels entry for active body (enable 'debug contacts on')
+        NON_FINITE,          // computed but non-finite (unexpected)
+        NOT_SEEN             // no world contact this tick
+    }
+
     // -- Phase 1C capture gate --------------------------------------------------
     // When false, process() is a no-op: returns empty list, no counter increments.
     // Controlled externally by DiagnosticContactCaptureMixin (sets it based on
@@ -95,6 +106,16 @@ public final class SableImpactCapture {
     // null until first contact event since last reset.
     private static VictimInfo lastVictimInfo;
 
+    // Phase 1E: world kImpact diagnostic fields -- always overwritten each tick that
+    // has a world contact; NOT "last non-zero" semantics.
+    // worldKImpactStatusLastTick explains why worldKImpactLastTick is NaN or finite.
+    private static boolean            lastWorldContactSeen;
+    private static double             lastWorldKImpact       = Double.NaN;
+    private static int                lastWorldActiveId      = -1;
+    private static boolean            lastWorldHasPostVel;
+    private static boolean            lastWorldHasStartVel;
+    private static WorldKImpactStatus lastWorldKImpactStatus = WorldKImpactStatus.NOT_SEEN;
+
     // -- T-8 rolling stats -------------------------------------------------------
     // Updated only when: ACTIVE_IMPACT AND impactEnergyJ finite > 0 AND kineticDelta finite.
     private static final int T8_WINDOW = 32;
@@ -137,7 +158,14 @@ public final class SableImpactCapture {
             ImpactMetrics lastActiveImpactMetrics,   // ACTIVE_IMPACT only; null if none since reset
             T8Stats       t8Stats,                   // rolling calibration stats
             boolean       captureActive,             // false when gate is closed (all diagnostics off)
-            VictimInfo    lastVictimInfo             // Phase 1D: most recent victim detection; null if none
+            VictimInfo    lastVictimInfo,            // Phase 1D: most recent victim detection; null if none
+            // Phase 1E world kImpact diagnostics (always reflects last tick that had a world contact)
+            boolean            worldContactSeenLastTick,
+            double             worldKImpactLastTick,
+            int                worldActiveIdLastTick,
+            boolean            worldHasPostVelLastTick,
+            boolean            worldHasStartVelLastTick,
+            WorldKImpactStatus worldKImpactStatusLastTick
     ) {}
 
     public static synchronized RuntimeStats stats() {
@@ -157,7 +185,13 @@ public final class SableImpactCapture {
                 lastActiveImpactMetrics,
                 snapshotT8Stats(),
                 captureGate,
-                lastVictimInfo);
+                lastVictimInfo,
+                lastWorldContactSeen,
+                lastWorldKImpact,
+                lastWorldActiveId,
+                lastWorldHasPostVel,
+                lastWorldHasStartVel,
+                lastWorldKImpactStatus);
     }
 
     public static synchronized void resetCounters() {
@@ -176,6 +210,12 @@ public final class SableImpactCapture {
         lastActiveImpactMetrics  = null;
         lastVictimInfo           = null;
         captureGate    = true;  // restore to active so subsequent enable works
+        lastWorldContactSeen   = false;
+        lastWorldKImpact       = Double.NaN;
+        lastWorldActiveId      = -1;
+        lastWorldHasPostVel    = false;
+        lastWorldHasStartVel   = false;
+        lastWorldKImpactStatus = WorldKImpactStatus.NOT_SEEN;
         t8SampleCount  = 0;
         t8LastRatio    = Double.NaN;
         t8MinRatio     = Double.NaN;
@@ -226,6 +266,12 @@ public final class SableImpactCapture {
         // = 0.5 * massActive * |vBefore^2 - vAfter^2|; NaN when velocity unavailable.
         double worldKImpact = Double.NaN;
 
+        // Phase 1E world kImpact diagnostic tracking (per-tick, OR semantics for flags).
+        int     worldDiagActiveId    = -1;
+        boolean worldDiagHasPostVel  = false;
+        boolean worldDiagHasStartVel = false;
+        WorldKImpactStatus worldDiagStatus = WorldKImpactStatus.NOT_SEEN;
+
         for (int i = 0; i < count; i++) {
             int base = i * 15;
             int    idA      = (int) data[base];
@@ -246,9 +292,25 @@ public final class SableImpactCapture {
                 // mEff for world contact = massActive (world is infinitely massive).
                 BodySnapshot aSnap = (snapA != null) ? snapA : snapB;
                 int aId = (snapA != null) ? idA : idB;
-                if (aSnap.velocityReadValid()) {
+                worldDiagActiveId = aId; // last active id seen (diagnostic)
+
+                if (!aSnap.velocityReadValid()) {
+                    // Only set failure status if we don't already have a better one.
+                    if (worldDiagStatus != WorldKImpactStatus.OK
+                            && worldDiagStatus != WorldKImpactStatus.NON_FINITE
+                            && worldDiagStatus != WorldKImpactStatus.NO_START_VEL) {
+                        worldDiagStatus = WorldKImpactStatus.NO_POST_VEL;
+                    }
+                } else {
+                    worldDiagHasPostVel = true;
                     double[] vb = tickStartVels.get(aId);
-                    if (vb != null) {
+                    if (vb != null) worldDiagHasStartVel = true;
+                    if (vb == null) {
+                        if (worldDiagStatus != WorldKImpactStatus.OK
+                                && worldDiagStatus != WorldKImpactStatus.NON_FINITE) {
+                            worldDiagStatus = WorldKImpactStatus.NO_START_VEL;
+                        }
+                    } else {
                         double vbSq = vb[0]*vb[0] + vb[1]*vb[1] + vb[2]*vb[2];
                         double vaSq = aSnap.linVelX()*aSnap.linVelX()
                                     + aSnap.linVelY()*aSnap.linVelY()
@@ -256,6 +318,11 @@ public final class SableImpactCapture {
                         double k = 0.5 * aSnap.massKpg() * Math.abs(vbSq - vaSq);
                         if (Double.isNaN(worldKImpact) || k > worldKImpact) {
                             worldKImpact = k;
+                        }
+                        if (Double.isFinite(k)) {
+                            worldDiagStatus = WorldKImpactStatus.OK; // once OK, stays OK
+                        } else if (worldDiagStatus != WorldKImpactStatus.OK) {
+                            worldDiagStatus = WorldKImpactStatus.NON_FINITE;
                         }
                     }
                 }
@@ -319,7 +386,9 @@ public final class SableImpactCapture {
                             noActiveVictim.confidence()));
                 }
             }
-            recordStats(serverTick, count, 0, 0, 0, null, null, noActiveVictim);
+            recordStats(serverTick, count, 0, 0, 0, null, null, noActiveVictim,
+                    sawWorldContact, worldKImpact, worldDiagActiveId,
+                    worldDiagHasPostVel, worldDiagHasStartVel, worldDiagStatus);
             return List.of();
         }
 
@@ -412,20 +481,29 @@ public final class SableImpactCapture {
         }
 
         recordStats(serverTick, count, result.size(), activeImpactCount, sustainedCount,
-                latestRecordMetrics, latestActiveImpactMetrics, tickVictim);
+                latestRecordMetrics, latestActiveImpactMetrics, tickVictim,
+                sawWorldContact, worldKImpact, worldDiagActiveId,
+                worldDiagHasPostVel, worldDiagHasStartVel, worldDiagStatus);
         return result;
     }
 
     private static synchronized void recordStats(long tick, int rawContacts, int records,
                                                   int activeImpacts, int sustained) {
-        recordStats(tick, rawContacts, records, activeImpacts, sustained, null, null, null);
+        recordStats(tick, rawContacts, records, activeImpacts, sustained, null, null, null,
+                false, Double.NaN, -1, false, false, WorldKImpactStatus.NOT_SEEN);
     }
 
     private static synchronized void recordStats(long tick, int rawContacts, int records,
                                                   int activeImpacts, int sustained,
                                                   ImpactMetrics latestRecordMetrics,
                                                   ImpactMetrics latestActiveImpactMetrics,
-                                                  VictimInfo tickVictimInfo) {
+                                                  VictimInfo tickVictimInfo,
+                                                  boolean worldContactSeen,
+                                                  double worldKImpact,
+                                                  int worldActiveId,
+                                                  boolean worldHasPostVel,
+                                                  boolean worldHasStartVel,
+                                                  WorldKImpactStatus worldStatus) {
         totalProcessCalls++;
         totalRawContactsSeen      += rawContacts;
         totalImpactRecordsCreated += records;
@@ -456,6 +534,13 @@ public final class SableImpactCapture {
         if (tickVictimInfo != null) {
             lastVictimInfo = tickVictimInfo;
         }
+        // Phase 1E world kImpact diagnostics: always overwrite (not last-non-zero semantics).
+        lastWorldContactSeen   = worldContactSeen;
+        lastWorldKImpact       = worldKImpact;
+        lastWorldActiveId      = worldActiveId;
+        lastWorldHasPostVel    = worldHasPostVel;
+        lastWorldHasStartVel   = worldHasStartVel;
+        lastWorldKImpactStatus = worldStatus;
     }
 
     private static synchronized void updateT8Stats(double ratio) {

@@ -323,10 +323,17 @@ public final class DiagnosticCommand {
                     "[TI capture threshold] none").withStyle(ChatFormatting.DARK_GRAY), false);
         } else {
             VictimInfo displayVictim = (victim != null) ? victim : VictimInfo.unknown();
-            // Use kImpact from last ACTIVE_IMPACT if available; fall back to last record.
-            double kImpact = (impact != null)
-                    ? impact.kineticImpactEnergyJ()
-                    : (rec != null ? rec.kineticImpactEnergyJ() : Double.NaN);
+            // For WORLD_BLOCK: use single-body world kImpact estimate (stored in stats).
+            // For ACTIVE_SUBLEVEL: use active-vs-active metrics from last ImpactRecord.
+            // This distinction is critical: active-vs-active impact has no world kImpact.
+            double kImpact;
+            if (displayVictim.kind() == VictimInfo.Kind.WORLD_BLOCK) {
+                kImpact = stats.worldKImpactLastTick();
+            } else {
+                kImpact = (impact != null)
+                        ? impact.kineticImpactEnergyJ()
+                        : (rec != null ? rec.kineticImpactEnergyJ() : Double.NaN);
+            }
             double matThreshold = displayVictim.materialThresholdJ();
             boolean wouldExceed = Double.isFinite(kImpact) && kImpact > matThreshold;
             boolean noCallback  = displayVictim.source() == VictimInfo.Source.NO_CALLBACK;
@@ -338,6 +345,20 @@ public final class DiagnosticCommand {
                     ? ("(" + displayVictim.posX() + "," + displayVictim.posY() + ","
                        + displayVictim.posZ() + ")")
                     : "unknown";
+            // Build worldKImpactStatus note for WORLD_BLOCK contacts.
+            String worldKStatusNote = "";
+            if (displayVictim.kind() == VictimInfo.Kind.WORLD_BLOCK && !noCallback) {
+                SableImpactCapture.WorldKImpactStatus wks = stats.worldKImpactStatusLastTick();
+                if (wks == SableImpactCapture.WorldKImpactStatus.NO_START_VEL) {
+                    worldKStatusNote = " worldKStatus=NO_START_VEL [enable 'debug contacts on']";
+                } else if (wks == SableImpactCapture.WorldKImpactStatus.NO_POST_VEL) {
+                    worldKStatusNote = " worldKStatus=NO_POST_VEL";
+                } else if (wks == SableImpactCapture.WorldKImpactStatus.OK) {
+                    worldKStatusNote = " worldKStatus=OK";
+                } else if (wks != SableImpactCapture.WorldKImpactStatus.NOT_SEEN) {
+                    worldKStatusNote = " worldKStatus=" + wks;
+                }
+            }
             String noteStr = noCallback
                     ? "world contact seen; no block data (no BlockSubLevelCollisionCallback + sampling failed)"
                     : "diagnostic-only";
@@ -352,6 +373,7 @@ public final class DiagnosticCommand {
                     + " kImpact=" + (Double.isNaN(kImpact) ? "NaN" : fmt(kImpact))
                     + " kBand=" + KImpactBand.of(kImpact)
                     + " wouldExceed=" + wouldExceed
+                    + worldKStatusNote
                     + " note=" + noteStr;
             ctx.getSource().sendSuccess(() -> Component.literal(threshLine).withStyle(threshColor), false);
         }

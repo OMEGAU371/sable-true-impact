@@ -120,7 +120,7 @@ public final class SableEventBridge {
         }
 
         boolean needSnapshots = DiagnosticConfig.ENABLED && DiagnosticConfig.LOG_BODY_SNAPSHOTS;
-        boolean needTickStart = DiagnosticConfig.is(DiagnosticConfig.LOG_RAW_CONTACTS);
+        boolean needTickStart = DiagnosticConfig.ENABLED; // needed for world kImpact + T-3-MISS
         if (!needSnapshots && !needTickStart) return;
 
         long tick = system.getLevel().getGameTime();
@@ -129,7 +129,10 @@ public final class SableEventBridge {
 
         List<ServerSubLevel> subLevels = container.getAllSubLevels();
 
-        // Capture tick-start velocity at substep 0 for T-3-MISS pairwise scan.
+        // Capture tick-start velocity at substep 0.
+        // Required for: T-3-MISS pairwise scan (LOG_RAW_CONTACTS) AND world-vs-active
+        // kImpact estimate (SableImpactCapture.process). Capturing whenever ENABLED
+        // ensures world contacts always have start-vel data regardless of sub-flags.
         // Cleared each substep-0 pass to avoid stale data from the previous tick.
         if (needTickStart && substep == 0) {
             tickStartVelById.clear();

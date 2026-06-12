@@ -1261,6 +1261,13 @@ class SableImpactCaptureTest {
         assertNull(s.lastRecordMetrics(),       "resetCounters must clear lastRecordMetrics");
         assertNull(s.lastActiveImpactMetrics(), "resetCounters must clear lastActiveImpactMetrics");
         assertNull(s.lastVictimInfo(),          "resetCounters must clear lastVictimInfo");
+        assertFalse(s.worldContactSeenLastTick(), "resetCounters must clear worldContactSeen");
+        assertTrue(Double.isNaN(s.worldKImpactLastTick()), "resetCounters must clear worldKImpact to NaN");
+        assertEquals(-1, s.worldActiveIdLastTick(), "resetCounters must clear worldActiveId to -1");
+        assertFalse(s.worldHasPostVelLastTick(),  "resetCounters must clear worldHasPostVel");
+        assertFalse(s.worldHasStartVelLastTick(), "resetCounters must clear worldHasStartVel");
+        assertEquals(SableImpactCapture.WorldKImpactStatus.NOT_SEEN,
+                s.worldKImpactStatusLastTick(), "resetCounters must reset worldKImpactStatus to NOT_SEEN");
         assertTrue(s.captureActive(),
                 "resetCounters must restore captureGate to true (active) for test isolation");
         // verify T-8 fields don't linger after reset
@@ -1456,6 +1463,9 @@ class SableImpactCaptureTest {
         assertEquals(0L,
                 io.github.omegau371.trueimpact.damage.DeferredDamageQueue.stats().totalEnqueued(),
                 "NaN kImpact (no start vels) must not enqueue");
+        assertEquals(SableImpactCapture.WorldKImpactStatus.NO_START_VEL,
+                SableImpactCapture.stats().worldKImpactStatusLastTick(),
+                "missing start vels -> worldKImpactStatus must be NO_START_VEL");
     }
 
     @Test
@@ -1484,6 +1494,88 @@ class SableImpactCaptureTest {
         assertEquals(2L,
                 io.github.omegau371.trueimpact.damage.DeferredDamageQueue.stats().totalEnqueued(),
                 "different ticks same pos/block must both enqueue");
+    }
+
+    // -- Phase 1E world kImpact diagnostic status ------------------------------------
+
+    @Test
+    void world_contact_with_start_and_post_vel_worldKImpactStatus_OK() {
+        // Active body: mass=5, vBefore=(10,0,0), vAfter=(2,0,0)
+        // kImpact = 0.5 * 5.0 * |100 - 4| = 240 > dirt threshold 5.0 -> enqueue
+        SableVictimCapture.captureContactPointBlock("minecraft:dirt", 5, 63, 5);
+        Map<Integer, BodySnapshot> snaps = Map.of(10, snapWithVel(10, 5.0, 2.0, 0.0, 0.0));
+        Map<Integer, double[]> startVels = Map.of(10, new double[]{10.0, 0.0, 0.0});
+        SableImpactCapture.process(oneContact(10, 99, 100.0), 970L, 2, snaps, startVels);
+
+        SableImpactCapture.RuntimeStats s = SableImpactCapture.stats();
+        assertTrue(s.worldContactSeenLastTick(), "world contact must be seen");
+        assertEquals(SableImpactCapture.WorldKImpactStatus.OK,
+                s.worldKImpactStatusLastTick(), "both vels present -> status OK");
+        assertTrue(Double.isFinite(s.worldKImpactLastTick()),
+                "worldKImpact must be finite: " + s.worldKImpactLastTick());
+        assertTrue(s.worldHasPostVelLastTick(), "post vel available");
+        assertTrue(s.worldHasStartVelLastTick(), "start vel available");
+        // kImpact = 0.5 * 5.0 * |10^2 - 2^2| = 0.5 * 5 * 96 = 240
+        assertEquals(240.0, s.worldKImpactLastTick(), 1e-9);
+        assertEquals(1L,
+                io.github.omegau371.trueimpact.damage.DeferredDamageQueue.stats().totalEnqueued(),
+                "kImpact=240 > dirt threshold 5 -> must enqueue");
+    }
+
+    @Test
+    void world_contact_missing_start_vel_gives_NO_START_VEL_status() {
+        // Post vel available but no start vels -> worldKImpact = NaN -> no enqueue
+        SableVictimCapture.captureContactPointBlock("minecraft:dirt", 5, 63, 5);
+        Map<Integer, BodySnapshot> snaps = Map.of(10, snapWithVel(10, 5.0, 2.0, 0.0, 0.0));
+        SableImpactCapture.process(oneContact(10, 99, 100.0), 971L, 2, snaps, Map.of());
+
+        SableImpactCapture.RuntimeStats s = SableImpactCapture.stats();
+        assertTrue(s.worldContactSeenLastTick());
+        assertEquals(SableImpactCapture.WorldKImpactStatus.NO_START_VEL,
+                s.worldKImpactStatusLastTick(), "no start vels -> NO_START_VEL");
+        assertTrue(s.worldHasPostVelLastTick(), "post vel available (snapWithVel)");
+        assertFalse(s.worldHasStartVelLastTick(), "no start vels in tickStartVels");
+        assertTrue(Double.isNaN(s.worldKImpactLastTick()),
+                "worldKImpact must be NaN when start vels missing");
+        assertEquals(0L,
+                io.github.omegau371.trueimpact.damage.DeferredDamageQueue.stats().totalEnqueued(),
+                "NaN kImpact must not enqueue");
+    }
+
+    @Test
+    void world_contact_invalid_post_vel_gives_NO_POST_VEL_status() {
+        // snap() has velocityReadValid=false -> worldKImpact = NaN -> no enqueue
+        SableVictimCapture.captureContactPointBlock("minecraft:dirt", 5, 63, 5);
+        Map<Integer, BodySnapshot> snaps = Map.of(10, snap(10, 5.0)); // no valid velocity
+        Map<Integer, double[]> startVels = Map.of(10, new double[]{10.0, 0.0, 0.0});
+        SableImpactCapture.process(oneContact(10, 99, 100.0), 972L, 2, snaps, startVels);
+
+        SableImpactCapture.RuntimeStats s = SableImpactCapture.stats();
+        assertTrue(s.worldContactSeenLastTick());
+        assertEquals(SableImpactCapture.WorldKImpactStatus.NO_POST_VEL,
+                s.worldKImpactStatusLastTick(), "velocityReadValid=false -> NO_POST_VEL");
+        assertFalse(s.worldHasPostVelLastTick(), "post vel invalid");
+        assertEquals(0L,
+                io.github.omegau371.trueimpact.damage.DeferredDamageQueue.stats().totalEnqueued(),
+                "no post vel -> no enqueue");
+    }
+
+    @Test
+    void no_world_contact_tick_worldKImpactStatus_NOT_SEEN() {
+        // Active-vs-active only: no world contact -> worldKImpactStatus NOT_SEEN
+        Map<Integer, BodySnapshot> snaps = Map.of(
+                10, snapWithVel(10, 5.0, 2.0, 0.0, 0.0),
+                20, snapWithVel(20, 5.0, -2.0, 0.0, 0.0));
+        Map<Integer, double[]> startVels = Map.of(
+                10, new double[]{5.0, 0.0, 0.0},
+                20, new double[]{-5.0, 0.0, 0.0});
+        SableImpactCapture.process(oneContact(10, 20, 300.0), 973L, 2, snaps, startVels);
+
+        SableImpactCapture.RuntimeStats s = SableImpactCapture.stats();
+        assertFalse(s.worldContactSeenLastTick(), "active-vs-active only -> no world contact");
+        assertEquals(SableImpactCapture.WorldKImpactStatus.NOT_SEEN,
+                s.worldKImpactStatusLastTick(), "no world contact -> NOT_SEEN");
+        assertTrue(Double.isNaN(s.worldKImpactLastTick()), "no world contact -> worldKImpact NaN");
     }
 
     // -- Phase 1C canonical velocity-derived fields ------------------------------------
