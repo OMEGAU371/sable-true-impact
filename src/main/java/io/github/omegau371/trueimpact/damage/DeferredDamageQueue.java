@@ -4,15 +4,12 @@ import java.util.ArrayDeque;
 import java.util.HashSet;
 
 /**
- * Phase 1E: deferred damage event queue.
+ * Deferred damage event queue.
  *
  * Events are enqueued during physics tick processing (clearCollisions, server thread)
- * and flushed on ServerTickEvent.Post (safe world-access window, same thread).
+ * and applied on ServerTickEvent.Post (safe world-access window, same thread).
  *
- * CONTRACT (Phase 1E -- diagnostic only):
- *   - flush() counts and stores the last event; MUST NOT call destroyBlock, setBlock, or crack.
- *   - DamageResolver still returns NONE; this queue does NOT feed the resolver yet.
- *   - Phase 2A will promote flush() to call DamageResolver.resolve() and apply real effects.
+ * Phase 2A: ImpactBlockApplicator.tryApply() applies SOFT_SOIL compaction effects.
  *
  * Threading: all operations are called on the server thread. No synchronization needed.
  *
@@ -31,6 +28,11 @@ public final class DeferredDamageQueue {
     private static long totalEnqueued;
     private static long totalFlushed;
     private static DeferredDamageEvent lastFlushed;
+
+    // Phase 2A apply/skip counters (updated by recordApplyResult per flushed event).
+    private static long totalApplied;
+    private static long totalSkipped;
+    private static ApplyRecord lastApplyRecord;
 
     // Dedup state for the current tick; cleared when serverTick changes.
     private static final HashSet<String> seenThisTick = new HashSet<>();
@@ -73,16 +75,13 @@ public final class DeferredDamageQueue {
         return true;
     }
 
-    // ---- flush -------------------------------------------------------------------
+    // ---- flush (Phase 1E compat) --------------------------------------------------
 
     /**
-     * Flushes all pending events.
+     * Count-only flush: removes all pending events, increments totalFlushed, no world mutation.
+     * Used in unit tests to verify the queue without a real ServerLevel.
      *
-     * Phase 1E: counts events and retains last for status display.
-     * MUST NOT modify game world state in this phase.
-     * Phase 2A: will call DamageResolver.resolve() per event and apply crack/break.
-     *
-     * Called from TrueImpactMod.onServerTickPost() on every server tick.
+     * TrueImpactMod uses drainAll() + ImpactBlockApplicator for Phase 2A production behavior.
      *
      * @return count of events flushed
      */
@@ -96,11 +95,49 @@ public final class DeferredDamageQueue {
         return count;
     }
 
+    // ---- Phase 2A: drain + apply -------------------------------------------------
+
+    /**
+     * Drains all pending events and returns them as a list.
+     * Increments totalFlushed and updates lastFlushed for each drained event.
+     *
+     * Called by TrueImpactMod.onServerTickPost() which then calls
+     * ImpactBlockApplicator.tryApply() per event and recordApplyResult() for each outcome.
+     *
+     * @return list of drained events (empty if none pending)
+     */
+    public static java.util.List<DeferredDamageEvent> drainAll() {
+        if (pending.isEmpty()) return java.util.List.of();
+        java.util.List<DeferredDamageEvent> result = new java.util.ArrayList<>(pending);
+        for (DeferredDamageEvent e : result) {
+            lastFlushed = e;
+            totalFlushed++;
+        }
+        pending.clear();
+        return result;
+    }
+
+    /**
+     * Records the outcome of applying a flushed event.
+     * Updates totalApplied or totalSkipped based on ApplyOutcome.wasApplied().
+     *
+     * Called by TrueImpactMod once per event after ImpactBlockApplicator.tryApply().
+     */
+    public static void recordApplyResult(DeferredDamageEvent event, ApplyOutcome outcome) {
+        lastApplyRecord = new ApplyRecord(event, outcome);
+        if (outcome.wasApplied()) {
+            totalApplied++;
+        } else {
+            totalSkipped++;
+        }
+    }
+
     // ---- stats/control -----------------------------------------------------------
 
     /** Point-in-time snapshot of queue statistics for status display. */
     public static QueueStats stats() {
-        return new QueueStats(pending.size(), totalEnqueued, totalFlushed, lastFlushed);
+        return new QueueStats(pending.size(), totalEnqueued, totalFlushed,
+                totalApplied, totalSkipped, lastFlushed, lastApplyRecord);
     }
 
     /**
@@ -115,13 +152,22 @@ public final class DeferredDamageQueue {
         totalEnqueued   = 0L;
         totalFlushed    = 0L;
         lastFlushed     = null;
+        totalApplied    = 0L;
+        totalSkipped    = 0L;
+        lastApplyRecord = null;
     }
+
+    /** Outcome record pairing an event with its apply result. */
+    public record ApplyRecord(DeferredDamageEvent event, ApplyOutcome outcome) {}
 
     /** Point-in-time snapshot of queue state. */
     public record QueueStats(
             int                 pending,
             long                totalEnqueued,
             long                totalFlushed,
-            DeferredDamageEvent lastFlushed    // null if no event flushed since startup
+            long                totalApplied,   // Phase 2A: events that mutated a block
+            long                totalSkipped,   // Phase 2A: events skipped (gate or mismatch)
+            DeferredDamageEvent lastFlushed,    // null if no event flushed since startup
+            ApplyRecord         lastApplyRecord // null if no result recorded since startup
     ) {}
 }

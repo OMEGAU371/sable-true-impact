@@ -64,6 +64,7 @@ public abstract class DiagnosticContactCaptureMixin {
         Map<Integer, BodySnapshot> snaps        = SableEventBridge.getLastPostSnapshots();
         Map<Integer, double[]>    tickStartVels = SableEventBridge.getTickStartVels();
         long tick                      = level.getGameTime();
+        String levelKey                = level.dimension().location().toString();
 
         // Contact-point block detection for world-vs-active contacts (PATH A, unconditional).
         // BlockSubLevelCollisionCallback fires only for blocks implementing
@@ -77,7 +78,7 @@ public abstract class DiagnosticContactCaptureMixin {
         }
 
         // PATH A: damage pipeline -- always runs, no diagnostic gate.
-        SableImpactCapture.process(data, tick, substepCount, snaps, tickStartVels);
+        SableImpactCapture.process(data, tick, substepCount, snaps, tickStartVels, levelKey);
 
         // PATH B: diagnostic logging -- gated on LOG_RAW_CONTACTS.
         if (DiagnosticConfig.is(DiagnosticConfig.LOG_RAW_CONTACTS)) {

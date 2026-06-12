@@ -4,8 +4,10 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.context.CommandContext;
+import io.github.omegau371.trueimpact.damage.ApplyOutcome;
 import io.github.omegau371.trueimpact.damage.DeferredDamageQueue;
 import io.github.omegau371.trueimpact.damage.DeferredDamageEvent;
+import io.github.omegau371.trueimpact.damage.ImpactRuntimeConfig;
 import io.github.omegau371.trueimpact.damage.MaterialThresholdProfile;
 import io.github.omegau371.trueimpact.damage.VictimInfo;
 import io.github.omegau371.trueimpact.diagnostic.T4ApplyForceExperiment;
@@ -318,12 +320,21 @@ public final class DiagnosticCommand {
                     "[TI capture threshold] none").withStyle(ChatFormatting.DARK_GRAY), false);
         } else {
             VictimInfo displayVictim = (victim != null) ? victim : VictimInfo.unknown();
-            // For WORLD_BLOCK: use single-body world kImpact estimate (stored in stats).
-            // For ACTIVE_SUBLEVEL: use active-vs-active metrics from last ImpactRecord.
-            // This distinction is critical: active-vs-active impact has no world kImpact.
+            // For WORLD_BLOCK: use single-body world kImpact from this tick.
+            // If NaN (subsequent zero-contact ticks reset it), fall back to the last
+            // applied/queued event so Line 10 stays consistent with Line 11 (damage queue).
+            // For ACTIVE_SUBLEVEL: use active-vs-active metrics.
             double kImpact;
             if (displayVictim.kind() == VictimInfo.Kind.WORLD_BLOCK) {
                 kImpact = stats.worldKImpactLastTick();
+                if (Double.isNaN(kImpact)) {
+                    DeferredDamageQueue.QueueStats qsf = DeferredDamageQueue.stats();
+                    if (qsf.lastApplyRecord() != null) {
+                        kImpact = qsf.lastApplyRecord().event().kImpact();
+                    } else if (qsf.lastFlushed() != null) {
+                        kImpact = qsf.lastFlushed().kImpact();
+                    }
+                }
             } else {
                 kImpact = (impact != null)
                         ? impact.kineticImpactEnergyJ()
@@ -372,32 +383,46 @@ public final class DiagnosticCommand {
                     + " note=" + noteStr;
             ctx.getSource().sendSuccess(() -> Component.literal(threshLine).withStyle(threshColor), false);
         }
-        // Line 11: Phase 1E deferred damage queue state.
-        // YELLOW when pending > 0 (events awaiting flush), AQUA when totalEnqueued > 0 but empty
-        // (events have been produced and flushed), DARK_GRAY when no events ever produced.
+        // Line 11: Phase 2A damage queue state -- enqueue, apply, skip counters.
+        // YELLOW when pending > 0 (awaiting flush), GOLD when applied > 0, AQUA otherwise.
+        // DARK_GRAY when no events ever produced.
         DeferredDamageQueue.QueueStats qStats = DeferredDamageQueue.stats();
+        boolean effectsEnabled = ImpactRuntimeConfig.APPLY_BLOCK_EFFECTS;
         if (qStats.totalEnqueued() == 0) {
             ctx.getSource().sendSuccess(() -> Component.literal(
                     "[TI damage queue] pending=0 totalEnqueued=0 totalFlushed=0"
+                    + " totalApplied=0 totalSkipped=0"
+                    + " effects=" + effectsEnabled
                     + " [no WORLD_BLOCK impacts above threshold detected yet]")
                     .withStyle(ChatFormatting.DARK_GRAY), false);
         } else {
-            ChatFormatting qColor = (qStats.pending() > 0)
-                    ? ChatFormatting.YELLOW : ChatFormatting.AQUA;
-            DeferredDamageEvent last = qStats.lastFlushed();
-            String lastStr = (last == null) ? "none"
-                    : ("t" + last.serverTick()
-                       + " " + last.victimBlock()
-                       + " (" + last.posX() + "," + last.posY() + "," + last.posZ() + ")"
-                       + " kImpact=" + fmt(last.kImpact())
-                       + " class=" + last.materialClass()
-                       + " src=" + last.source());
+            ChatFormatting qColor = (qStats.pending() > 0) ? ChatFormatting.YELLOW
+                    : (qStats.totalApplied() > 0) ? ChatFormatting.GOLD
+                    : ChatFormatting.AQUA;
+            DeferredDamageEvent lastFlushed = qStats.lastFlushed();
+            String lastFlushedStr = (lastFlushed == null) ? "none"
+                    : ("t" + lastFlushed.serverTick()
+                       + " " + lastFlushed.victimBlock()
+                       + " (" + lastFlushed.posX() + "," + lastFlushed.posY()
+                       + "," + lastFlushed.posZ() + ")"
+                       + " kImpact=" + fmt(lastFlushed.kImpact())
+                       + " class=" + lastFlushed.materialClass()
+                       + " src=" + lastFlushed.source());
+            DeferredDamageQueue.ApplyRecord lastApply = qStats.lastApplyRecord();
+            String lastApplyStr = (lastApply == null) ? "none"
+                    : (lastApply.outcome() + " " + lastApply.event().victimBlock()
+                       + " (" + lastApply.event().posX() + "," + lastApply.event().posY()
+                       + "," + lastApply.event().posZ() + ")"
+                       + " kImpact=" + fmt(lastApply.event().kImpact()));
             final String qLine = "[TI damage queue]"
                     + " pending=" + qStats.pending()
                     + " totalEnqueued=" + qStats.totalEnqueued()
                     + " totalFlushed=" + qStats.totalFlushed()
-                    + " last=" + lastStr
-                    + " note=diagnostic-only-no-destroyBlock";
+                    + " totalApplied=" + qStats.totalApplied()
+                    + " totalSkipped=" + qStats.totalSkipped()
+                    + " effects=" + effectsEnabled
+                    + " lastFlushed=" + lastFlushedStr
+                    + " lastApply=" + lastApplyStr;
             ctx.getSource().sendSuccess(() -> Component.literal(qLine).withStyle(qColor), false);
         }
 

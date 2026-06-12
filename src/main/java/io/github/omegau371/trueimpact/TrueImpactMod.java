@@ -2,11 +2,20 @@ package io.github.omegau371.trueimpact;
 
 import io.github.omegau371.trueimpact.command.DiagnosticCommand;
 import io.github.omegau371.trueimpact.command.StatusCommand;
+import io.github.omegau371.trueimpact.damage.ApplyOutcome;
+import io.github.omegau371.trueimpact.damage.BlockView;
+import io.github.omegau371.trueimpact.damage.DeferredDamageEvent;
 import io.github.omegau371.trueimpact.damage.DeferredDamageQueue;
+import io.github.omegau371.trueimpact.damage.ImpactBlockApplicator;
 import io.github.omegau371.trueimpact.diagnostic.ExperimentLog;
 import io.github.omegau371.trueimpact.observation.DiagnosticConfig;
 import io.github.omegau371.trueimpact.observation.DiagnosticStateManager;
 import io.github.omegau371.trueimpact.platform.DistInfo;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.common.NeoForge;
@@ -58,11 +67,60 @@ public class TrueImpactMod {
     }
 
     private void onServerTickPost(ServerTickEvent.Post event) {
-        // Phase 1E: flush deferred damage queue each tick.
-        // Fires after all world ticks (safe world-access window; physics step is complete).
-        // Phase 1E flush: count only, no destroyBlock.
-        // Phase 2A will call DamageResolver.resolve() here.
-        DeferredDamageQueue.flush();
+        // Phase 2A: drain deferred damage queue and apply real block effects.
+        // Fires after all world ticks (safe world-access window; physics step complete).
+        // ImpactBlockApplicator handles revalidation and SOFT_SOIL compaction.
+        java.util.List<DeferredDamageEvent> events = DeferredDamageQueue.drainAll();
+        if (events.isEmpty()) return;
+        MinecraftServer server = event.getServer();
+        for (DeferredDamageEvent e : events) {
+            ServerLevel level = findLevel(server, e.levelKey());
+            ApplyOutcome outcome;
+            if (level == null) {
+                outcome = ApplyOutcome.SKIP_CHUNK_UNLOADED;
+            } else {
+                outcome = ImpactBlockApplicator.tryApply(new ServerLevelBlockView(level), e);
+            }
+            DeferredDamageQueue.recordApplyResult(e, outcome);
+        }
+    }
+
+    private static ServerLevel findLevel(MinecraftServer server, String levelKey) {
+        for (ServerLevel l : server.getAllLevels()) {
+            if (l.dimension().location().toString().equals(levelKey)) return l;
+        }
+        return null;
+    }
+
+    /** MC-dependent implementation of BlockView backed by a real ServerLevel. */
+    private static final class ServerLevelBlockView implements BlockView {
+        private final ServerLevel level;
+
+        ServerLevelBlockView(ServerLevel level) { this.level = level; }
+
+        @Override
+        public boolean hasChunkAt(int x, int y, int z) {
+            return level.hasChunkAt(new BlockPos(x, y, z));
+        }
+
+        @Override
+        public String getBlockId(int x, int y, int z) {
+            BlockPos pos = new BlockPos(x, y, z);
+            ResourceLocation loc =
+                    BuiltInRegistries.BLOCK.getKey(level.getBlockState(pos).getBlock());
+            return loc != null ? loc.toString() : "minecraft:air";
+        }
+
+        @Override
+        public boolean setBlock(int x, int y, int z, String targetBlockId) {
+            ResourceLocation loc = ResourceLocation.tryParse(targetBlockId);
+            if (loc == null) return false;
+            java.util.Optional<net.minecraft.world.level.block.Block> blockOpt =
+                    BuiltInRegistries.BLOCK.getOptional(loc);
+            if (blockOpt.isEmpty()) return false;
+            return level.setBlockAndUpdate(
+                    new BlockPos(x, y, z), blockOpt.get().defaultBlockState());
+        }
     }
 
     private void onServerStopped(ServerStoppedEvent event) {

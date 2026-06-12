@@ -229,6 +229,22 @@ public final class SableImpactCapture {
             int substepCount,
             Map<Integer, BodySnapshot> lastPostSnaps,
             Map<Integer, double[]> tickStartVels) {
+        return process(data, serverTick, substepCount, lastPostSnaps, tickStartVels,
+                "minecraft:overworld");
+    }
+
+    /**
+     * Full-signature version with explicit level key for DeferredDamageEvent.
+     * Called by DiagnosticContactCaptureMixin with the actual level dimension ID.
+     * The 5-arg overload defaults to "minecraft:overworld" for test compat.
+     */
+    public static List<ImpactRecord> process(
+            double[] data,
+            long serverTick,
+            int substepCount,
+            Map<Integer, BodySnapshot> lastPostSnaps,
+            Map<Integer, double[]> tickStartVels,
+            String levelKey) {
 
         int count = (data != null) ? data.length / 15 : 0;
         if (count <= 0) {
@@ -355,7 +371,7 @@ public final class SableImpactCapture {
                         && Double.isFinite(worldKImpact)
                         && worldKImpact > noActiveVictim.materialThresholdJ()) {
                     DeferredDamageQueue.enqueue(new DeferredDamageEvent(
-                            serverTick,
+                            serverTick, levelKey,
                             noActiveVictim.blockId(),
                             noActiveVictim.posX(), noActiveVictim.posY(), noActiveVictim.posZ(),
                             noActiveVictim.materialClass(),
@@ -448,7 +464,7 @@ public final class SableImpactCapture {
                     : worldKImpact;
             if (Double.isFinite(kImpact) && kImpact > tickVictim.materialThresholdJ()) {
                 DeferredDamageQueue.enqueue(new DeferredDamageEvent(
-                        serverTick,
+                        serverTick, levelKey,
                         tickVictim.blockId(),
                         tickVictim.posX(), tickVictim.posY(), tickVictim.posZ(),
                         tickVictim.materialClass(),
