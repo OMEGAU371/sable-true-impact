@@ -299,4 +299,55 @@ class BlockDamageAccumulatorTest {
                 "lastUpdatedSnapshot must reflect the most recent accumulate call");
         assertEquals(20, last.key().posX());
     }
+
+    // -- regression tests (Phase 2D in-game observed mismatch) --------------------
+
+    @Test
+    void regression_stone_raw_55_965_below_cap_all_fields_correct() {
+        // Regression: andesite, raw=55.965J, STONE threshold=50J, cap=100J.
+        // raw < cap -> effective must equal raw.
+        // effLast must equal rawLast. ratio=55.965/50=1.1193. state=CRITICAL.
+        DeferredDamageEvent ev = event("minecraft:overworld", "minecraft:andesite",
+                MaterialThresholdProfile.MaterialClass.STONE, 10, 64, 10, 55.965, 1L);
+        BlockDamageAccumulator.accumulate(ev);
+
+        BlockDamageAccumulator.Snapshot snap = BlockDamageAccumulator.getSnapshot(
+                "minecraft:overworld", 10, 64, 10, "minecraft:andesite");
+        assertNotNull(snap);
+        assertEquals(55.965, snap.lastRawImpactJ(), 0.001,
+                "rawLast must match input kImpact");
+        assertEquals(55.965, snap.lastEffectiveDamageJ(), 0.001,
+                "effLast must equal raw when raw(55.965) < cap(100)");
+        assertEquals(55.965, snap.accumulatedEffectiveDamageJ(), 0.001,
+                "accumEff must equal effective -- must NOT show cap value (100)");
+        assertEquals(50.0, snap.thresholdJ(), 0.001);
+        assertEquals(55.965 / 50.0, snap.ratio(), 0.001,
+                "ratio = accumEff/threshold = 55.965/50 = 1.1193");
+        assertEquals(1, snap.hitCount());
+        assertEquals(DamageState.CRITICAL, snap.damageState(),
+                "1.1193 >= 1.0 -> CRITICAL");
+    }
+
+    @Test
+    void regression_stone_raw_150_above_cap_accumulates_capped_value() {
+        // Regression: raw=150J, STONE threshold=50J, cap=100J.
+        // raw > cap -> effective=100. accumEff=100. ratio=2.0. rawLast=150 (preserved).
+        DeferredDamageEvent ev = event("minecraft:overworld", "minecraft:stone",
+                MaterialThresholdProfile.MaterialClass.STONE, 10, 64, 10, 150.0, 1L);
+        BlockDamageAccumulator.accumulate(ev);
+
+        BlockDamageAccumulator.Snapshot snap = BlockDamageAccumulator.getSnapshot(
+                "minecraft:overworld", 10, 64, 10, "minecraft:stone");
+        assertNotNull(snap);
+        assertEquals(150.0, snap.lastRawImpactJ(), 0.001,
+                "rawLast must be raw kImpact even when capped");
+        assertEquals(100.0, snap.lastEffectiveDamageJ(), 0.001,
+                "effLast must be cap (100) when raw(150) > cap(100)");
+        assertEquals(100.0, snap.accumulatedEffectiveDamageJ(), 0.001,
+                "accumEff must equal capped effective");
+        assertEquals(2.0, snap.ratio(), 0.001,
+                "ratio = 100/50 = 2.0");
+        assertEquals(1, snap.hitCount());
+        assertEquals(DamageState.CRITICAL, snap.damageState(), "2.0 >= 1.0 -> CRITICAL");
+    }
 }

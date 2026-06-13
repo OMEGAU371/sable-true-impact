@@ -100,4 +100,33 @@ class EffectiveDamageModelTest {
         assertEquals(999.0, r.rawImpactJ(), 0.001, "rawImpactJ must always equal the input kImpact");
         assertEquals(100.0, r.effectiveDamageJ(), 0.001);
     }
+
+    // -- regression tests (Phase 2D in-game observed mismatch) --------------------
+
+    @Test
+    void regression_stone_raw_55_965_below_cap_effective_equals_raw() {
+        // Regression: raw=55.965J, STONE threshold=50J, cap=100J.
+        // raw < cap -> effective must equal raw, NOT the cap value.
+        EffectiveDamageModel.Result r = EffectiveDamageModel.compute(
+                55.965, MaterialThresholdProfile.MaterialClass.STONE, 50.0);
+        assertEquals(55.965, r.rawImpactJ(), 0.001,
+                "rawImpactJ must always equal the input kImpact");
+        assertEquals(55.965, r.effectiveDamageJ(), 0.001,
+                "effective must equal raw when raw(55.965) < cap(100) -- must not return cap");
+        assertFalse(r.wasCapped(),
+                "wasCapped must be false when raw <= cap");
+    }
+
+    @Test
+    void regression_stone_raw_150_above_cap_effective_is_capped_at_100() {
+        // Regression: raw=150J, STONE threshold=50J, cap=100J.
+        // raw > cap -> effective must be exactly the cap value.
+        EffectiveDamageModel.Result r = EffectiveDamageModel.compute(
+                150.0, MaterialThresholdProfile.MaterialClass.STONE, 50.0);
+        assertEquals(150.0, r.rawImpactJ(), 0.001,
+                "rawImpactJ must always equal the input kImpact");
+        assertEquals(100.0, r.effectiveDamageJ(), 0.001,
+                "effective must be capped at 2*threshold=100 when raw(150) > cap(100)");
+        assertTrue(r.wasCapped());
+    }
 }
