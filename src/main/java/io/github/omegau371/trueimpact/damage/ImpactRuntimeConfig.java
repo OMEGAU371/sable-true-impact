@@ -30,4 +30,12 @@ public final class ImpactRuntimeConfig {
      * Default: true.
      */
     public static volatile boolean ENABLE_DAMAGE_FEEDBACK = true;
+
+    /**
+     * Controls whether debris items are spawned for STONE/GENERIC blocks at CRITICAL state.
+     * When false: no ItemEntity is spawned; MaterialResponsePlanner plans still computed.
+     * Debris deduplication (one drop per block) applies regardless of this flag.
+     * Default: true.
+     */
+    public static volatile boolean ENABLE_DEBRIS_DROPS = true;
 }

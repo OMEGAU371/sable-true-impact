@@ -4,6 +4,8 @@ import io.github.omegau371.trueimpact.damage.BlockDamageAccumulator;
 import io.github.omegau371.trueimpact.damage.DamageState;
 import io.github.omegau371.trueimpact.damage.DeferredDamageEvent;
 import io.github.omegau371.trueimpact.damage.DeferredDamageQueue;
+import io.github.omegau371.trueimpact.damage.MaterialResponsePlan;
+import io.github.omegau371.trueimpact.damage.MaterialResponseType;
 import io.github.omegau371.trueimpact.damage.MaterialThresholdProfile;
 import io.github.omegau371.trueimpact.damage.VictimInfo;
 import org.junit.jupiter.api.AfterEach;
@@ -190,6 +192,56 @@ class DamageCommandTest {
         assertTrue(formatted.contains("accumEff=55.965J"), "accumulated effective");
         assertTrue(formatted.contains("state=CRITICAL"), "damage state (ratio=1.12 >= 1.0)");
         assertTrue(formatted.contains("hits=1"), "hit count");
+    }
+
+    // -- DamageInspectFormatter.formatPlan ----------------------------------------
+
+    @Test
+    void formatPlan_DROP_DEBRIS_with_debris_already_dropped() {
+        MaterialResponsePlan plan = new MaterialResponsePlan(
+                MaterialResponseType.DROP_DEBRIS,
+                MaterialThresholdProfile.MaterialClass.STONE,
+                DamageState.CRITICAL,
+                100.0, 100.0, 50.0, 2.0,
+                true, true,
+                "debris eligible; block preserved in Phase 2E");
+        String result = DamageInspectFormatter.formatPlan(plan, true);
+        assertTrue(result.contains("[TI damage plan]"));
+        assertTrue(result.contains("response=DROP_DEBRIS"));
+        assertTrue(result.contains("fbe=true"));
+        assertTrue(result.contains("debris=true"));
+        assertTrue(result.contains("note="));
+    }
+
+    @Test
+    void formatPlan_NONE_shows_false_flags() {
+        MaterialResponsePlan plan = new MaterialResponsePlan(
+                MaterialResponseType.NONE,
+                MaterialThresholdProfile.MaterialClass.STONE,
+                DamageState.INTACT,
+                20.0, 20.0, 50.0, 0.4,
+                false, false,
+                "below crack threshold (ratio=0.400)");
+        String result = DamageInspectFormatter.formatPlan(plan, false);
+        assertTrue(result.contains("response=NONE"));
+        assertTrue(result.contains("fbe=false"));
+        assertTrue(result.contains("debris=false"));
+    }
+
+    @Test
+    void formatPlan_FUTURE_BREAK_ELIGIBLE_debris_not_yet_dropped() {
+        MaterialResponsePlan plan = new MaterialResponsePlan(
+                MaterialResponseType.FUTURE_BREAK_ELIGIBLE,
+                MaterialThresholdProfile.MaterialClass.WOOD,
+                DamageState.CRITICAL,
+                60.0, 60.0, 20.0, 3.0,
+                false, true,
+                "future break eligible (WOOD); no action in Phase 2E");
+        String result = DamageInspectFormatter.formatPlan(plan, false);
+        assertTrue(result.contains("response=FUTURE_BREAK_ELIGIBLE"));
+        assertTrue(result.contains("fbe=true"));
+        assertTrue(result.contains("debris=false"),
+                "debris=false when markDebrisDropped has not been called for this block");
     }
 
     @Test

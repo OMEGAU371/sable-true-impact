@@ -6,6 +6,8 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import io.github.omegau371.trueimpact.damage.BlockDamageAccumulator;
 import io.github.omegau371.trueimpact.damage.DamageState;
+import io.github.omegau371.trueimpact.damage.MaterialResponsePlan;
+import io.github.omegau371.trueimpact.damage.MaterialResponsePlanner;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -19,25 +21,25 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 
 /**
- * /trueimpact damage subcommands (Phase 2D).
+ * /trueimpact damage subcommands (Phase 2D/2E).
  *
  *   /trueimpact damage inspect <x> <y> <z>
  *       Looks up current block at that position in the source's dimension.
- *       Read-only: never mutates the world.
  *
  *   /trueimpact damage inspect last
- *       Shows BlockDamageAccumulator.lastUpdatedSnapshot() -- the most recent impact
- *       regardless of position or material. Useful without knowing exact coordinates.
+ *       Shows BlockDamageAccumulator.lastUpdatedSnapshot().
  *
  *   /trueimpact damage inspect here
  *       Inspects the block targeted by the player's crosshair (4.5-block ray cast).
- *       Requires a player source; shows an error if console or no block targeted.
- *       Read-only: never mutates the world.
+ *
+ *   All inspect variants show two output lines:
+ *     [TI damage inspect] -- accumulated damage fields
+ *     [TI damage plan]    -- MaterialResponsePlan (Phase 2E)
  *
  *   /trueimpact damage clear
  *       Clears BlockDamageAccumulator only. Queue counters are preserved.
  *
- * All damage subcommands require operator permission (level 2).
+ * All subcommands require operator permission (level 2).
  */
 public final class DamageCommand {
 
@@ -68,13 +70,8 @@ public final class DamageCommand {
         int x = IntegerArgumentType.getInteger(ctx, "x");
         int y = IntegerArgumentType.getInteger(ctx, "y");
         int z = IntegerArgumentType.getInteger(ctx, "z");
-
         ServerLevel level = ctx.getSource().getLevel();
-        String levelKey   = level.dimension().location().toString();
-        BlockPos pos      = new BlockPos(x, y, z);
-
-        String currentBlockId = resolveBlockId(level, pos);
-        sendInspectResult(ctx.getSource(), levelKey, pos, currentBlockId);
+        sendInspectResult(ctx.getSource(), level, new BlockPos(x, y, z));
         return 1;
     }
 
@@ -87,10 +84,7 @@ public final class DamageCommand {
                     () -> Component.literal("[TI damage] no damage recorded yet")
                             .withStyle(ChatFormatting.GRAY), false);
         } else {
-            ChatFormatting color = colorForState(snap.damageState());
-            final String text = DamageInspectFormatter.formatEntry(snap);
-            ctx.getSource().sendSuccess(
-                    () -> Component.literal(text).withStyle(color), false);
+            sendInspectResultFromSnapshot(ctx.getSource(), snap);
         }
         return 1;
     }
@@ -116,10 +110,7 @@ public final class DamageCommand {
         }
 
         BlockPos targetPos = ((BlockHitResult) hit).getBlockPos();
-        ServerLevel level  = source.getLevel();
-        String levelKey    = level.dimension().location().toString();
-        String blockId     = resolveBlockId(level, targetPos);
-        sendInspectResult(source, levelKey, targetPos, blockId);
+        sendInspectResult(source, source.getLevel(), targetPos);
         return 1;
     }
 
@@ -137,14 +128,9 @@ public final class DamageCommand {
 
     // -- shared helpers -----------------------------------------------------------
 
-    private static String resolveBlockId(ServerLevel level, BlockPos pos) {
-        if (!level.hasChunkAt(pos)) return "minecraft:air";
-        ResourceLocation loc = BuiltInRegistries.BLOCK.getKey(level.getBlockState(pos).getBlock());
-        return (loc != null) ? loc.toString() : "minecraft:air";
-    }
-
-    private static void sendInspectResult(CommandSourceStack source,
-                                          String levelKey, BlockPos pos, String blockId) {
+    private static void sendInspectResult(CommandSourceStack source, ServerLevel level, BlockPos pos) {
+        String levelKey  = level.dimension().location().toString();
+        String blockId   = resolveBlockId(level, pos);
         BlockDamageAccumulator.Snapshot snap = BlockDamageAccumulator.getSnapshot(
                 levelKey, pos.getX(), pos.getY(), pos.getZ(), blockId);
         if (snap == null) {
@@ -152,10 +138,25 @@ public final class DamageCommand {
                     levelKey, pos.getX(), pos.getY(), pos.getZ(), blockId);
             source.sendSuccess(() -> Component.literal(text).withStyle(ChatFormatting.GRAY), false);
         } else {
-            ChatFormatting color = colorForState(snap.damageState());
-            final String text = DamageInspectFormatter.formatEntry(snap);
-            source.sendSuccess(() -> Component.literal(text).withStyle(color), false);
+            sendInspectResultFromSnapshot(source, snap);
         }
+    }
+
+    private static void sendInspectResultFromSnapshot(CommandSourceStack source,
+                                                      BlockDamageAccumulator.Snapshot snap) {
+        MaterialResponsePlan plan = MaterialResponsePlanner.plan(snap);
+        boolean debrisDropped = MaterialResponsePlanner.hasDroppedDebris(snap.key());
+        ChatFormatting color = colorForState(snap.damageState());
+        final String entryText = DamageInspectFormatter.formatEntry(snap);
+        final String planText  = DamageInspectFormatter.formatPlan(plan, debrisDropped);
+        source.sendSuccess(() -> Component.literal(entryText).withStyle(color), false);
+        source.sendSuccess(() -> Component.literal(planText).withStyle(ChatFormatting.GRAY), false);
+    }
+
+    private static String resolveBlockId(ServerLevel level, BlockPos pos) {
+        if (!level.hasChunkAt(pos)) return "minecraft:air";
+        ResourceLocation loc = BuiltInRegistries.BLOCK.getKey(level.getBlockState(pos).getBlock());
+        return (loc != null) ? loc.toString() : "minecraft:air";
     }
 
     // Formatting delegated to DamageInspectFormatter (MC-free, unit-testable).

@@ -1,6 +1,7 @@
 package io.github.omegau371.trueimpact.command;
 
 import io.github.omegau371.trueimpact.damage.BlockDamageAccumulator;
+import io.github.omegau371.trueimpact.damage.MaterialResponsePlan;
 
 /**
  * MC-free formatter helpers for /trueimpact damage inspect output.
@@ -34,6 +35,20 @@ public final class DamageInspectFormatter {
                 + " state=" + snap.damageState()
                 + " hits=" + snap.hitCount()
                 + " lastTick=" + snap.lastUpdatedTick();
+    }
+
+    /**
+     * Formats the material response plan line shown below the main inspect line.
+     *
+     * @param plan          the plan produced by MaterialResponsePlanner.plan(snap)
+     * @param debrisDropped whether debris has already been dropped for this block's key
+     */
+    public static String formatPlan(MaterialResponsePlan plan, boolean debrisDropped) {
+        return "[TI damage plan]"
+                + " response=" + plan.responseType()
+                + " fbe=" + plan.futureBreakEligible()
+                + " debris=" + debrisDropped
+                + " note=" + plan.diagnosticNote();
     }
 
     private static String fmt(double v) {

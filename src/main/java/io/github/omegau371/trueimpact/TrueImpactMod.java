@@ -11,6 +11,9 @@ import io.github.omegau371.trueimpact.damage.DamageState;
 import io.github.omegau371.trueimpact.damage.DeferredDamageEvent;
 import io.github.omegau371.trueimpact.damage.DeferredDamageQueue;
 import io.github.omegau371.trueimpact.damage.ImpactBlockApplicator;
+import io.github.omegau371.trueimpact.damage.ImpactRuntimeConfig;
+import io.github.omegau371.trueimpact.damage.MaterialResponsePlan;
+import io.github.omegau371.trueimpact.damage.MaterialResponsePlanner;
 import io.github.omegau371.trueimpact.diagnostic.ExperimentLog;
 import io.github.omegau371.trueimpact.observation.DiagnosticConfig;
 import io.github.omegau371.trueimpact.observation.DiagnosticStateManager;
@@ -22,6 +25,9 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
@@ -45,6 +51,7 @@ public class TrueImpactMod {
         NeoForge.EVENT_BUS.addListener(this::onServerStopped);
         DiagnosticStateManager.registerFlushHook(BlockDamageAccumulator::clear);
         DiagnosticStateManager.registerFlushHook(DamageFeedbackTracker::clear);
+        DiagnosticStateManager.registerFlushHook(MaterialResponsePlanner::clear);
 
         if (DistInfo.isSableLoaded()) {
             LOGGER.info("True Impact: Sable detected -- diagnostic observation layer ready (mixins applied by plugin)");
@@ -77,33 +84,58 @@ public class TrueImpactMod {
     }
 
     private void onServerTickPost(ServerTickEvent.Post event) {
-        // Phase 2A: drain deferred damage queue and apply real block effects.
-        // Fires after all world ticks (safe world-access window; physics step complete).
-        // ImpactBlockApplicator handles revalidation and SOFT_SOIL compaction.
+        // Drain deferred damage queue -- safe world-access window (after all physics ticks).
         java.util.List<DeferredDamageEvent> events = DeferredDamageQueue.drainAll();
         if (events.isEmpty()) return;
         MinecraftServer server = event.getServer();
         for (DeferredDamageEvent e : events) {
+            // Phase 2C: accumulate effective damage.
             BlockDamageAccumulator.accumulate(e);
+
+            // Phase 2A: SOFT_SOIL compaction (grass_block -> dirt) via ImpactBlockApplicator.
             ServerLevel level = findLevel(server, e.levelKey());
-            ApplyOutcome outcome;
-            if (level == null) {
-                outcome = ApplyOutcome.SKIP_CHUNK_UNLOADED;
-            } else {
-                outcome = ImpactBlockApplicator.tryApply(new ServerLevelBlockView(level), e);
-            }
+            ApplyOutcome outcome = (level == null)
+                    ? ApplyOutcome.SKIP_CHUNK_UNLOADED
+                    : ImpactBlockApplicator.tryApply(new ServerLevelBlockView(level), e);
             DeferredDamageQueue.recordApplyResult(e, outcome);
-            // Phase 2D: cosmetic feedback (particles) for CRACKED/CRITICAL blocks.
-            // Rate-limited per block and globally per tick. Read-only -- no world mutation.
-            if (level != null) {
-                BlockDamageAccumulator.Snapshot snap = BlockDamageAccumulator.getSnapshot(
-                        e.levelKey(), e.posX(), e.posY(), e.posZ(), e.victimBlock());
-                if (snap != null && DamageFeedbackTracker.shouldEmit(
+
+            // Phase 2E: material response planning + execution (one snapshot read covers 2D+2E).
+            BlockDamageAccumulator.Snapshot snap = BlockDamageAccumulator.getSnapshot(
+                    e.levelKey(), e.posX(), e.posY(), e.posZ(), e.victimBlock());
+            if (snap != null) {
+                MaterialResponsePlan plan = MaterialResponsePlanner.plan(snap);
+
+                // Debris drop: STONE/GENERIC CRITICAL, first time only, when level available.
+                if (plan.shouldDropDebris()
+                        && level != null
+                        && ImpactRuntimeConfig.ENABLE_DEBRIS_DROPS
+                        && MaterialResponsePlanner.markDebrisDropped(snap.key())) {
+                    dropDebris(level, e.posX(), e.posY(), e.posZ());
+                }
+                MaterialResponsePlanner.recordExecuted(plan);
+
+                // Phase 2D: cosmetic particle feedback (rate-limited, read-only).
+                if (level != null && DamageFeedbackTracker.shouldEmit(
                         e.posX(), e.posY(), e.posZ(), snap.damageState(), server.getTickCount())) {
                     emitDamageFeedback(level, e.posX(), e.posY(), e.posZ(), snap.damageState());
                 }
             }
         }
+    }
+
+    // Drops a single block-item at the impact position (debris effect, no block removal).
+    private static void dropDebris(ServerLevel level, int x, int y, int z) {
+        BlockPos pos = new BlockPos(x, y, z);
+        if (!level.hasChunkAt(pos)) return;
+        net.minecraft.world.item.Item item = level.getBlockState(pos).getBlock().asItem();
+        if (item == Items.AIR) return;
+        ItemEntity entity = new ItemEntity(level, x + 0.5, y + 0.5, z + 0.5,
+                new ItemStack(item, 1));
+        entity.setDeltaMovement(
+                (level.random.nextDouble() - 0.5) * 0.1,
+                level.random.nextDouble() * 0.05 + 0.05,
+                (level.random.nextDouble() - 0.5) * 0.1);
+        level.addFreshEntity(entity);
     }
 
     private static void emitDamageFeedback(ServerLevel level, int x, int y, int z, DamageState state) {

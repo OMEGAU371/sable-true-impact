@@ -9,6 +9,7 @@ import io.github.omegau371.trueimpact.damage.BlockDamageAccumulator;
 import io.github.omegau371.trueimpact.damage.DamageFeedbackTracker;
 import io.github.omegau371.trueimpact.damage.DamageState;
 import io.github.omegau371.trueimpact.damage.DeferredDamageQueue;
+import io.github.omegau371.trueimpact.damage.MaterialResponsePlanner;
 import io.github.omegau371.trueimpact.damage.DeferredDamageEvent;
 import io.github.omegau371.trueimpact.damage.ImpactRuntimeConfig;
 import io.github.omegau371.trueimpact.damage.MaterialThresholdProfile;
@@ -471,6 +472,20 @@ public final class DiagnosticCommand {
                     + " fdbk/tick=" + fdbkLast)
                     .withStyle(accumColor), false);
         }
+
+        // Line 13: Phase 2E material response planner counters.
+        // GOLD when any responses planned, DARK_GRAY when idle.
+        MaterialResponsePlanner.PlannerStats ps = MaterialResponsePlanner.stats();
+        ChatFormatting plannerColor = (ps.totalResponsesPlanned() > 0)
+                ? ChatFormatting.GOLD : ChatFormatting.DARK_GRAY;
+        ctx.getSource().sendSuccess(() -> Component.literal(
+                "[TI response]"
+                + " planned=" + ps.totalResponsesPlanned()
+                + " debris=" + ps.totalDebrisDropped()
+                + " debrisKeys=" + ps.debrisDroppedKeyCount()
+                + " fbe=" + ps.totalFutureBreakEligible()
+                + " last=" + ps.lastResponseType())
+                .withStyle(plannerColor), false);
 
         return 1;
     }
