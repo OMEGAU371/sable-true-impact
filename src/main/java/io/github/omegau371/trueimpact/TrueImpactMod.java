@@ -6,6 +6,7 @@ import io.github.omegau371.trueimpact.command.StatusCommand;
 import io.github.omegau371.trueimpact.damage.ApplyOutcome;
 import io.github.omegau371.trueimpact.damage.BlockDamageAccumulator;
 import io.github.omegau371.trueimpact.damage.BlockView;
+import io.github.omegau371.trueimpact.damage.CrackOverlayTracker;
 import io.github.omegau371.trueimpact.damage.DamageFeedbackTracker;
 import io.github.omegau371.trueimpact.damage.DamageState;
 import io.github.omegau371.trueimpact.damage.DeferredDamageEvent;
@@ -14,6 +15,7 @@ import io.github.omegau371.trueimpact.damage.ImpactBlockApplicator;
 import io.github.omegau371.trueimpact.damage.ImpactRuntimeConfig;
 import io.github.omegau371.trueimpact.damage.MaterialResponsePlan;
 import io.github.omegau371.trueimpact.damage.MaterialResponsePlanner;
+import io.github.omegau371.trueimpact.damage.MaterialThresholdProfile;
 import io.github.omegau371.trueimpact.diagnostic.ExperimentLog;
 import io.github.omegau371.trueimpact.observation.DiagnosticConfig;
 import io.github.omegau371.trueimpact.observation.DiagnosticStateManager;
@@ -52,6 +54,7 @@ public class TrueImpactMod {
         DiagnosticStateManager.registerFlushHook(BlockDamageAccumulator::clear);
         DiagnosticStateManager.registerFlushHook(DamageFeedbackTracker::clear);
         DiagnosticStateManager.registerFlushHook(MaterialResponsePlanner::clear);
+        DiagnosticStateManager.registerFlushHook(CrackOverlayTracker::clear);
 
         if (DistInfo.isSableLoaded()) {
             LOGGER.info("True Impact: Sable detected -- diagnostic observation layer ready (mixins applied by plugin)");
@@ -105,7 +108,8 @@ public class TrueImpactMod {
             if (snap != null) {
                 MaterialResponsePlan plan = MaterialResponsePlanner.plan(snap);
 
-                // Debris drop: STONE/GENERIC CRITICAL, first time only, when level available.
+                // Debris drop: disabled by default (ENABLE_DEBRIS_DROPS = false).
+                // Code preserved for Phase 2F; markDebrisDropped tracks dedup state.
                 if (plan.shouldDropDebris()
                         && level != null
                         && ImpactRuntimeConfig.ENABLE_DEBRIS_DROPS
@@ -118,6 +122,17 @@ public class TrueImpactMod {
                 if (level != null && DamageFeedbackTracker.shouldEmit(
                         e.posX(), e.posY(), e.posZ(), snap.damageState(), server.getTickCount())) {
                     emitDamageFeedback(level, e.posX(), e.posY(), e.posZ(), snap.damageState());
+                }
+
+                // Phase 2E hotfix: vanilla crack overlay for CRACKED/CRITICAL blocks.
+                // Skipped for SOFT_SOIL (compaction is the primary response).
+                if (level != null
+                        && snap.materialClass() != MaterialThresholdProfile.MaterialClass.SOFT_SOIL) {
+                    int crackProgress = CrackOverlayTracker.tryUpdate(
+                            snap.key(), snap.damageState(), snap.ratio(), server.getTickCount());
+                    if (crackProgress >= 0) {
+                        applyCrackOverlay(level, snap.key(), crackProgress);
+                    }
                 }
             }
         }
@@ -136,6 +151,14 @@ public class TrueImpactMod {
                 level.random.nextDouble() * 0.05 + 0.05,
                 (level.random.nextDouble() - 0.5) * 0.1);
         level.addFreshEntity(entity);
+    }
+
+    // Sends a vanilla block-breaking progress packet (0-9) to nearby players.
+    // No block is removed. fakeBreakerId is stable and negative per block key.
+    private static void applyCrackOverlay(ServerLevel level, BlockDamageAccumulator.AccKey key, int progress) {
+        BlockPos pos = new BlockPos(key.posX(), key.posY(), key.posZ());
+        if (!level.hasChunkAt(pos)) return;
+        level.destroyBlockProgress(CrackOverlayTracker.fakeBreakerIdFor(key), pos, progress);
     }
 
     private static void emitDamageFeedback(ServerLevel level, int x, int y, int z, DamageState state) {

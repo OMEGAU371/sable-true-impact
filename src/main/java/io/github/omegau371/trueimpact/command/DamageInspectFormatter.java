@@ -1,6 +1,7 @@
 package io.github.omegau371.trueimpact.command;
 
 import io.github.omegau371.trueimpact.damage.BlockDamageAccumulator;
+import io.github.omegau371.trueimpact.damage.CrackOverlayTracker;
 import io.github.omegau371.trueimpact.damage.MaterialResponsePlan;
 
 /**
@@ -44,10 +45,12 @@ public final class DamageInspectFormatter {
      * @param debrisDropped whether debris has already been dropped for this block's key
      */
     public static String formatPlan(MaterialResponsePlan plan, boolean debrisDropped) {
+        int crackProgress = CrackOverlayTracker.ratioToProgress(plan.damageState(), plan.ratio());
         return "[TI damage plan]"
                 + " response=" + plan.responseType()
                 + " fbe=" + plan.futureBreakEligible()
                 + " debris=" + debrisDropped
+                + " crack=" + crackProgress
                 + " note=" + plan.diagnosticNote();
     }
 

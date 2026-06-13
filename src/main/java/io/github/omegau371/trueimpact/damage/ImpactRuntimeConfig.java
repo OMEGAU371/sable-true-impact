@@ -35,7 +35,15 @@ public final class ImpactRuntimeConfig {
      * Controls whether debris items are spawned for STONE/GENERIC blocks at CRITICAL state.
      * When false: no ItemEntity is spawned; MaterialResponsePlanner plans still computed.
      * Debris deduplication (one drop per block) applies regardless of this flag.
+     * Default: false (disabled in Phase 2E hotfix; reserved for Phase 2F).
+     */
+    public static volatile boolean ENABLE_DEBRIS_DROPS = false;
+
+    /**
+     * Controls the vanilla block-breaking crack overlay (progress 0..9) for CRACKED/CRITICAL blocks.
+     * When true: sends destroyBlockProgress packets via CrackOverlayTracker (rate-limited).
+     * Does not destroy blocks -- purely visual feedback.
      * Default: true.
      */
-    public static volatile boolean ENABLE_DEBRIS_DROPS = true;
+    public static volatile boolean ENABLE_VANILLA_CRACK_OVERLAY = true;
 }

@@ -6,6 +6,7 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import io.github.omegau371.trueimpact.damage.ApplyOutcome;
 import io.github.omegau371.trueimpact.damage.BlockDamageAccumulator;
+import io.github.omegau371.trueimpact.damage.CrackOverlayTracker;
 import io.github.omegau371.trueimpact.damage.DamageFeedbackTracker;
 import io.github.omegau371.trueimpact.damage.DamageState;
 import io.github.omegau371.trueimpact.damage.DeferredDamageQueue;
@@ -486,6 +487,18 @@ public final class DiagnosticCommand {
                 + " fbe=" + ps.totalFutureBreakEligible()
                 + " last=" + ps.lastResponseType())
                 .withStyle(plannerColor), false);
+
+        // Line 14: Phase 2E hotfix -- vanilla crack overlay counters.
+        // GOLD when overlays are active, DARK_GRAY when idle.
+        ChatFormatting crackColor = (CrackOverlayTracker.activeCrackOverlays() > 0)
+                ? ChatFormatting.GOLD : ChatFormatting.DARK_GRAY;
+        ctx.getSource().sendSuccess(() -> Component.literal(
+                "[TI crack]"
+                + " updates=" + CrackOverlayTracker.totalCrackOverlayUpdates()
+                + " active=" + CrackOverlayTracker.activeCrackOverlays()
+                + " lastProgress=" + CrackOverlayTracker.lastCrackProgress()
+                + " overlay=" + ImpactRuntimeConfig.ENABLE_VANILLA_CRACK_OVERLAY)
+                .withStyle(crackColor), false);
 
         return 1;
     }

@@ -6,7 +6,7 @@ Guidance for Claude Code when working in this repository.
 
 **True Impact (Rewrite)** -- NeoForge 1.21.1 / Java 21 mod adding physics-based impact damage
 on top of the Sable physics engine.
-Mod ID: `true_impact` | Package root: `io.github.omegau371.trueimpact` | Current phase: `0.12.0-phase2e`
+Mod ID: `true_impact` | Package root: `io.github.omegau371.trueimpact` | Current phase: `0.12.1-phase2e`
 
 > This is a from-scratch rewrite. The legacy codebase lives in
 > `C:\Users\l\Desktop\Projects\TI\archived\pr-4-test` (read-only reference).

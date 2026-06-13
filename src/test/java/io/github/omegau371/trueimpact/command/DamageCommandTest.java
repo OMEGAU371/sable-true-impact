@@ -25,11 +25,14 @@ class DamageCommandTest {
         BlockDamageAccumulator.clear();
         DeferredDamageQueue.clear();
         io.github.omegau371.trueimpact.damage.DamageFeedbackTracker.clear();
+        io.github.omegau371.trueimpact.damage.CrackOverlayTracker.clear();
     }
 
     @AfterEach
     void restoreDefaults() {
         io.github.omegau371.trueimpact.damage.ImpactRuntimeConfig.ENABLE_DAMAGE_FEEDBACK = true;
+        io.github.omegau371.trueimpact.damage.ImpactRuntimeConfig.ENABLE_VANILLA_CRACK_OVERLAY = true;
+        io.github.omegau371.trueimpact.damage.ImpactRuntimeConfig.ENABLE_DEBRIS_DROPS = false;
     }
 
     // -- DamageInspectFormatter.formatNoEntry -------------------------------------
@@ -210,11 +213,12 @@ class DamageCommandTest {
         assertTrue(result.contains("response=DROP_DEBRIS"));
         assertTrue(result.contains("fbe=true"));
         assertTrue(result.contains("debris=true"));
+        assertTrue(result.contains("crack=9"), "CRITICAL must show crack progress 9");
         assertTrue(result.contains("note="));
     }
 
     @Test
-    void formatPlan_NONE_shows_false_flags() {
+    void formatPlan_NONE_shows_false_flags_and_no_overlay() {
         MaterialResponsePlan plan = new MaterialResponsePlan(
                 MaterialResponseType.NONE,
                 MaterialThresholdProfile.MaterialClass.STONE,
@@ -226,6 +230,7 @@ class DamageCommandTest {
         assertTrue(result.contains("response=NONE"));
         assertTrue(result.contains("fbe=false"));
         assertTrue(result.contains("debris=false"));
+        assertTrue(result.contains("crack=-1"), "INTACT must show crack=-1 (no overlay)");
     }
 
     @Test
@@ -242,6 +247,59 @@ class DamageCommandTest {
         assertTrue(result.contains("fbe=true"));
         assertTrue(result.contains("debris=false"),
                 "debris=false when markDebrisDropped has not been called for this block");
+        assertTrue(result.contains("crack=9"), "CRITICAL WOOD must show crack=9");
+    }
+
+    @Test
+    void formatPlan_CRACKED_shows_mid_crack_stage() {
+        MaterialResponsePlan plan = new MaterialResponsePlan(
+                MaterialResponseType.COSMETIC_CRACK,
+                MaterialThresholdProfile.MaterialClass.STONE,
+                DamageState.CRACKED,
+                40.0, 40.0, 50.0, 0.80,
+                false, false,
+                "cosmetic crack (ratio=0.800)");
+        String result = DamageInspectFormatter.formatPlan(plan, false);
+        // ratio=0.80 -> CRACKED -> progress=6
+        assertTrue(result.contains("crack=6"), "CRACKED at ratio=0.80 must show crack=6");
+    }
+
+    @Test
+    void debris_disabled_by_default_and_planner_still_returns_drop_debris_for_stone() {
+        // Phase 2E hotfix: ENABLE_DEBRIS_DROPS=false disables spawn; plan is unchanged.
+        io.github.omegau371.trueimpact.damage.ImpactRuntimeConfig.ENABLE_DEBRIS_DROPS = false;
+        io.github.omegau371.trueimpact.damage.DeferredDamageEvent ev =
+                new io.github.omegau371.trueimpact.damage.DeferredDamageEvent(
+                        1L, "minecraft:overworld", "minecraft:stone", 10, 64, 10,
+                        MaterialThresholdProfile.MaterialClass.STONE, 100.0, 50.0,
+                        VictimInfo.Source.CONTACT_POINT_SAMPLE, VictimInfo.Confidence.APPROX);
+        BlockDamageAccumulator.accumulate(ev);
+        BlockDamageAccumulator.Snapshot snap = BlockDamageAccumulator.lastUpdatedSnapshot();
+        assertNotNull(snap);
+        io.github.omegau371.trueimpact.damage.MaterialResponsePlan plan =
+                io.github.omegau371.trueimpact.damage.MaterialResponsePlanner.plan(snap);
+        assertEquals(MaterialResponseType.DROP_DEBRIS, plan.responseType(),
+                "planner always plans DROP_DEBRIS for STONE CRITICAL regardless of flag");
+        assertTrue(plan.shouldDropDebris(), "plan.shouldDropDebris=true even when flag is false");
+        assertFalse(io.github.omegau371.trueimpact.damage.ImpactRuntimeConfig.ENABLE_DEBRIS_DROPS,
+                "ENABLE_DEBRIS_DROPS=false: TrueImpactMod suppresses the ItemEntity spawn");
+    }
+
+    @Test
+    void soft_soil_plan_never_sets_shouldDropDebris() {
+        // SOFT_SOIL at CRITICAL -> COMPACT_SOFT_SOIL; shouldDropDebris must always be false.
+        io.github.omegau371.trueimpact.damage.DeferredDamageEvent ev =
+                new io.github.omegau371.trueimpact.damage.DeferredDamageEvent(
+                        1L, "minecraft:overworld", "minecraft:grass_block", 10, 64, 10,
+                        MaterialThresholdProfile.MaterialClass.SOFT_SOIL, 30.0, 5.0,
+                        VictimInfo.Source.CONTACT_POINT_SAMPLE, VictimInfo.Confidence.APPROX);
+        BlockDamageAccumulator.accumulate(ev);
+        BlockDamageAccumulator.Snapshot snap = BlockDamageAccumulator.lastUpdatedSnapshot();
+        assertNotNull(snap);
+        io.github.omegau371.trueimpact.damage.MaterialResponsePlan plan =
+                io.github.omegau371.trueimpact.damage.MaterialResponsePlanner.plan(snap);
+        assertEquals(MaterialResponseType.COMPACT_SOFT_SOIL, plan.responseType());
+        assertFalse(plan.shouldDropDebris(), "SOFT_SOIL must never set shouldDropDebris");
     }
 
     @Test

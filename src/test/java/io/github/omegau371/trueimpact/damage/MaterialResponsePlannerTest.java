@@ -21,7 +21,7 @@ class MaterialResponsePlannerTest {
 
     @AfterEach
     void restoreDefaults() {
-        ImpactRuntimeConfig.ENABLE_DEBRIS_DROPS = true;
+        ImpactRuntimeConfig.ENABLE_DEBRIS_DROPS = false; // production default since Phase 2E hotfix
     }
 
     // -- helper: build a snapshot at a specific ratio via accumulation ------------

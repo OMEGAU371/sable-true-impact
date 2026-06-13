@@ -5,6 +5,7 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import io.github.omegau371.trueimpact.damage.BlockDamageAccumulator;
+import io.github.omegau371.trueimpact.damage.CrackOverlayTracker;
 import io.github.omegau371.trueimpact.damage.DamageState;
 import io.github.omegau371.trueimpact.damage.MaterialResponsePlan;
 import io.github.omegau371.trueimpact.damage.MaterialResponsePlanner;
@@ -119,9 +120,26 @@ public final class DamageCommand {
     private static int clear(CommandContext<CommandSourceStack> ctx) {
         int before = BlockDamageAccumulator.entryCount();
         BlockDamageAccumulator.clear();
+
+        // Drain crack overlay state and send destroyBlockProgress(-1) to remove visual cracks.
+        java.util.List<CrackOverlayTracker.WorldClearAction> crackClears = CrackOverlayTracker.drainForClear();
+        if (!crackClears.isEmpty()) {
+            ServerLevel level = ctx.getSource().getLevel();
+            String levelKey = level.dimension().location().toString();
+            for (CrackOverlayTracker.WorldClearAction action : crackClears) {
+                if (levelKey.equals(action.key().levelKey())) {
+                    BlockPos pos = new BlockPos(
+                            action.key().posX(), action.key().posY(), action.key().posZ());
+                    level.destroyBlockProgress(action.fakeBreakerId(), pos, -1);
+                }
+            }
+        }
+
         final int count = before;
+        final int cracksCleared = crackClears.size();
         ctx.getSource().sendSuccess(
-                () -> Component.literal("[TI damage] accumulator cleared (" + count + " entries removed)")
+                () -> Component.literal("[TI damage] accumulator cleared ("
+                        + count + " entries, " + cracksCleared + " crack overlays)")
                         .withStyle(ChatFormatting.AQUA), false);
         return 1;
     }
