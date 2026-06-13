@@ -114,6 +114,84 @@ class DamageCommandTest {
                 "queue totalFlushed must NOT be reset by damage clear");
     }
 
+    // -- inspect last path --------------------------------------------------------
+
+    @Test
+    void inspect_last_with_empty_accumulator_returns_null_snapshot() {
+        // No accumulations: lastUpdatedSnapshot() must be null.
+        // The command would show "no damage recorded yet".
+        assertNull(BlockDamageAccumulator.lastUpdatedSnapshot(),
+                "lastUpdatedSnapshot must be null when accumulator is empty");
+    }
+
+    @Test
+    void inspect_last_after_single_accumulate_returns_that_entry() {
+        DeferredDamageEvent ev = new DeferredDamageEvent(
+                1L, "minecraft:overworld", "minecraft:stone", 10, 64, 10,
+                MaterialThresholdProfile.MaterialClass.STONE, 60.0, 50.0,
+                VictimInfo.Source.CONTACT_POINT_SAMPLE, VictimInfo.Confidence.APPROX);
+        BlockDamageAccumulator.accumulate(ev);
+
+        BlockDamageAccumulator.Snapshot snap = BlockDamageAccumulator.lastUpdatedSnapshot();
+        assertNotNull(snap, "lastUpdatedSnapshot must be non-null after accumulate");
+
+        String formatted = DamageInspectFormatter.formatEntry(snap);
+        assertTrue(formatted.contains("[TI damage inspect]"), "must use inspect format prefix");
+        assertTrue(formatted.contains("minecraft:stone"), "must contain block id");
+        assertTrue(formatted.contains("hits=1"), "must show hit count");
+        assertTrue(formatted.contains("class=STONE"), "must show material class");
+    }
+
+    @Test
+    void inspect_last_after_multiple_accumulates_shows_most_recent() {
+        DeferredDamageEvent ev1 = new DeferredDamageEvent(
+                1L, "minecraft:overworld", "minecraft:stone", 10, 64, 10,
+                MaterialThresholdProfile.MaterialClass.STONE, 60.0, 50.0,
+                VictimInfo.Source.CONTACT_POINT_SAMPLE, VictimInfo.Confidence.APPROX);
+        DeferredDamageEvent ev2 = new DeferredDamageEvent(
+                2L, "minecraft:overworld", "minecraft:grass_block", 20, 64, 20,
+                MaterialThresholdProfile.MaterialClass.SOFT_SOIL, 10.0, 5.0,
+                VictimInfo.Source.CONTACT_POINT_SAMPLE, VictimInfo.Confidence.APPROX);
+
+        BlockDamageAccumulator.accumulate(ev1);
+        BlockDamageAccumulator.accumulate(ev2);
+
+        BlockDamageAccumulator.Snapshot snap = BlockDamageAccumulator.lastUpdatedSnapshot();
+        assertNotNull(snap);
+        assertEquals("minecraft:grass_block", snap.key().victimBlock(),
+                "lastUpdatedSnapshot must reflect the most recent accumulate call");
+        assertEquals(20, snap.key().posX(),
+                "position must be from the most recent event");
+
+        String formatted = DamageInspectFormatter.formatEntry(snap);
+        assertTrue(formatted.contains("minecraft:grass_block"));
+        assertTrue(formatted.contains("pos=(20,64,20)"));
+    }
+
+    @Test
+    void inspect_last_formatted_output_contains_all_key_fields() {
+        DeferredDamageEvent ev = new DeferredDamageEvent(
+                42L, "minecraft:overworld", "minecraft:andesite", 5, 63, -3,
+                MaterialThresholdProfile.MaterialClass.STONE, 55.965, 50.0,
+                VictimInfo.Source.CONTACT_POINT_SAMPLE, VictimInfo.Confidence.APPROX);
+        BlockDamageAccumulator.accumulate(ev);
+
+        BlockDamageAccumulator.Snapshot snap = BlockDamageAccumulator.lastUpdatedSnapshot();
+        assertNotNull(snap);
+        String formatted = DamageInspectFormatter.formatEntry(snap);
+
+        // All fields required by the command spec must be present
+        assertTrue(formatted.contains("block=minecraft:andesite"), "block id");
+        assertTrue(formatted.contains("pos=(5,63,-3)"), "position");
+        assertTrue(formatted.contains("class=STONE"), "material class");
+        assertTrue(formatted.contains("threshold=50.000J"), "threshold");
+        assertTrue(formatted.contains("rawLast=55.965J"), "raw last impact");
+        assertTrue(formatted.contains("effLast=55.965J"), "eff last (below cap -> equals raw)");
+        assertTrue(formatted.contains("accumEff=55.965J"), "accumulated effective");
+        assertTrue(formatted.contains("state=CRITICAL"), "damage state (ratio=1.12 >= 1.0)");
+        assertTrue(formatted.contains("hits=1"), "hit count");
+    }
+
     @Test
     void non_SOFT_SOIL_CRITICAL_returns_feedback_flag_with_no_block_mutation() {
         // Phase 2D: DamageFeedbackTracker is a boolean gate only. It has no setBlock.
