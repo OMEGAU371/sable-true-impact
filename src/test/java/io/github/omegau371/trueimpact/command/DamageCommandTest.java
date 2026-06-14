@@ -260,8 +260,8 @@ class DamageCommandTest {
                 false, false,
                 "cosmetic crack (ratio=0.800)");
         String result = DamageInspectFormatter.formatPlan(plan, false);
-        // ratio=0.80 -> CRACKED -> progress=6
-        assertTrue(result.contains("crack=6"), "CRACKED at ratio=0.80 must show crack=6");
+        // ratio=0.80 -> 0.80..0.90 band -> progress=7
+        assertTrue(result.contains("crack=7"), "CRACKED at ratio=0.80 must show crack=7");
     }
 
     @Test

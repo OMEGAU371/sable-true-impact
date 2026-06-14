@@ -64,9 +64,8 @@ class CrackProgressDataFlowTest {
      * effective per hit = min(12, 100) = 12J.
      *
      * hit 1: accumulated= 12J, ratio=0.24 -> INTACT  -> no overlay (-1)
-     * hit 2: accumulated= 24J, ratio=0.48 -> BRUISED -> no overlay (-1)
-     * hit 3: accumulated= 36J, ratio=0.72 -> CRACKED -> progress 6
-     *          t=(0.72-0.60)/0.40=0.30, round(5+0.60)=6
+     * hit 2: accumulated= 24J, ratio=0.48 -> BRUISED -> progress 3  (0.40..0.50 band)
+     * hit 3: accumulated= 36J, ratio=0.72 -> CRACKED -> progress 6  (0.70..0.80 band)
      *
      * The crack level rises with accumulated ratio, not with any single hit value.
      */
@@ -78,11 +77,11 @@ class CrackProgressDataFlowTest {
 
         BlockDamageAccumulator.Snapshot snap2 = hit(12.0);
         assertEquals(DamageState.BRUISED, snap2.damageState(), "hit 2: ratio=0.48 -> BRUISED");
-        assertEquals(-1, progress(snap2), "hit 2: BRUISED -> no overlay");
+        assertEquals(3, progress(snap2), "hit 2: BRUISED ratio=0.48 -> crack progress 3 (0.40..0.50 band)");
 
         BlockDamageAccumulator.Snapshot snap3 = hit(12.0);
         assertEquals(DamageState.CRACKED, snap3.damageState(), "hit 3: ratio=0.72 -> CRACKED");
-        assertEquals(6, progress(snap3), "hit 3: CRACKED ratio=0.72 -> crack progress 6");
+        assertEquals(6, progress(snap3), "hit 3: CRACKED ratio=0.72 -> crack progress 6 (0.70..0.80 band)");
 
         // The per-hit lastEffectiveDamageJ is still 12J (unchanged),
         // but the accumulated total drives the transition to CRACKED.
@@ -116,9 +115,8 @@ class CrackProgressDataFlowTest {
      * Two snapshots share the same lastEffectiveDamageJ (10J) but differ in
      * accumulatedEffectiveDamageJ (10J vs 45J).
      *
-     * Snapshot A: accumulated=10J -> ratio=0.20 -> INTACT  -> no overlay
-     * Snapshot B: accumulated=45J -> ratio=0.90 -> CRACKED -> progress 7
-     *              t=(0.90-0.60)/0.40=0.75, round(5+1.5)=7
+     * Snapshot A: accumulated=10J -> ratio=0.20 -> INTACT  -> no overlay (-1)
+     * Snapshot B: accumulated=45J -> ratio=0.90 -> CRACKED -> progress 8  (0.90..1.00 band)
      *
      * Proves the formula uses the running accumulated ratio, not the last-hit value.
      */
@@ -158,7 +156,7 @@ class CrackProgressDataFlowTest {
         int progressB = CrackOverlayTracker.ratioToProgress(snapB.damageState(), snapB.ratio());
 
         assertEquals(-1, progressA, "A: INTACT (accumulated=10J) -> no overlay");
-        assertEquals(7,  progressB, "B: CRACKED (accumulated=45J, ratio=0.90) -> crack progress 7");
+        assertEquals(8,  progressB, "B: CRACKED (accumulated=45J, ratio=0.90) -> crack progress 8 (0.90..1.00 band)");
         assertNotEquals(progressA, progressB,
                 "same lastEffectiveDamageJ but different accumulated -> different crack progress");
     }

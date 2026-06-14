@@ -6,14 +6,16 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Phase 2E hotfix: tracks per-block vanilla crack overlay state (progress 0..9).
+ * Tracks per-block vanilla crack overlay state (progress 0..9).
  *
  * Converts accumulated damage ratio + DamageState to a vanilla block-breaking
  * progress stage (0-9) for use with ServerLevel.destroyBlockProgress().
  *
- * CRACKED  -> 5..7 (linear interpolation over ratio 0.60..1.00)
- * CRITICAL -> 9
- * INTACT / BRUISED -> -1 (no overlay)
+ * INTACT               -> -1 (no overlay)
+ * CRITICAL             -> 9  (always max, regardless of ratio)
+ * BRUISED / CRACKED    -> ratio-driven step table (0.10 per step):
+ *   ratio < 0.10 -> -1 | 0.10..0.20 -> 0 | 0.20..0.30 -> 1 | ...
+ *   0.90..1.00 -> 8    | >= 1.00     -> 9
  *
  * Rate-limited: suppresses re-sends of the same progress for the same block
  * within PER_BLOCK_UPDATE_COOLDOWN_TICKS to avoid packet spam.
@@ -53,24 +55,30 @@ public final class CrackOverlayTracker {
     }
 
     /**
-     * Maps a damage state and accumulated ratio to a vanilla crack progress value (0-9).
-     * Returns -1 when no overlay should be shown (INTACT, BRUISED).
+     * Maps accumulated damage ratio + DamageState to a vanilla crack progress (0-9), or -1.
      *
-     *   CRACKED  (ratio 0.60..1.00) -> 5..7  (linear, rounded)
-     *   CRITICAL (ratio >= 1.00)    -> 9
-     *   INTACT / BRUISED            -> -1
+     *   INTACT              -> -1 always
+     *   CRITICAL            -> 9 always
+     *   BRUISED / CRACKED   -> ratio step table (each 0.10 band = one step):
+     *     < 0.10  -> -1
+     *     0.10..  ->  0, 0.20.. -> 1, 0.30.. -> 2, 0.40.. -> 3, 0.50.. -> 4
+     *     0.60..  ->  5, 0.70.. -> 6, 0.80.. -> 7, 0.90.. -> 8, >= 1.00 -> 9
      */
     public static int ratioToProgress(DamageState state, double ratio) {
-        return switch (state) {
-            case INTACT, BRUISED -> -1;
-            case CRACKED -> {
-                // Linear interpolation: 0.60 -> 5, 1.00 -> 7.
-                double t = (ratio - 0.60) / (1.00 - 0.60);
-                t = Math.max(0.0, Math.min(1.0, t));
-                yield (int) Math.round(5.0 + t * 2.0);
-            }
-            case CRITICAL -> 9;
-        };
+        if (state == DamageState.INTACT)   return -1;
+        if (state == DamageState.CRITICAL) return 9;
+        // BRUISED and CRACKED: pure ratio-driven step table
+        if (ratio < 0.10) return -1;
+        if (ratio < 0.20) return 0;
+        if (ratio < 0.30) return 1;
+        if (ratio < 0.40) return 2;
+        if (ratio < 0.50) return 3;
+        if (ratio < 0.60) return 4;
+        if (ratio < 0.70) return 5;
+        if (ratio < 0.80) return 6;
+        if (ratio < 0.90) return 7;
+        if (ratio < 1.00) return 8;
+        return 9;
     }
 
     /**

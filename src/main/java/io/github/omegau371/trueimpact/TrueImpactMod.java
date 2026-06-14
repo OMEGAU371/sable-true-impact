@@ -124,7 +124,8 @@ public class TrueImpactMod {
                     emitDamageFeedback(level, e.posX(), e.posY(), e.posZ(), snap.damageState());
                 }
 
-                // Phase 2E hotfix: vanilla crack overlay for CRACKED/CRITICAL blocks.
+                // Phase 2E: vanilla crack overlay for BRUISED/CRACKED/CRITICAL blocks.
+                // Progress driven purely by accumulated ratio (0.10 per step).
                 // Skipped for SOFT_SOIL (compaction is the primary response).
                 if (level != null
                         && snap.materialClass() != MaterialThresholdProfile.MaterialClass.SOFT_SOIL) {

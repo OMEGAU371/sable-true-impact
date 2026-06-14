@@ -26,59 +26,117 @@ class CrackOverlayTrackerTest {
         ImpactRuntimeConfig.ENABLE_VANILLA_CRACK_OVERLAY = true;
     }
 
-    // -- ratioToProgress: INTACT / BRUISED -----------------------------------------
+    // -- ratioToProgress: INTACT ---------------------------------------------------
 
     @Test
     void intact_returns_no_overlay() {
         assertEquals(-1, CrackOverlayTracker.ratioToProgress(DamageState.INTACT, 0.10));
     }
 
+    // -- ratioToProgress: BRUISED --------------------------------------------------
+
     @Test
-    void bruised_returns_no_overlay() {
-        assertEquals(-1, CrackOverlayTracker.ratioToProgress(DamageState.BRUISED, 0.40));
+    void bruised_below_threshold_returns_no_overlay() {
+        // ratio < 0.10 -> -1 even for non-INTACT states
+        assertEquals(-1, CrackOverlayTracker.ratioToProgress(DamageState.BRUISED, 0.05));
     }
 
-    // -- ratioToProgress: CRACKED --------------------------------------------------
+    @Test
+    void bruised_emits_overlay_when_ratio_above_threshold() {
+        // BRUISED with ratio >= 0.10 must now produce an overlay
+        int progress = CrackOverlayTracker.ratioToProgress(DamageState.BRUISED, 0.15);
+        assertTrue(progress >= 0,
+                "BRUISED at ratio 0.15 must emit overlay, got " + progress);
+    }
+
+    // -- ratioToProgress: ratio step table (BRUISED used as representative state) ---
 
     @Test
-    void cracked_at_lower_bound_returns_5() {
-        // ratio=0.60 -> t=0 -> round(5+0) = 5
+    void ratio_005_returns_no_overlay() {
+        assertEquals(-1, CrackOverlayTracker.ratioToProgress(DamageState.BRUISED, 0.05));
+    }
+
+    @Test
+    void ratio_015_returns_0() {
+        assertEquals(0, CrackOverlayTracker.ratioToProgress(DamageState.BRUISED, 0.15));
+    }
+
+    @Test
+    void ratio_025_returns_1() {
+        assertEquals(1, CrackOverlayTracker.ratioToProgress(DamageState.BRUISED, 0.25));
+    }
+
+    @Test
+    void ratio_035_returns_2() {
+        assertEquals(2, CrackOverlayTracker.ratioToProgress(DamageState.BRUISED, 0.35));
+    }
+
+    @Test
+    void ratio_045_returns_3() {
+        assertEquals(3, CrackOverlayTracker.ratioToProgress(DamageState.BRUISED, 0.45));
+    }
+
+    @Test
+    void ratio_055_returns_4() {
+        assertEquals(4, CrackOverlayTracker.ratioToProgress(DamageState.BRUISED, 0.55));
+    }
+
+    @Test
+    void ratio_065_returns_5() {
+        assertEquals(5, CrackOverlayTracker.ratioToProgress(DamageState.BRUISED, 0.65));
+    }
+
+    @Test
+    void ratio_075_returns_6() {
+        assertEquals(6, CrackOverlayTracker.ratioToProgress(DamageState.BRUISED, 0.75));
+    }
+
+    @Test
+    void ratio_085_returns_7() {
+        assertEquals(7, CrackOverlayTracker.ratioToProgress(DamageState.BRUISED, 0.85));
+    }
+
+    @Test
+    void ratio_095_returns_8() {
+        assertEquals(8, CrackOverlayTracker.ratioToProgress(DamageState.BRUISED, 0.95));
+    }
+
+    @Test
+    void ratio_100_returns_9() {
+        assertEquals(9, CrackOverlayTracker.ratioToProgress(DamageState.BRUISED, 1.00));
+    }
+
+    // -- ratioToProgress: CRACKED uses same step table ----------------------------
+
+    @Test
+    void cracked_at_0_60_returns_5() {
         assertEquals(5, CrackOverlayTracker.ratioToProgress(DamageState.CRACKED, 0.60));
     }
 
     @Test
-    void cracked_at_midpoint_returns_6() {
-        // ratio=0.80 -> t=0.5 -> round(5+1) = 6
-        assertEquals(6, CrackOverlayTracker.ratioToProgress(DamageState.CRACKED, 0.80));
+    void cracked_at_0_80_returns_7() {
+        assertEquals(7, CrackOverlayTracker.ratioToProgress(DamageState.CRACKED, 0.80));
     }
 
     @Test
-    void cracked_at_upper_bound_returns_7() {
-        // ratio=1.00 -> t=1.0 -> round(5+2) = 7
-        assertEquals(7, CrackOverlayTracker.ratioToProgress(DamageState.CRACKED, 1.00));
+    void cracked_at_0_50_returns_4() {
+        assertEquals(4, CrackOverlayTracker.ratioToProgress(DamageState.CRACKED, 0.50));
     }
 
     @Test
-    void cracked_clamps_below_lower_bound() {
-        // ratio < 0.60 clamps t to 0 -> progress 5
-        assertEquals(5, CrackOverlayTracker.ratioToProgress(DamageState.CRACKED, 0.50));
-    }
-
-    @Test
-    void cracked_clamps_above_upper_bound() {
-        // ratio > 1.00 clamps t to 1 -> progress 7
-        assertEquals(7, CrackOverlayTracker.ratioToProgress(DamageState.CRACKED, 1.10));
+    void cracked_at_1_00_returns_9() {
+        assertEquals(9, CrackOverlayTracker.ratioToProgress(DamageState.CRACKED, 1.00));
     }
 
     // -- ratioToProgress: CRITICAL -------------------------------------------------
 
     @Test
-    void critical_at_threshold_returns_9() {
+    void critical_always_returns_9_at_threshold() {
         assertEquals(9, CrackOverlayTracker.ratioToProgress(DamageState.CRITICAL, 1.00));
     }
 
     @Test
-    void critical_at_high_ratio_returns_9() {
+    void critical_always_returns_9_at_high_ratio() {
         assertEquals(9, CrackOverlayTracker.ratioToProgress(DamageState.CRITICAL, 5.00));
     }
 
@@ -96,10 +154,20 @@ class CrackOverlayTrackerTest {
 
     @Test
     void tryUpdate_first_call_for_cracked_returns_correct_stage() {
+        // ratio=0.80 -> 0.80 <= x < 0.90 -> 7
         BlockDamageAccumulator.AccKey key = new BlockDamageAccumulator.AccKey(
                 "minecraft:overworld", 10, 64, 10, "minecraft:stone");
         int result = CrackOverlayTracker.tryUpdate(key, DamageState.CRACKED, 0.80, 1L);
-        assertEquals(6, result);
+        assertEquals(7, result);
+    }
+
+    @Test
+    void tryUpdate_first_call_for_bruised_emits_overlay() {
+        // BRUISED at ratio 0.25 -> progress 1
+        BlockDamageAccumulator.AccKey key = new BlockDamageAccumulator.AccKey(
+                "minecraft:overworld", 10, 64, 10, "minecraft:stone");
+        int result = CrackOverlayTracker.tryUpdate(key, DamageState.BRUISED, 0.25, 1L);
+        assertEquals(1, result);
     }
 
     // -- tryUpdate: rate limiting --------------------------------------------------
@@ -109,7 +177,6 @@ class CrackOverlayTrackerTest {
         BlockDamageAccumulator.AccKey key = new BlockDamageAccumulator.AccKey(
                 "minecraft:overworld", 10, 64, 10, "minecraft:stone");
         CrackOverlayTracker.tryUpdate(key, DamageState.CRITICAL, 1.5, 1L);
-        // Within cooldown window
         int result = CrackOverlayTracker.tryUpdate(key, DamageState.CRITICAL, 1.5, 5L);
         assertEquals(-1, result, "same progress within cooldown must return -1");
         assertEquals(1L, CrackOverlayTracker.totalCrackOverlayUpdates(),
@@ -129,16 +196,17 @@ class CrackOverlayTrackerTest {
 
     @Test
     void tryUpdate_progress_change_triggers_immediate_update() {
+        // First call: CRACKED ratio=0.80 -> progress 7
+        // Second call same tick: CRITICAL -> progress 9 (different) -> must bypass cooldown
         BlockDamageAccumulator.AccKey key = new BlockDamageAccumulator.AccKey(
                 "minecraft:overworld", 10, 64, 10, "minecraft:stone");
-        CrackOverlayTracker.tryUpdate(key, DamageState.CRACKED, 0.80, 1L); // progress = 6
-        // Same tick but CRITICAL -> progress = 9 (different) -- cooldown bypass
+        CrackOverlayTracker.tryUpdate(key, DamageState.CRACKED, 0.80, 1L);
         int result = CrackOverlayTracker.tryUpdate(key, DamageState.CRITICAL, 1.5, 1L);
         assertEquals(9, result, "changed progress must bypass cooldown");
     }
 
     @Test
-    void tryUpdate_intact_within_cooldown_returns_minus_one() {
+    void tryUpdate_intact_returns_minus_one() {
         BlockDamageAccumulator.AccKey key = new BlockDamageAccumulator.AccKey(
                 "minecraft:overworld", 10, 64, 10, "minecraft:stone");
         int result = CrackOverlayTracker.tryUpdate(key, DamageState.INTACT, 0.1, 1L);
@@ -234,8 +302,6 @@ class CrackOverlayTrackerTest {
                 "minecraft:overworld", 10, 64, 10, "minecraft:stone");
         BlockDamageAccumulator.AccKey k2 = new BlockDamageAccumulator.AccKey(
                 "minecraft:overworld", 99, 64, 99, "minecraft:stone");
-        // Different coords -> different AccKey hashCode -> different IDs (probabilistically)
-        // Only check they are deterministic and negative; collision probability is negligible.
         assertTrue(CrackOverlayTracker.fakeBreakerIdFor(k1) < 0);
         assertTrue(CrackOverlayTracker.fakeBreakerIdFor(k2) < 0);
     }
