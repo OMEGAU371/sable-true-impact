@@ -17,33 +17,35 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.lang.reflect.Field;
-import java.util.Collections;
+import java.lang.reflect.Method;
 import java.util.Map;
 
 /**
  * Intercepts Rapier3D.clearCollisions() to feed the damage pipeline and diagnostic logs.
  *
- * Two independent paths run after clearCollisions() returns:
+ * Dual-path injection for Sable 1.x / 2.0.x compatibility:
  *
- *   PATH A -- damage pipeline (SableImpactCapture + victim detection):
- *     Runs UNCONDITIONALLY on every physics tick regardless of diagnostic flags.
- *     MUST NOT be placed inside any DiagnosticConfig gate.
- *     Diagnostic flags control only log/chat output, never whether capture runs.
+ *   SABLE 1.x PATH (@Redirect, require=0):
+ *     clearCollisions(int sceneId) is called from inside processCollisionEffects().
+ *     @Redirect intercepts the call; sceneId passed to Rapier3D.clearCollisions via
+ *     reflection (avoids compile error on 2.0.x where the method is package-private).
+ *     Returns the real data so Sable can continue processing.
  *
- *   PATH B -- diagnostic logging (ContactLogger):
- *     Runs only when LOG_RAW_CONTACTS is enabled.
- *     Safe to gate; logs have no game-side effects.
+ *   SABLE 2.0.x PATH (@Inject at HEAD, require=0):
+ *     clearCollisions() is a separate method that caches its result in recentCollisions
+ *     before processCollisionEffects() runs.  Inject at HEAD reads the cached field
+ *     via reflection (avoids @Shadow crash when field is in a parent class).
  *
- * snaps (lastPostSnaps) and tickStartVels are always populated unconditionally
- * by SableEventBridge regardless of diagnostic flags.
+ * Both paths call TI$doProcess(data); a tick-scoped guard prevents double execution.
+ * On each Sable version, exactly one path fires; the other degrades silently (require=0
+ * + null check in TI$doProcess).
  *
- * [T-5] clearCollisions is called once after all substeps -- array covers ALL substeps.
- * [C2]  Bodies not found in activeSubLevels -> NON_ACTIVE_SUBLEVEL_BODY, NOT "terrain".
- *
- * Original double[] is passed through unchanged.
+ * PATH A (damage pipeline): runs unconditionally, no diagnostic gate.
+ * PATH B (ContactLogger):   gated on LOG_RAW_CONTACTS.
  */
 @Mixin(targets = "dev.ryanhcode.sable.physics.impl.rapier.RapierPhysicsPipeline",
        remap = false)
@@ -51,10 +53,11 @@ public abstract class DiagnosticContactCaptureMixin {
 
     @Shadow @Final private ServerLevel level;
 
-    // Sable 2.0.x: clearCollisions() became a separate method on RapierPhysicsPipeline that
-    // caches its result in recentCollisions before processCollisionEffects() runs.
-    // @Shadow would crash if the field lives in a parent class; reflection handles both cases.
-    @Unique private static volatile Field TI$recentCollisionsField;
+    // ── Tick-scoped dedup: prevents double-processing if both injectors somehow fire ──
+    @Unique private long TI$lastProcessedTick = -1L;
+
+    // ── Sable 2.0.x: recentCollisions field (may be in a parent class) ────────────
+    @Unique private static volatile Field   TI$recentCollisionsField;
     @Unique private static volatile boolean TI$fieldSearchDone;
 
     @Unique
@@ -77,37 +80,80 @@ public abstract class DiagnosticContactCaptureMixin {
         try { return (double[]) f.get(this); } catch (Throwable ignored) { return null; }
     }
 
-    // Sable 2.0.x: inject at HEAD of processCollisionEffects() and read the already-cached
-    // recentCollisions field via reflection instead of @Redirect on clearCollisions().
-    // require=0 so a future Sable rename degrades silently rather than crashing on load.
+    // ── Sable 1.x: Rapier3D.clearCollisions(int) static method ───────────────────
+    @Unique private static volatile Method  TI$legacyClearCollisionsMethod;
+    @Unique private static volatile boolean TI$legacyMethodSearchDone;
+
+    @Unique
+    private double[] TI$callClearCollisionsLegacy(int sceneId) {
+        if (!TI$legacyMethodSearchDone) {
+            Method found = null;
+            try {
+                Class<?> cls = Class.forName(
+                        "dev.ryanhcode.sable.physics.impl.rapier.Rapier3D");
+                found = cls.getDeclaredMethod("clearCollisions", int.class);
+                found.setAccessible(true);
+            } catch (Throwable ignored) {}
+            TI$legacyClearCollisionsMethod = found;
+            TI$legacyMethodSearchDone      = true;
+        }
+        Method m = TI$legacyClearCollisionsMethod;
+        if (m == null) return null;
+        try { return (double[]) m.invoke(null, sceneId); } catch (Throwable ignored) { return null; }
+    }
+
+    // ── SABLE 1.x INJECTION ────────────────────────────────────────────────────────
+    // Intercepts the clearCollisions(int) call inside processCollisionEffects.
+    // require=0: silently skips on Sable 2.0.x (call no longer present there).
+    // Returns the real data array so Sable can continue processing unmodified.
+    @Redirect(
+            method = "processCollisionEffects",
+            at = @At(value = "INVOKE",
+                     target = "Ldev/ryanhcode/sable/physics/impl/rapier/Rapier3D;clearCollisions(I)[D",
+                     remap = false),
+            require = 0,
+            remap = false
+    )
+    private double[] captureViaRedirect(int sceneId) {
+        double[] data = TI$callClearCollisionsLegacy(sceneId);
+        TI$doProcess(data);
+        return (data != null) ? data : new double[0];
+    }
+
+    // ── SABLE 2.0.x INJECTION ──────────────────────────────────────────────────────
+    // Reads the recentCollisions field populated by the preceding clearCollisions() call.
+    // require=0: silently skips on Sable 1.x (no recentCollisions field → returns null
+    // → TI$doProcess no-ops).
     @Inject(
             method = "processCollisionEffects",
             at = @At("HEAD"),
             require = 0,
             remap = false
     )
-    private void captureContactData(CallbackInfo ci) {
+    private void captureViaInject(CallbackInfo ci) {
         double[] data = TI$getRecentCollisions();
+        TI$doProcess(data);
+    }
 
-        SubLevelPhysicsSystem system   = SubLevelPhysicsSystem.get(level);
-        int substepCount               = (system != null) ? system.getConfig().substepsPerTick : -1;
+    // ── shared processing (called by both paths) ───────────────────────────────────
+    @Unique
+    private void TI$doProcess(double[] data) {
+        long tick = level.getGameTime();
+        if (tick == TI$lastProcessedTick) return; // already processed this tick
+        TI$lastProcessedTick = tick;
+
+        SubLevelPhysicsSystem system = SubLevelPhysicsSystem.get(level);
+        int substepCount = (system != null) ? system.getConfig().substepsPerTick : -1;
         Map<Integer, BodySnapshot> snaps        = SableEventBridge.getLastPostSnapshots();
-        Map<Integer, double[]>    tickStartVels = SableEventBridge.getTickStartVels();
-        long tick                      = level.getGameTime();
+        Map<Integer, double[]>     tickStartVels = SableEventBridge.getTickStartVels();
         // Use SubLevelPhysicsSystem.getLevel() for the dimension key.
         // RapierPhysicsPipeline.level can be a virtual physics level whose dimension()
         // is not registered in the Minecraft level registry (returns "minecraft:missing").
-        // system.getLevel() is always the real parent ServerLevel (overworld/nether/end).
         String levelKey = (system != null)
                 ? system.getLevel().dimension().location().toString()
                 : level.dimension().location().toString();
 
-        // Contact-point block detection for world-vs-active contacts (PATH A, unconditional).
-        // BlockSubLevelCollisionCallback fires only for blocks implementing
-        // BlockWithSubLevelCollisionCallback. Most vanilla blocks have null callbacks.
-        // Falls back to transforming the contact point to world space and sampling
-        // level.getBlockState() at and near that position.
-        // Runs BEFORE process() so SableImpactCapture can read SableVictimCapture.
+        // Contact-point block detection (PATH A, unconditional).
         // Skip only if callback path already captured data this tick (callback is preferred).
         if (!SableVictimCapture.hasCaptureThisTick()) {
             tryContactPointBlockDetection(data, snaps);
@@ -120,7 +166,6 @@ public abstract class DiagnosticContactCaptureMixin {
         if (DiagnosticConfig.is(DiagnosticConfig.LOG_RAW_CONTACTS)) {
             ContactLogger.onClearCollisions(data, tick, substepCount, snaps, tickStartVels);
         }
-
     }
 
     // -- Phase 1D: contact-point block detection -----------------------------------
@@ -150,25 +195,19 @@ public abstract class DiagnosticContactCaptureMixin {
             if (snapA == null && snapB == null) continue; // both unknown
             if (snapA != null && snapB != null) continue; // active-vs-active
 
-            // Exactly one active body; use ITS contact point in ITS local frame
             BodySnapshot activeSnap = (snapA != null) ? snapA : snapB;
             double lpX, lpY, lpZ;
             if (snapA != null) {
-                // A is active; localPointA in offsets 9-11
                 lpX = data[base + 9];
                 lpY = data[base + 10];
                 lpZ = data[base + 11];
             } else {
-                // B is active; localPointB in offsets 12-14
                 lpX = data[base + 12];
                 lpY = data[base + 13];
                 lpZ = data[base + 14];
             }
 
-            // Transform body-COM-local -> world
             double[] wcp = transformLocalToWorld(activeSnap, lpX, lpY, lpZ);
-
-            // Sample block at contact point and adjacent positions
             BlockPos candidate = sampleNearestSolidBlock(wcp);
             if (candidate != null) {
                 ResourceLocation loc = BuiltInRegistries.BLOCK
@@ -176,7 +215,7 @@ public abstract class DiagnosticContactCaptureMixin {
                 if (loc != null) {
                     SableVictimCapture.captureContactPointBlock(loc.toString(),
                             candidate.getX(), candidate.getY(), candidate.getZ());
-                    return; // first successful detection is sufficient for diagnostics
+                    return;
                 }
             }
         }
@@ -200,7 +239,6 @@ public abstract class DiagnosticContactCaptureMixin {
 
     /**
      * Tries to find a non-air block at or adjacent to the given world contact point.
-     * Contact point is on the active body's surface; the victim block is just outside.
      * Returns null if no solid block found or if hasChunkAt fails for all candidates.
      */
     private BlockPos sampleNearestSolidBlock(double[] wcp) {
