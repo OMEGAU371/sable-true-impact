@@ -63,7 +63,7 @@ public abstract class DiagnosticCallbackWrapperMixin {
         }
 
         @Override
-        public CollisionResult sable$onCollision(BlockPos pos, Vector3d hitPos, double impactVelocity) {
+        public CollisionResult sable$onCollision(BlockPos pos, BlockPos otherPos, Vector3d hitPos, double impactVelocity) {
             // Victim capture: record block type for world-vs-active detection (unconditional).
             // Fires during Rapier3D.step() callbacks. Read-only; no world mutation.
             // pos space is UNCONFIRMED (T-2 pending); posLooksWorld heuristic excludes
@@ -114,7 +114,7 @@ public abstract class DiagnosticCallbackWrapperMixin {
             }
 
             // Observation-only: delegate and return original result unchanged
-            return delegate.sable$onCollision(pos, hitPos, impactVelocity);
+            return delegate.sable$onCollision(pos, otherPos, hitPos, impactVelocity);
         }
     }
 }

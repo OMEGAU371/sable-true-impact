@@ -15,7 +15,7 @@ group = mod_group_id
 repositories {
     mavenCentral()
     flatDir { dirs 'libs' }
-    // Sable physics engine (optional runtime dependency)
+    // sable-companion (math utilities; version 1.6.0 unchanged in Sable 2.0.x)
     exclusiveContent {
         forRepository {
             maven {
@@ -24,7 +24,6 @@ repositories {
             }
         }
         filter {
-            includeGroup("dev.ryanhcode.sable")
             includeGroup("dev.ryanhcode.sable-companion")
         }
     }
@@ -76,9 +75,10 @@ configurations {
 
 dependencies {
     // Sable physics engine — compile-only optional dependency.
-    // At runtime, sable-neoforge-1.21.1-1.2.2.jar must be present in the mods folder.
+    // At runtime, sable-neoforge-1.21.1-2.0.1.jar must be present in the mods folder.
     // All Sable API usage is guarded behind DistInfo.isSableLoaded() checks.
-    compileOnly "dev.ryanhcode.sable:sable-common-1.21.1:1.2.2"
+    compileOnly "blank:sable-neoforge-1.21.1:2.0.1"
+    compileOnly "blank:sable-rapier:2.0.1"
     compileOnly "dev.ryanhcode.sable-companion:sable-companion-common-1.21.1:1.6.0"
 
     testImplementation platform("org.junit:junit-bom:5.11.0")
@@ -230,7 +230,7 @@ tasks.register('copySableToRunMods') {
     description = 'Copy Sable NeoForge JAR to run/mods/ for with-Sable runServer verification. run/ is git-ignored.'
     notCompatibleWithConfigurationCache('Accesses file system at execution time for dev-only helper')
     doLast {
-        def sableJar = file('D:\\.minecraft\\versions\\1.21.1-NeoForge_21.1.228\\mods\\sable-neoforge-1.21.1-1.2.2.jar')
+        def sableJar = file('D:\\.minecraft\\versions\\1.21.1-NeoForge_21.1.228\\mods\\sable-neoforge-1.21.1-2.0.1.jar')
         if (!sableJar.exists()) {
             throw new GradleException(
                 "Sable JAR not found at expected path: ${sableJar}\n" +

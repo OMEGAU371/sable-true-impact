@@ -1,6 +1,5 @@
 package io.github.omegau371.trueimpact.mixin;
 
-import dev.ryanhcode.sable.physics.impl.rapier.Rapier3D;
 import dev.ryanhcode.sable.sublevel.system.SubLevelPhysicsSystem;
 import io.github.omegau371.trueimpact.diagnostic.ContactLogger;
 import io.github.omegau371.trueimpact.observation.BodySnapshot;
@@ -15,9 +14,12 @@ import net.minecraft.server.level.ServerLevel;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+import java.lang.reflect.Field;
 import java.util.Collections;
 import java.util.Map;
 
@@ -49,15 +51,43 @@ public abstract class DiagnosticContactCaptureMixin {
 
     @Shadow @Final private ServerLevel level;
 
-    @Redirect(
+    // Sable 2.0.x: clearCollisions() became a separate method on RapierPhysicsPipeline that
+    // caches its result in recentCollisions before processCollisionEffects() runs.
+    // @Shadow would crash if the field lives in a parent class; reflection handles both cases.
+    @Unique private static volatile Field TI$recentCollisionsField;
+    @Unique private static volatile boolean TI$fieldSearchDone;
+
+    @Unique
+    private double[] TI$getRecentCollisions() {
+        if (!TI$fieldSearchDone) {
+            Field found = null;
+            try {
+                for (Class<?> c = getClass(); c != null && c != Object.class; c = c.getSuperclass()) {
+                    try {
+                        Field f = c.getDeclaredField("recentCollisions");
+                        if (f.getType() == double[].class) { f.setAccessible(true); found = f; break; }
+                    } catch (NoSuchFieldException ignored) {}
+                }
+            } catch (Throwable ignored) {}
+            TI$recentCollisionsField = found;
+            TI$fieldSearchDone = true;
+        }
+        Field f = TI$recentCollisionsField;
+        if (f == null) return null;
+        try { return (double[]) f.get(this); } catch (Throwable ignored) { return null; }
+    }
+
+    // Sable 2.0.x: inject at HEAD of processCollisionEffects() and read the already-cached
+    // recentCollisions field via reflection instead of @Redirect on clearCollisions().
+    // require=0 so a future Sable rename degrades silently rather than crashing on load.
+    @Inject(
             method = "processCollisionEffects",
-            at = @At(value = "INVOKE",
-                     target = "Ldev/ryanhcode/sable/physics/impl/rapier/Rapier3D;clearCollisions(I)[D",
-                     remap = false),
+            at = @At("HEAD"),
+            require = 0,
             remap = false
     )
-    private double[] captureContactData(int sceneId) {
-        double[] data = Rapier3D.clearCollisions(sceneId);
+    private void captureContactData(CallbackInfo ci) {
+        double[] data = TI$getRecentCollisions();
 
         SubLevelPhysicsSystem system   = SubLevelPhysicsSystem.get(level);
         int substepCount               = (system != null) ? system.getConfig().substepsPerTick : -1;
@@ -91,7 +121,6 @@ public abstract class DiagnosticContactCaptureMixin {
             ContactLogger.onClearCollisions(data, tick, substepCount, snaps, tickStartVels);
         }
 
-        return data;
     }
 
     // -- Phase 1D: contact-point block detection -----------------------------------
