@@ -11,18 +11,17 @@ NeoForge 1.21.1 · Java 21 · Mod ID: `true_impact` · Current: `0.4.0-delta`
 ---
 
 <details open>
-<summary><b>🇬🇧 English</b> (click to collapse)</summary>
+<summary><b>English</b> (click to collapse)</summary>
 
 ## Features
 
 ### Overview
 
 True Impact adds physics-based structural damage to Sable-simulated bodies and the surrounding
-world. Where most impact-damage mods work off a fixed table of block-to-damage values, this mod
-derives its break and crack thresholds directly from each block's vanilla hardness and blast
-resistance — the same numbers Minecraft itself already uses for mining and explosions. The
-result is a damage model that stays consistent with vanilla balance instead of introducing a
-second, disconnected set of numbers to tune.
+world. Break and crack thresholds are derived directly from each block's vanilla hardness and
+blast resistance — the same numbers Minecraft itself already uses for mining and explosions —
+so the damage model stays consistent with vanilla balance instead of introducing a separate set
+of numbers to tune.
 
 ### World and structure damage
 
@@ -132,16 +131,15 @@ reviewed and released only after multiple rounds of testing.
 </details>
 
 <details>
-<summary><b>🇨🇳 中文</b>(点击展开)</summary>
+<summary><b>中文</b>(点击展开)</summary>
 
 ## 功能
 
 ### 总览
 
-True Impact 给 Sable 模拟的物理结构和周围世界加入了基于物理的结构性伤害。多数撞击伤害类
-模组依赖一张"方块对应伤害值"的固定数值表,这个模组不同——破坏与裂纹阈值直接从每个方块的
-原版硬度和爆炸抗性推导而来,跟 Minecraft 本身用于挖掘和爆炸判定的是同一套数字。结果是一套
-与原版平衡保持一致的伤害模型,而不是另起一套脱节的数值需要单独调校。
+True Impact 给 Sable 模拟的物理结构和周围世界加入了基于物理的结构性伤害。破坏与裂纹阈值
+直接从每个方块的原版硬度和爆炸抗性推导而来,跟 Minecraft 本身用于挖掘和爆炸判定的是同一套
+数字,伤害模型因此与原版平衡保持一致,而不是另起一套脱节的数值需要单独调校。
 
 ### 世界方块与结构伤害
 
