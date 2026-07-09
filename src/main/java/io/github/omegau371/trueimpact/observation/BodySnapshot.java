@@ -11,9 +11,10 @@ package io.github.omegau371.trueimpact.observation;
  * [T-7 pending] linVel/angVel units are UNKNOWN — do not label block/s without T-7 evidence.
  *
  * Coordinate spaces (see docs/coordinate-systems.md):
- *   comX/Y/Z    — PLOT_RELATIVE [block]
+ *   comX/Y/Z    — EMBEDDED_WORLD [block] (subtract plotCenterX/Y/Z to get plot-local offset)
  *   posX/Y/Z    — WORLD [block]
- *   rotPtX/Y/Z  — PLOT_RELATIVE [block, inferred; see §3.2 note 1]
+ *   rotPtX/Y/Z      — physics-world rotation point (NOT plot-relative; see §3.2 note 1)
+ *   plotCenterX/Y/Z — embedded-world block coordinates of the plot center (from plot.getCenterBlock())
  *   linVelX/Y/Z — WORLD direction [IT], unit UNKNOWN [T-7]
  *   angVelX/Y/Z — WORLD direction [IT], unit UNKNOWN [T-7]
  *   oriX/Y/Z/W  — world orientation quaternion
@@ -30,6 +31,7 @@ public record BodySnapshot(
         double posX, double posY, double posZ,
         double oriX, double oriY, double oriZ, double oriW,
         double rotPtX, double rotPtY, double rotPtZ,
+        int plotCenterX, int plotCenterY, int plotCenterZ,
         boolean velocityReadValid,
         double linVelX, double linVelY, double linVelZ,
         double angVelX, double angVelY, double angVelZ

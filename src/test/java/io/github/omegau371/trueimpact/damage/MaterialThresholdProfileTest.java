@@ -17,11 +17,12 @@ class MaterialThresholdProfileTest {
     // -- threshold values -------------------------------------------------------
 
     @Test void soft_soil_threshold_is_5()        { assertEquals(5.0,   threshold(SOFT_SOIL),     1e-9); }
+    @Test void brittle_threshold_is_15()         { assertEquals(15.0,  threshold(BRITTLE),        1e-9); }
     @Test void wood_threshold_is_20()            { assertEquals(20.0,  threshold(WOOD),           1e-9); }
     @Test void stone_threshold_is_50()           { assertEquals(50.0,  threshold(STONE),          1e-9); }
     @Test void metal_threshold_is_120()          { assertEquals(120.0, threshold(METAL),          1e-9); }
     @Test void high_strength_threshold_is_300()  { assertEquals(300.0, threshold(HIGH_STRENGTH),  1e-9); }
-    @Test void generic_threshold_is_50()         { assertEquals(50.0,  threshold(GENERIC),        1e-9); }
+    @Test void generic_threshold_is_40()         { assertEquals(40.0,  threshold(GENERIC),        1e-9); }
 
     // -- block classification: required spec cases ----------------------------
 
@@ -62,7 +63,7 @@ class MaterialThresholdProfileTest {
 
     @Test
     void unknown_block_is_generic() {
-        assertEquals(GENERIC, classify("minecraft:diamond_block"));
+        assertEquals(GENERIC, classify("minecraft:sponge"));
     }
 
     @Test
@@ -137,11 +138,59 @@ class MaterialThresholdProfileTest {
     }
 
     @Test
-    void wouldExceed_generic_uses_stone_threshold() {
-        // GENERIC threshold == STONE threshold (both 50.0)
-        assertEquals(threshold(STONE), threshold(GENERIC), 1e-9,
-                "GENERIC and STONE share the same placeholder threshold");
-        assertTrue(wouldExceed(51.0, GENERIC), "51.0 > 50.0 -> true");
-        assertFalse(wouldExceed(49.0, GENERIC), "49.0 < 50.0 -> false");
+    void wouldExceed_generic_threshold_is_40() {
+        assertEquals(40.0, threshold(GENERIC), 1e-9);
+        assertTrue(wouldExceed(41.0, GENERIC),  "41.0 > 40.0 -> true");
+        assertFalse(wouldExceed(39.0, GENERIC), "39.0 < 40.0 -> false");
+    }
+
+    @Test
+    void glass_is_brittle() {
+        assertEquals(BRITTLE, classify("minecraft:glass"));
+    }
+
+    @Test
+    void ice_is_brittle() {
+        assertEquals(BRITTLE, classify("minecraft:ice"));
+    }
+
+    // -- breakMultiplier values ------------------------------------------------
+
+    @Test void brittle_multiplier_is_3()       { assertEquals(3.0,  breakMultiplier(BRITTLE),       1e-9); }
+    @Test void wood_multiplier_is_5()          { assertEquals(5.0,  breakMultiplier(WOOD),          1e-9); }
+    @Test void stone_multiplier_is_10()        { assertEquals(10.0, breakMultiplier(STONE),         1e-9); }
+    @Test void metal_multiplier_is_15()        { assertEquals(15.0, breakMultiplier(METAL),         1e-9); }
+    @Test void highStrength_multiplier_is_25() { assertEquals(25.0, breakMultiplier(HIGH_STRENGTH), 1e-9); }
+
+    // -- combined break thresholds (Phase 3A: the value that governs destruction) --
+
+    @Test void brittleBreakThreshold_is45J()       { assertEquals(45.0,   breakThreshold(BRITTLE),       1e-9); }
+    @Test void woodBreakThreshold_is100J()         { assertEquals(100.0,  breakThreshold(WOOD),          1e-9); }
+    @Test void stoneBreakThreshold_is500J()        { assertEquals(500.0,  breakThreshold(STONE),         1e-9); }
+    @Test void metalBreakThreshold_is1800J()       { assertEquals(1800.0, breakThreshold(METAL),         1e-9); }
+    @Test void highStrengthBreakThreshold_is7500J(){ assertEquals(7500.0, breakThreshold(HIGH_STRENGTH), 1e-9); }
+
+    @Test
+    void breakThresholds_strictlyOrdered() {
+        assertTrue(breakThreshold(BRITTLE) < breakThreshold(WOOD));
+        assertTrue(breakThreshold(WOOD)    < breakThreshold(STONE));
+        assertTrue(breakThreshold(STONE)   < breakThreshold(METAL));
+        assertTrue(breakThreshold(METAL)   < breakThreshold(HIGH_STRENGTH));
+    }
+
+    // -- additional block coverage (Phase 3A material lookup) -----------------
+
+    @Test void glass_pane_is_brittle()        { assertEquals(BRITTLE,       classify("glass_pane")); }
+    @Test void packed_ice_is_brittle()        { assertEquals(BRITTLE,       classify("packed_ice")); }
+    @Test void terracotta_is_brittle()        { assertEquals(BRITTLE,       classify("terracotta")); }
+    @Test void stone_bricks_is_stone()        { assertEquals(STONE,         classify("stone_bricks")); }
+    @Test void white_concrete_is_stone()      { assertEquals(STONE,         classify("white_concrete")); }
+    @Test void diamond_block_is_metal()       { assertEquals(METAL,         classify("diamond_block")); }
+    @Test void crying_obsidian_is_high()      { assertEquals(HIGH_STRENGTH, classify("crying_obsidian")); }
+
+    // -- helper ---------------------------------------------------------------
+
+    private static double breakThreshold(MaterialThresholdProfile.MaterialClass mc) {
+        return threshold(mc) * breakMultiplier(mc);
     }
 }

@@ -32,7 +32,29 @@ public final class MaterialResponsePlanner {
 
     // -- debris deduplication (one drop per AccKey per session) -------------------
 
-    private static final Set<BlockDamageAccumulator.AccKey> debrisDroppedKeys = new HashSet<>();
+    private static final Set<BlockDamageAccumulator.AccKey> debrisDroppedKeys  = new HashSet<>();
+
+    // -- break deduplication (one destroy per AccKey per session) -----------------
+
+    private static final Set<BlockDamageAccumulator.AccKey> breakScheduledKeys = new HashSet<>();
+
+    /**
+     * Marks that a block-break has been scheduled for this accumulator key.
+     *
+     * Returns true on the FIRST call for this key (the caller should destroy the block).
+     * Returns false on subsequent calls (skip -- already broken/scheduled).
+     * Increments totalBlocksBroken counter on first call.
+     */
+    public static boolean markBreakScheduled(BlockDamageAccumulator.AccKey key) {
+        boolean first = breakScheduledKeys.add(key);
+        if (first) totalBlocksBroken++;
+        return first;
+    }
+
+    /** Returns true if a break has already been scheduled for this accumulator key. */
+    public static boolean hasBreakScheduled(BlockDamageAccumulator.AccKey key) {
+        return breakScheduledKeys.contains(key);
+    }
 
     /**
      * Marks that debris has been dropped for this accumulator key.
@@ -57,6 +79,7 @@ public final class MaterialResponsePlanner {
     private static long totalResponsesPlanned;    // non-NONE plan executions
     private static long totalDebrisDropped;        // first-time debris drops
     private static long totalFutureBreakEligible;  // plan executions with fbe=true
+    private static long totalBlocksBroken;          // first-time block destructions (Phase 2F)
     private static MaterialResponseType lastResponseType = MaterialResponseType.NONE;
 
     /**
@@ -78,18 +101,21 @@ public final class MaterialResponsePlanner {
     /** Point-in-time snapshot of planner statistics for status display. */
     public static PlannerStats stats() {
         return new PlannerStats(totalResponsesPlanned, totalDebrisDropped,
-                totalFutureBreakEligible, lastResponseType, debrisDroppedKeys.size());
+                totalFutureBreakEligible, totalBlocksBroken,
+                lastResponseType, debrisDroppedKeys.size(), breakScheduledKeys.size());
     }
 
     /**
-     * Clears all planner state (debris-drop history and counters).
+     * Clears all planner state (debris-drop history, break history, and counters).
      * Registered as a DiagnosticStateManager flush hook.
      */
     public static void clear() {
         debrisDroppedKeys.clear();
+        breakScheduledKeys.clear();
         totalResponsesPlanned    = 0L;
         totalDebrisDropped       = 0L;
         totalFutureBreakEligible = 0L;
+        totalBlocksBroken        = 0L;
         lastResponseType         = MaterialResponseType.NONE;
     }
 
@@ -121,19 +147,20 @@ public final class MaterialResponsePlanner {
             // CRITICAL
             switch (mc) {
                 case SOFT_SOIL -> {
-                    responseType = MaterialResponseType.COMPACT_SOFT_SOIL;
-                    note = "soil compaction handled by ImpactBlockApplicator";
+                    responseType        = MaterialResponseType.COMPACT_SOFT_SOIL;
+                    futureBreakEligible = true;  // break when compaction chain is exhausted
+                    note = "soil compaction or break at CRITICAL (SOFT_SOIL)";
                 }
-                case STONE, GENERIC -> {
-                    responseType    = MaterialResponseType.DROP_DEBRIS;
+                case BRITTLE, STONE, GENERIC -> {
+                    responseType        = MaterialResponseType.DROP_DEBRIS;
                     shouldDropDebris    = true;
                     futureBreakEligible = true;
-                    note = "debris eligible; block preserved in Phase 2E";
+                    note = "debris + break eligible (" + mc + ")";
                 }
                 case WOOD, METAL, HIGH_STRENGTH -> {
-                    responseType    = MaterialResponseType.FUTURE_BREAK_ELIGIBLE;
+                    responseType        = MaterialResponseType.FUTURE_BREAK_ELIGIBLE;
                     futureBreakEligible = true;
-                    note = "future break eligible (" + mc + "); no action in Phase 2E";
+                    note = "break eligible (" + mc + ")";
                 }
                 default -> {
                     responseType = MaterialResponseType.NONE;
@@ -154,8 +181,10 @@ public final class MaterialResponsePlanner {
             long totalResponsesPlanned,
             long totalDebrisDropped,
             long totalFutureBreakEligible,
+            long totalBlocksBroken,
             MaterialResponseType lastResponseType,
-            int debrisDroppedKeyCount
+            int debrisDroppedKeyCount,
+            int breakScheduledKeyCount
     ) {}
 
     private static String fmt(double v) {

@@ -185,15 +185,16 @@ class DamageCommandTest {
         assertNotNull(snap);
         String formatted = DamageInspectFormatter.formatEntry(snap);
 
-        // All fields required by the command spec must be present
+        // All fields required by the command spec must be present.
+        // kImpact=55.965 > threshold=50.0 → effective=50.0 (capped). rawLast preserved.
         assertTrue(formatted.contains("block=minecraft:andesite"), "block id");
         assertTrue(formatted.contains("pos=(5,63,-3)"), "position");
         assertTrue(formatted.contains("class=STONE"), "material class");
         assertTrue(formatted.contains("threshold=50.000J"), "threshold");
-        assertTrue(formatted.contains("rawLast=55.965J"), "raw last impact");
-        assertTrue(formatted.contains("effLast=55.965J"), "eff last (below cap -> equals raw)");
-        assertTrue(formatted.contains("accumEff=55.965J"), "accumulated effective");
-        assertTrue(formatted.contains("state=CRITICAL"), "damage state (ratio=1.12 >= 1.0)");
+        assertTrue(formatted.contains("rawLast=55.965J"), "raw last impact preserved even when capped");
+        assertTrue(formatted.contains("effLast=50.000J"), "effLast=min(55.965,threshold=50)=50");
+        assertTrue(formatted.contains("accumEff=50.000J"), "accumEff=50 (capped to threshold)");
+        assertTrue(formatted.contains("state=CRITICAL"), "damage state (ratio=50/50=1.0 >= 1.0)");
         assertTrue(formatted.contains("hits=1"), "hit count");
     }
 

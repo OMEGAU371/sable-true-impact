@@ -30,7 +30,7 @@ public final class CrackOverlayTracker {
     private CrackOverlayTracker() {}
 
     // Cooldown before re-sending the same progress for the same block (ticks).
-    static final int PER_BLOCK_UPDATE_COOLDOWN_TICKS = 10;
+    public static int PER_BLOCK_UPDATE_COOLDOWN_TICKS = 10;
 
     // Negative base for fake breaker IDs.
     // Range: [Integer.MIN_VALUE/2, Integer.MIN_VALUE/2 + 0x3FFFFFFF].
@@ -109,6 +109,11 @@ public final class CrackOverlayTracker {
 
         CrackEntry entry = states.get(key);
         if (entry != null) {
+            // Monotonic display: accumulated damage DECAYS between hits (stress
+            // relaxation), so a later hit can compute a LOWER ratio — sending it makes
+            // the crack visually heal mid-bombardment ("crack reversal"). The overlay
+            // holds the highest progress reached; removeEntry (break/replace) clears it.
+            if (newProgress < entry.lastProgress) return -1;
             if (entry.lastProgress == newProgress
                     && serverTick - entry.lastTick < PER_BLOCK_UPDATE_COOLDOWN_TICKS) {
                 return -1;
@@ -135,6 +140,19 @@ public final class CrackOverlayTracker {
 
     public static int lastCrackProgress() {
         return lastCrackProgress;
+    }
+
+    /**
+     * Removes the crack overlay entry for a single block and returns the fake breaker ID
+     * so the caller can send destroyBlockProgress(id, pos, -1) to clients.
+     * Returns Integer.MIN_VALUE if no entry existed (no client packet needed).
+     *
+     * NOTE: do NOT use -1 as sentinel -- fakeBreakerIdFor() range is [FAKE_BREAKER_BASE, -1]
+     * so -1 is a valid fakeBreakerId and would collide with a -1 sentinel.
+     */
+    public static int removeEntry(BlockDamageAccumulator.AccKey key) {
+        CrackEntry entry = states.remove(key);
+        return (entry != null) ? entry.fakeBreakerId : Integer.MIN_VALUE;
     }
 
     /**

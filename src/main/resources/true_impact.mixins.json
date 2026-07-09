@@ -5,8 +5,7 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "DiagnosticCallbackWrapperMixin",
-    "DiagnosticContactCaptureMixin",
-    "DiagnosticPhysicsStepMixin"
+    "DiagnosticContactCaptureMixin"
   ],
   "minVersion": "0.8"
 }

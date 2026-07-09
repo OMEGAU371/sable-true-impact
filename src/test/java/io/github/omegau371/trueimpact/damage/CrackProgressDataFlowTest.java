@@ -12,9 +12,8 @@ import static org.junit.jupiter.api.Assertions.*;
  *
  * Pipeline under test:
  *   DeferredDamageEvent.kImpact()
- *   -> EffectiveDamageModel.compute()
- *   -> BlockDamageAccumulator.accumulate()  (accumulatedEffectiveDamageJ)
- *   -> Snapshot.ratio() = accumulated / threshold
+ *   -> BlockDamageAccumulator.accumulate()  effectiveJ = min(kImpact, threshold)
+ *   -> Snapshot.ratio() = accumulatedEffectiveJ / threshold
  *   -> DamageState.of(ratio)
  *   -> CrackOverlayTracker.ratioToProgress(state, ratio)
  *   -> destroyBlockProgress()  [progress value asserted; no MC runtime needed]
@@ -23,7 +22,8 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class CrackProgressDataFlowTest {
 
-    // STONE: threshold=50J, effective-cap=threshold*2=100J.
+    // STONE: crackThreshold (used as DeferredDamageEvent.threshold) = 50J.
+    // Unified cap: effectiveJ = min(kImpact, 50J).
     private static final double STONE_THRESHOLD = 50.0;
 
     @BeforeEach
@@ -31,6 +31,15 @@ class CrackProgressDataFlowTest {
         BlockDamageAccumulator.clear();
         CrackOverlayTracker.clear();
         ImpactRuntimeConfig.ENABLE_VANILLA_CRACK_OVERLAY = true;
+        // Exact-value data-flow assertions: disable elastic floor and relaxation.
+        ImpactRuntimeConfig.SUBLEVEL_ELASTIC_FLOOR = 0.0;
+        ImpactRuntimeConfig.SUBLEVEL_DAMAGE_HALF_LIFE_TICKS = 0;
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void restoreConfig() {
+        ImpactRuntimeConfig.SUBLEVEL_ELASTIC_FLOOR = 0.2;
+        ImpactRuntimeConfig.SUBLEVEL_DAMAGE_HALF_LIFE_TICKS = 60;
     }
 
     // -- shared helpers -----------------------------------------------------------
@@ -60,8 +69,8 @@ class CrackProgressDataFlowTest {
     // -- test 1: multi-hit accumulation -------------------------------------------
 
     /**
-     * Three 12J hits on STONE (threshold=50J, cap=100J).
-     * effective per hit = min(12, 100) = 12J.
+     * Three 12J hits on STONE (threshold=50J).
+     * effectiveJ per hit = min(12, 50) = 12J.
      *
      * hit 1: accumulated= 12J, ratio=0.24 -> INTACT  -> no overlay (-1)
      * hit 2: accumulated= 24J, ratio=0.48 -> BRUISED -> progress 3  (0.40..0.50 band)
@@ -164,14 +173,15 @@ class CrackProgressDataFlowTest {
     // -- test 4: CRITICAL ratio >= 1.0 always yields progress 9 ------------------
 
     /**
-     * A 60J hit on STONE (threshold=50J, cap=100J) pushes the accumulated ratio
-     * to 1.20 -> CRITICAL -> crack progress must be 9 (maximum pre-break stage).
+     * A 60J hit on STONE (threshold=50J) pushes the accumulated ratio to 1.0 -> CRITICAL.
+     * Unified cap: effectiveJ = min(60, 50) = 50J → accumulated = 50J → ratio = 1.0.
+     * Crack progress must be 9 (maximum pre-break stage).
      */
     @Test
     void critical_accumulated_ratio_produces_max_crack_progress_9() {
         BlockDamageAccumulator.Snapshot snap = hit(60.0);
         assertEquals(DamageState.CRITICAL, snap.damageState(), "60J on 50J threshold -> CRITICAL");
-        assertEquals(1.2, snap.ratio(), 0.001, "accumulated ratio = 60/50 = 1.20");
+        assertEquals(1.0, snap.ratio(), 0.001, "effectiveJ = min(60,50) = 50J -> ratio = 50/50 = 1.0");
         assertEquals(9, progress(snap), "CRITICAL -> crack progress must be 9");
 
         // Confirm via tryUpdate (the actual TrueImpactMod call path).

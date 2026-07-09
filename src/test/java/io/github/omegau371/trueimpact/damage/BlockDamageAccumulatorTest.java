@@ -1,5 +1,6 @@
 package io.github.omegau371.trueimpact.damage;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -7,7 +8,16 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for BlockDamageAccumulator.
- * Phase 2C: accumulates effectiveDamageJ (capped), not raw kImpact.
+ *
+ * Unified cap formula: effectiveJ = min(rawKImpact, event.threshold()).
+ * event.threshold() is the break threshold supplied by onServerTickPost
+ * (BlockHardnessProfile × confinement factor). In these tests the threshold
+ * comes from MaterialThresholdProfile.threshold(mc) (the crack threshold) as a
+ * convenient numeric value -- the accumulator treats it as an opaque cap.
+ *
+ * STONE crack threshold = 50J.  SOFT_SOIL crack threshold = 5J.
+ * Below threshold → effective = raw.  At/above threshold → effective = threshold.
+ *
  * No Minecraft runtime required.
  */
 class BlockDamageAccumulatorTest {
@@ -15,6 +25,17 @@ class BlockDamageAccumulatorTest {
     @BeforeEach
     void reset() {
         BlockDamageAccumulator.clear();
+        // These tests verify the raw accumulation math; disable the elastic floor and
+        // stress relaxation so exact-value assertions stay valid. Dedicated tests below
+        // re-enable them explicitly.
+        ImpactRuntimeConfig.SUBLEVEL_ELASTIC_FLOOR = 0.0;
+        ImpactRuntimeConfig.SUBLEVEL_DAMAGE_HALF_LIFE_TICKS = 0;
+    }
+
+    @AfterEach
+    void restoreConfig() {
+        ImpactRuntimeConfig.SUBLEVEL_ELASTIC_FLOOR = 0.2;
+        ImpactRuntimeConfig.SUBLEVEL_DAMAGE_HALF_LIFE_TICKS = 60;
     }
 
     // -- helpers ------------------------------------------------------------------
@@ -41,16 +62,16 @@ class BlockDamageAccumulatorTest {
 
     @Test
     void one_hit_creates_accumulator_entry() {
-        // STONE threshold=50, cap=100. kImpact=60 < 100 -> effective=60
-        BlockDamageAccumulator.accumulate(stoneAt(10, 64, 10, 60.0, 1L));
+        // STONE threshold=50J. kImpact=30 < threshold -> effective=30J (no capping).
+        BlockDamageAccumulator.accumulate(stoneAt(10, 64, 10, 30.0, 1L));
 
         assertEquals(1, BlockDamageAccumulator.entryCount());
         BlockDamageAccumulator.Snapshot snap =
                 BlockDamageAccumulator.getSnapshot("minecraft:overworld", 10, 64, 10, "minecraft:stone");
         assertNotNull(snap);
-        assertEquals(60.0, snap.accumulatedEffectiveDamageJ(), 0.001);
-        assertEquals(60.0, snap.lastRawImpactJ(), 0.001);
-        assertEquals(60.0, snap.lastEffectiveDamageJ(), 0.001);
+        assertEquals(30.0, snap.accumulatedEffectiveDamageJ(), 0.001);
+        assertEquals(30.0, snap.lastRawImpactJ(), 0.001);
+        assertEquals(30.0, snap.lastEffectiveDamageJ(), 0.001);
         assertEquals(1, snap.hitCount());
         assertEquals(1L, snap.lastUpdatedTick());
         assertEquals(MaterialThresholdProfile.MaterialClass.STONE, snap.materialClass());
@@ -58,25 +79,27 @@ class BlockDamageAccumulatorTest {
 
     @Test
     void repeated_hits_on_same_block_accumulate_effective_damage() {
-        // All hits below STONE cap (100). Effective = raw for all.
-        BlockDamageAccumulator.accumulate(stoneAt(10, 64, 10, 60.0, 1L));
-        BlockDamageAccumulator.accumulate(stoneAt(10, 64, 10, 80.0, 2L));
+        // k=30: below threshold(50) → eff=30
+        // k=60: above threshold    → eff=50
+        // k=50: equal threshold    → eff=50
+        BlockDamageAccumulator.accumulate(stoneAt(10, 64, 10, 30.0, 1L));
+        BlockDamageAccumulator.accumulate(stoneAt(10, 64, 10, 60.0, 2L));
         BlockDamageAccumulator.accumulate(stoneAt(10, 64, 10, 50.0, 3L));
 
         assertEquals(1, BlockDamageAccumulator.entryCount(), "same block/pos = same entry");
         BlockDamageAccumulator.Snapshot snap =
                 BlockDamageAccumulator.getSnapshot("minecraft:overworld", 10, 64, 10, "minecraft:stone");
         assertNotNull(snap);
-        assertEquals(190.0, snap.accumulatedEffectiveDamageJ(), 0.001, "60+80+50");
-        assertEquals(50.0, snap.lastRawImpactJ(), 0.001, "last hit");
-        assertEquals(50.0, snap.lastEffectiveDamageJ(), 0.001);
+        assertEquals(130.0, snap.accumulatedEffectiveDamageJ(), 0.001, "30+50+50");
+        assertEquals(50.0, snap.lastRawImpactJ(), 0.001, "last hit raw");
+        assertEquals(50.0, snap.lastEffectiveDamageJ(), 0.001, "last hit effective (50=threshold)");
         assertEquals(3, snap.hitCount());
         assertEquals(3L, snap.lastUpdatedTick());
     }
 
     @Test
     void accumulator_stores_effective_damage_not_raw_when_capped() {
-        // SOFT_SOIL threshold=5, cap=4*5=20. kImpact=1000 -> effective=20
+        // SOFT_SOIL threshold=5J. kImpact=1000 >> threshold -> effective=5J.
         DeferredDamageEvent ev = event("minecraft:overworld", "minecraft:grass_block",
                 MaterialThresholdProfile.MaterialClass.SOFT_SOIL, 5, 63, 5, 1000.0, 1L);
         BlockDamageAccumulator.accumulate(ev);
@@ -84,32 +107,34 @@ class BlockDamageAccumulatorTest {
         BlockDamageAccumulator.Snapshot snap =
                 BlockDamageAccumulator.getSnapshot("minecraft:overworld", 5, 63, 5, "minecraft:grass_block");
         assertNotNull(snap);
-        assertEquals(20.0, snap.accumulatedEffectiveDamageJ(), 0.001,
-                "accumulator must store effectiveDamageJ (20), not raw (1000)");
+        assertEquals(5.0, snap.accumulatedEffectiveDamageJ(), 0.001,
+                "accumulator must store effectiveDamageJ (5=threshold), not raw (1000)");
         assertEquals(1000.0, snap.lastRawImpactJ(), 0.001, "raw kImpact preserved in lastRawImpactJ");
-        assertEquals(20.0, snap.lastEffectiveDamageJ(), 0.001);
+        assertEquals(5.0, snap.lastEffectiveDamageJ(), 0.001);
         assertTrue(snap.lastEffectiveDamageJ() < snap.lastRawImpactJ(),
                 "effective must be less than raw when capped");
     }
 
     @Test
     void raw_and_eff_last_are_both_tracked_independently() {
-        // STONE cap=100. Hit with 300 -> raw=300, eff=100.
+        // STONE threshold=50J. kImpact=300 >> threshold -> raw=300, eff=50.
         BlockDamageAccumulator.accumulate(stoneAt(10, 64, 10, 300.0, 1L));
 
         BlockDamageAccumulator.Snapshot snap =
                 BlockDamageAccumulator.getSnapshot("minecraft:overworld", 10, 64, 10, "minecraft:stone");
         assertNotNull(snap);
-        assertEquals(300.0, snap.lastRawImpactJ(), 0.001);
-        assertEquals(100.0, snap.lastEffectiveDamageJ(), 0.001);
-        assertEquals(100.0, snap.accumulatedEffectiveDamageJ(), 0.001);
+        assertEquals(300.0, snap.lastRawImpactJ(), 0.001, "raw kImpact always preserved");
+        assertEquals(50.0, snap.lastEffectiveDamageJ(), 0.001, "effective = min(300, threshold=50)");
+        assertEquals(50.0, snap.accumulatedEffectiveDamageJ(), 0.001);
+        assertNotEquals(snap.lastRawImpactJ(), snap.lastEffectiveDamageJ(),
+                "raw and effective must differ when capped");
     }
 
     @Test
     void different_block_ids_at_same_pos_do_not_share_damage() {
-        // stone 100 -> cap=100, effective=100; grass 20 -> cap=20, effective=20
-        BlockDamageAccumulator.accumulate(stoneAt(10, 64, 10, 100.0, 1L));
-        BlockDamageAccumulator.accumulate(grassAt(10, 64, 10, 20.0, 2L));
+        // stone k=30 < threshold(50) → eff=30; grass k=2 < SOFT_SOIL threshold(5) → eff=2
+        BlockDamageAccumulator.accumulate(stoneAt(10, 64, 10, 30.0, 1L));
+        BlockDamageAccumulator.accumulate(grassAt(10, 64, 10, 2.0, 2L));
 
         assertEquals(2, BlockDamageAccumulator.entryCount(),
                 "different victimBlock = separate entry even at same pos");
@@ -119,14 +144,16 @@ class BlockDamageAccumulatorTest {
                 BlockDamageAccumulator.getSnapshot("minecraft:overworld", 10, 64, 10, "minecraft:grass_block");
         assertNotNull(stone);
         assertNotNull(grass);
-        assertEquals(100.0, stone.accumulatedEffectiveDamageJ(), 0.001);
-        assertEquals(20.0, grass.accumulatedEffectiveDamageJ(), 0.001);
+        assertEquals(30.0, stone.accumulatedEffectiveDamageJ(), 0.001, "stone below threshold → raw");
+        assertEquals(2.0,  grass.accumulatedEffectiveDamageJ(), 0.001, "grass below threshold → raw");
     }
 
     @Test
     void different_dimensions_do_not_share_damage() {
+        // ow: k=30 < threshold(50) → eff=30
+        // ne: k=80 > threshold(50) → eff=50
         DeferredDamageEvent ow = event("minecraft:overworld", "minecraft:stone",
-                MaterialThresholdProfile.MaterialClass.STONE, 10, 64, 10, 60.0, 1L);
+                MaterialThresholdProfile.MaterialClass.STONE, 10, 64, 10, 30.0, 1L);
         DeferredDamageEvent ne = event("minecraft:the_nether", "minecraft:stone",
                 MaterialThresholdProfile.MaterialClass.STONE, 10, 64, 10, 80.0, 1L);
 
@@ -140,14 +167,14 @@ class BlockDamageAccumulatorTest {
                 BlockDamageAccumulator.getSnapshot("minecraft:the_nether", 10, 64, 10, "minecraft:stone");
         assertNotNull(owSnap);
         assertNotNull(neSnap);
-        assertEquals(60.0, owSnap.accumulatedEffectiveDamageJ(), 0.001);
-        assertEquals(80.0, neSnap.accumulatedEffectiveDamageJ(), 0.001);
+        assertEquals(30.0, owSnap.accumulatedEffectiveDamageJ(), 0.001, "ow: k=30 < threshold → raw");
+        assertEquals(50.0, neSnap.accumulatedEffectiveDamageJ(), 0.001, "ne: k=80 > threshold → capped to 50");
     }
 
     @Test
     void levelKey_from_event_is_preserved_in_snapshot() {
         DeferredDamageEvent netherEvent = event("minecraft:the_nether", "minecraft:stone",
-                MaterialThresholdProfile.MaterialClass.STONE, 10, 64, 10, 60.0, 1L);
+                MaterialThresholdProfile.MaterialClass.STONE, 10, 64, 10, 30.0, 1L);
         BlockDamageAccumulator.accumulate(netherEvent);
 
         BlockDamageAccumulator.Snapshot snap =
@@ -159,14 +186,14 @@ class BlockDamageAccumulatorTest {
 
     @Test
     void stale_event_for_different_block_at_same_pos_does_not_corrupt_existing_entry() {
-        // stone 200 -> cap=100, effective=100
-        BlockDamageAccumulator.accumulate(stoneAt(10, 64, 10, 200.0, 1L));
+        // stone k=80 > threshold(50) → eff=50
+        BlockDamageAccumulator.accumulate(stoneAt(10, 64, 10, 80.0, 1L));
         double stoneDamage = BlockDamageAccumulator
                 .getSnapshot("minecraft:overworld", 10, 64, 10, "minecraft:stone")
                 .accumulatedEffectiveDamageJ();
 
         // Stale event for grass_block at same pos; creates separate entry.
-        BlockDamageAccumulator.accumulate(grassAt(10, 64, 10, 15.0, 2L));
+        BlockDamageAccumulator.accumulate(grassAt(10, 64, 10, 3.0, 2L));
 
         BlockDamageAccumulator.Snapshot stone =
                 BlockDamageAccumulator.getSnapshot("minecraft:overworld", 10, 64, 10, "minecraft:stone");
@@ -178,7 +205,7 @@ class BlockDamageAccumulatorTest {
 
     @Test
     void soft_soil_accumulates_effective_damage() {
-        // SOFT_SOIL threshold=5, cap=20. kImpact=100 -> effective=20
+        // SOFT_SOIL threshold=5J. kImpact=100 >> threshold → effective=5J.
         DeferredDamageEvent ev = event("minecraft:overworld", "minecraft:grass_block",
                 MaterialThresholdProfile.MaterialClass.SOFT_SOIL, 5, 63, 5, 100.0, 1L);
         BlockDamageAccumulator.accumulate(ev);
@@ -186,23 +213,23 @@ class BlockDamageAccumulatorTest {
         BlockDamageAccumulator.Snapshot snap =
                 BlockDamageAccumulator.getSnapshot("minecraft:overworld", 5, 63, 5, "minecraft:grass_block");
         assertNotNull(snap, "SOFT_SOIL events must be accumulated");
-        assertEquals(20.0, snap.accumulatedEffectiveDamageJ(), 0.001,
-                "SOFT_SOIL: cap=4*threshold=20; effective=20 not raw=100");
+        assertEquals(5.0, snap.accumulatedEffectiveDamageJ(), 0.001,
+                "SOFT_SOIL: cap=threshold=5; effective=5 not raw=100");
         assertEquals(MaterialThresholdProfile.MaterialClass.SOFT_SOIL, snap.materialClass());
     }
 
     @Test
     void stone_accumulates_effective_damage_but_does_not_mutate_in_phase_2c() {
-        // STONE: cap=2*50=100. kImpact=300 -> effective=100.
+        // STONE threshold=50J. kImpact=300 → effective=50. ratio=1.0 → CRITICAL.
         BlockDamageAccumulator.accumulate(stoneAt(10, 64, 10, 300.0, 1L));
 
         BlockDamageAccumulator.Snapshot snap =
                 BlockDamageAccumulator.getSnapshot("minecraft:overworld", 10, 64, 10, "minecraft:stone");
-        assertNotNull(snap, "STONE class must accumulate in Phase 2C");
-        assertEquals(100.0, snap.accumulatedEffectiveDamageJ(), 0.001, "capped at 2x threshold");
+        assertNotNull(snap, "STONE class must accumulate");
+        assertEquals(50.0, snap.accumulatedEffectiveDamageJ(), 0.001, "capped to threshold(50)");
         assertEquals(300.0, snap.lastRawImpactJ(), 0.001, "raw preserved");
         assertTrue(Double.isFinite(snap.ratio()) && snap.ratio() > 0,
-                "ratio must be positive (100/50 = 2.0)");
+                "ratio must be positive (50/50 = 1.0)");
         assertEquals(MaterialThresholdProfile.MaterialClass.STONE, snap.materialClass());
     }
 
@@ -210,7 +237,7 @@ class BlockDamageAccumulatorTest {
     void debug_flags_off_still_accumulates() {
         assertFalse(io.github.omegau371.trueimpact.observation.DiagnosticConfig.ENABLED,
                 "ENABLED must be false by default");
-        BlockDamageAccumulator.accumulate(stoneAt(10, 64, 10, 60.0, 1L));
+        BlockDamageAccumulator.accumulate(stoneAt(10, 64, 10, 30.0, 1L));
         assertEquals(1, BlockDamageAccumulator.entryCount(),
                 "accumulate must work regardless of DiagnosticConfig.ENABLED");
     }
@@ -220,7 +247,6 @@ class BlockDamageAccumulatorTest {
     @Test
     void damage_state_classified_correctly_at_boundaries() {
         // STONE threshold=50. Hit with 12 effective -> ratio=12/50=0.24 -> INTACT
-        // Need effective < 12.5 (50*0.25) for INTACT. Use kImpact=12, below cap.
         BlockDamageAccumulator.accumulate(stoneAt(10, 64, 10, 12.0, 1L));
         assertEquals(DamageState.INTACT,
                 BlockDamageAccumulator.getSnapshot("minecraft:overworld", 10, 64, 10, "minecraft:stone").damageState(),
@@ -234,7 +260,7 @@ class BlockDamageAccumulatorTest {
                 "12.5/50=0.25 -> BRUISED");
 
         BlockDamageAccumulator.clear();
-        // ratio >= 1.0 -> CRITICAL. effective=50, ratio=1.0. STONE cap=100; kImpact=50.
+        // ratio >= 1.0 -> CRITICAL. kImpact=50=threshold -> effective=50, ratio=1.0.
         BlockDamageAccumulator.accumulate(stoneAt(10, 64, 10, 50.0, 1L));
         assertEquals(DamageState.CRITICAL,
                 BlockDamageAccumulator.getSnapshot("minecraft:overworld", 10, 64, 10, "minecraft:stone").damageState(),
@@ -243,7 +269,7 @@ class BlockDamageAccumulatorTest {
 
     @Test
     void damage_state_advances_with_accumulated_hits() {
-        // Each hit: kImpact=10, STONE cap=100, effective=10. threshold=50.
+        // Each hit: kImpact=10 < threshold(50), effective=10. threshold=50.
         // After 3 hits: effective=30, ratio=0.60 -> CRACKED
         // After 5 hits: effective=50, ratio=1.00 -> CRITICAL
         for (int i = 1; i <= 3; i++) {
@@ -265,7 +291,7 @@ class BlockDamageAccumulatorTest {
 
     @Test
     void clear_resets_all_state() {
-        BlockDamageAccumulator.accumulate(stoneAt(10, 64, 10, 60.0, 1L));
+        BlockDamageAccumulator.accumulate(stoneAt(10, 64, 10, 30.0, 1L));
         BlockDamageAccumulator.clear();
 
         assertEquals(0, BlockDamageAccumulator.entryCount());
@@ -278,20 +304,20 @@ class BlockDamageAccumulatorTest {
 
     @Test
     void ratio_uses_effective_damage_over_threshold() {
-        // STONE threshold=50, cap=100. kImpact=75 (below cap) -> effective=75. ratio=75/50=1.5
-        BlockDamageAccumulator.accumulate(stoneAt(10, 64, 10, 75.0, 1L));
+        // STONE threshold=50. kImpact=25 (sub-threshold) → effective=25. ratio=25/50=0.5.
+        BlockDamageAccumulator.accumulate(stoneAt(10, 64, 10, 25.0, 1L));
         BlockDamageAccumulator.Snapshot snap =
                 BlockDamageAccumulator.getSnapshot("minecraft:overworld", 10, 64, 10, "minecraft:stone");
         assertNotNull(snap);
         assertEquals(50.0, snap.thresholdJ(), 0.001);
-        assertEquals(75.0, snap.accumulatedEffectiveDamageJ(), 0.001);
-        assertEquals(1.5, snap.ratio(), 0.001, "75/50=1.5");
+        assertEquals(25.0, snap.accumulatedEffectiveDamageJ(), 0.001);
+        assertEquals(0.5, snap.ratio(), 0.001, "25/50=0.5");
     }
 
     @Test
     void lastUpdatedSnapshot_tracks_most_recent_accumulate() {
-        BlockDamageAccumulator.accumulate(stoneAt(10, 64, 10, 60.0, 1L));
-        BlockDamageAccumulator.accumulate(grassAt(20, 64, 20, 15.0, 2L));
+        BlockDamageAccumulator.accumulate(stoneAt(10, 64, 10, 30.0, 1L));
+        BlockDamageAccumulator.accumulate(grassAt(20, 64, 20, 3.0, 2L));
 
         BlockDamageAccumulator.Snapshot last = BlockDamageAccumulator.lastUpdatedSnapshot();
         assertNotNull(last);
@@ -300,38 +326,29 @@ class BlockDamageAccumulatorTest {
         assertEquals(20, last.key().posX());
     }
 
-    // -- regression tests (Phase 2D in-game observed mismatch) --------------------
+    // -- regression tests ---------------------------------------------------------
 
     @Test
-    void regression_stone_raw_55_965_below_cap_all_fields_correct() {
-        // Regression: andesite, raw=55.965J, STONE threshold=50J, cap=100J.
-        // raw < cap -> effective must equal raw.
-        // effLast must equal rawLast. ratio=55.965/50=1.1193. state=CRITICAL.
+    void regression_stone_raw_below_threshold_not_capped() {
+        // k=30J < STONE threshold(50J) → effective=raw=30J. No capping.
         DeferredDamageEvent ev = event("minecraft:overworld", "minecraft:andesite",
-                MaterialThresholdProfile.MaterialClass.STONE, 10, 64, 10, 55.965, 1L);
+                MaterialThresholdProfile.MaterialClass.STONE, 10, 64, 10, 30.0, 1L);
         BlockDamageAccumulator.accumulate(ev);
 
         BlockDamageAccumulator.Snapshot snap = BlockDamageAccumulator.getSnapshot(
                 "minecraft:overworld", 10, 64, 10, "minecraft:andesite");
         assertNotNull(snap);
-        assertEquals(55.965, snap.lastRawImpactJ(), 0.001,
-                "rawLast must match input kImpact");
-        assertEquals(55.965, snap.lastEffectiveDamageJ(), 0.001,
-                "effLast must equal raw when raw(55.965) < cap(100)");
-        assertEquals(55.965, snap.accumulatedEffectiveDamageJ(), 0.001,
-                "accumEff must equal effective -- must NOT show cap value (100)");
+        assertEquals(30.0, snap.lastRawImpactJ(), 0.001);
+        assertEquals(30.0, snap.lastEffectiveDamageJ(), 0.001, "sub-threshold: effective=raw");
+        assertEquals(30.0, snap.accumulatedEffectiveDamageJ(), 0.001);
         assertEquals(50.0, snap.thresholdJ(), 0.001);
-        assertEquals(55.965 / 50.0, snap.ratio(), 0.001,
-                "ratio = accumEff/threshold = 55.965/50 = 1.1193");
-        assertEquals(1, snap.hitCount());
-        assertEquals(DamageState.CRITICAL, snap.damageState(),
-                "1.1193 >= 1.0 -> CRITICAL");
+        assertEquals(30.0 / 50.0, snap.ratio(), 0.001, "ratio=0.6 → CRACKED");
+        assertEquals(DamageState.CRACKED, snap.damageState());
     }
 
     @Test
-    void regression_stone_raw_150_above_cap_accumulates_capped_value() {
-        // Regression: raw=150J, STONE threshold=50J, cap=100J.
-        // raw > cap -> effective=100. accumEff=100. ratio=2.0. rawLast=150 (preserved).
+    void regression_stone_raw_above_threshold_capped_to_threshold() {
+        // k=150J > STONE threshold(50J) → effective=threshold=50J. ratio=1.0. rawLast preserved.
         DeferredDamageEvent ev = event("minecraft:overworld", "minecraft:stone",
                 MaterialThresholdProfile.MaterialClass.STONE, 10, 64, 10, 150.0, 1L);
         BlockDamageAccumulator.accumulate(ev);
@@ -339,15 +356,40 @@ class BlockDamageAccumulatorTest {
         BlockDamageAccumulator.Snapshot snap = BlockDamageAccumulator.getSnapshot(
                 "minecraft:overworld", 10, 64, 10, "minecraft:stone");
         assertNotNull(snap);
-        assertEquals(150.0, snap.lastRawImpactJ(), 0.001,
-                "rawLast must be raw kImpact even when capped");
-        assertEquals(100.0, snap.lastEffectiveDamageJ(), 0.001,
-                "effLast must be cap (100) when raw(150) > cap(100)");
-        assertEquals(100.0, snap.accumulatedEffectiveDamageJ(), 0.001,
-                "accumEff must equal capped effective");
-        assertEquals(2.0, snap.ratio(), 0.001,
-                "ratio = 100/50 = 2.0");
-        assertEquals(1, snap.hitCount());
-        assertEquals(DamageState.CRITICAL, snap.damageState(), "2.0 >= 1.0 -> CRITICAL");
+        assertEquals(150.0, snap.lastRawImpactJ(), 0.001, "raw preserved even when capped");
+        assertEquals(50.0, snap.lastEffectiveDamageJ(), 0.001, "effective=min(150,threshold=50)");
+        assertEquals(50.0, snap.accumulatedEffectiveDamageJ(), 0.001);
+        assertEquals(1.0, snap.ratio(), 0.001, "ratio=50/50=1.0");
+        assertEquals(DamageState.CRITICAL, snap.damageState(), "ratio=1.0 → CRITICAL");
+    }
+
+    // -- elastic floor + stress relaxation (2026-07-08 anti-grind fix) -------------
+
+    @Test
+    void hits_below_elastic_floor_are_purely_elastic_no_entry() {
+        ImpactRuntimeConfig.SUBLEVEL_ELASTIC_FLOOR = 0.2;
+        // STONE threshold=50J, floor=10J. A 9.9 J hit is elastic: no entry, no accumulation,
+        // no matter how many times it repeats (the observed resting-contact grind).
+        for (long t = 1; t <= 100; t++) {
+            BlockDamageAccumulator.accumulate(stoneAt(10, 64, 10, 9.9, t));
+        }
+        assertEquals(0, BlockDamageAccumulator.entryCount(),
+                "sub-floor hits must never accumulate");
+        // At the floor: accumulates normally.
+        BlockDamageAccumulator.accumulate(stoneAt(10, 64, 10, 10.0, 101L));
+        assertEquals(1, BlockDamageAccumulator.entryCount());
+    }
+
+    @Test
+    void accumulated_damage_decays_between_hits() {
+        ImpactRuntimeConfig.SUBLEVEL_DAMAGE_HALF_LIFE_TICKS = 60;
+        // Two 30 J hits 60 ticks apart: the first has halved to 15 by the second hit.
+        BlockDamageAccumulator.accumulate(stoneAt(10, 64, 10, 30.0, 1L));
+        BlockDamageAccumulator.accumulate(stoneAt(10, 64, 10, 30.0, 61L));
+        BlockDamageAccumulator.Snapshot snap = BlockDamageAccumulator.getSnapshot(
+                "minecraft:overworld", 10, 64, 10, "minecraft:stone");
+        assertNotNull(snap);
+        assertEquals(45.0, snap.accumulatedEffectiveDamageJ(), 0.001, "30/2 + 30");
+        assertEquals(2, snap.hitCount());
     }
 }

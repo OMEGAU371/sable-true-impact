@@ -142,16 +142,77 @@ class ImpactBlockApplicatorTest {
     }
 
     @Test
-    void dirt_block_above_threshold_returns_APPLIED_NO_OP() {
+    void dirt_has_no_transformation_target_returns_APPLIED_NO_OP() {
+        // dirt has no transformation target — accumulates damage and breaks at CRITICAL
         MockBlockView view = new MockBlockView();
-        view.put(5, 63, 5, "minecraft:dirt"); // dirt is SOFT_SOIL but has no Phase 2A effect
+        view.put(5, 63, 5, "minecraft:dirt");
         DeferredDamageEvent event = softSoilEvent("minecraft:dirt", 100.0);
 
         ApplyOutcome outcome = ImpactBlockApplicator.tryApply(view, event);
 
         assertEquals(ApplyOutcome.APPLIED_NO_OP, outcome,
-                "dirt hit with high kImpact should be APPLIED_NO_OP (no Phase 2A compaction target)");
-        assertNull(view.getLastSetId(), "no setBlock call for dirt NO_OP");
+                "dirt has no transformation target — breaks at CRITICAL via break path");
+        assertNull(view.getLastSetId());
+    }
+
+    @Test
+    void podzol_transforms_to_dirt() {
+        MockBlockView view = new MockBlockView();
+        view.put(5, 63, 5, "minecraft:podzol");
+        DeferredDamageEvent event = softSoilEvent("minecraft:podzol", 100.0);
+
+        assertEquals(ApplyOutcome.APPLIED, ImpactBlockApplicator.tryApply(view, event));
+        assertEquals("minecraft:dirt", view.getLastSetId());
+    }
+
+    @Test
+    void mycelium_transforms_to_dirt() {
+        MockBlockView view = new MockBlockView();
+        view.put(5, 63, 5, "minecraft:mycelium");
+        DeferredDamageEvent event = softSoilEvent("minecraft:mycelium", 100.0);
+
+        assertEquals(ApplyOutcome.APPLIED, ImpactBlockApplicator.tryApply(view, event));
+        assertEquals("minecraft:dirt", view.getLastSetId());
+    }
+
+    @Test
+    void suspicious_sand_transforms_to_sand() {
+        MockBlockView view = new MockBlockView();
+        view.put(5, 63, 5, "minecraft:suspicious_sand");
+        DeferredDamageEvent event = softSoilEvent("minecraft:suspicious_sand", 100.0);
+
+        assertEquals(ApplyOutcome.APPLIED, ImpactBlockApplicator.tryApply(view, event));
+        assertEquals("minecraft:sand", view.getLastSetId());
+    }
+
+    @Test
+    void suspicious_gravel_transforms_to_gravel() {
+        MockBlockView view = new MockBlockView();
+        view.put(5, 63, 5, "minecraft:suspicious_gravel");
+        DeferredDamageEvent event = softSoilEvent("minecraft:suspicious_gravel", 100.0);
+
+        assertEquals(ApplyOutcome.APPLIED, ImpactBlockApplicator.tryApply(view, event));
+        assertEquals("minecraft:gravel", view.getLastSetId());
+    }
+
+    @Test
+    void gravel_has_no_transformation_target_returns_APPLIED_NO_OP() {
+        MockBlockView view = new MockBlockView();
+        view.put(5, 63, 5, "minecraft:gravel");
+        DeferredDamageEvent event = softSoilEvent("minecraft:gravel", 100.0);
+
+        assertEquals(ApplyOutcome.APPLIED_NO_OP, ImpactBlockApplicator.tryApply(view, event));
+        assertNull(view.getLastSetId());
+    }
+
+    @Test
+    void sand_has_no_transformation_target_returns_APPLIED_NO_OP() {
+        MockBlockView view = new MockBlockView();
+        view.put(5, 63, 5, "minecraft:sand");
+        DeferredDamageEvent event = softSoilEvent("minecraft:sand", 100.0);
+
+        assertEquals(ApplyOutcome.APPLIED_NO_OP, ImpactBlockApplicator.tryApply(view, event));
+        assertNull(view.getLastSetId());
     }
 
     @Test

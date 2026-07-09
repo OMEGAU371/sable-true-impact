@@ -78,6 +78,9 @@ public final class SableBodyReader {
                 pose.orientation().x(), pose.orientation().y(),
                 pose.orientation().z(), pose.orientation().w(),
                 pose.rotationPoint().x(), pose.rotationPoint().y(), pose.rotationPoint().z(),
+                subLevel.getPlot().getCenterBlock().getX(),
+                subLevel.getPlot().getCenterBlock().getY(),
+                subLevel.getPlot().getCenterBlock().getZ(),
                 velocityReadValid, linX, linY, linZ, angX, angY, angZ
         );
     }

@@ -3,11 +3,19 @@ package io.github.omegau371.trueimpact.sable;
 import io.github.omegau371.trueimpact.damage.DamageResolver;
 import io.github.omegau371.trueimpact.damage.DeferredDamageEvent;
 import io.github.omegau371.trueimpact.damage.DeferredDamageQueue;
+import io.github.omegau371.trueimpact.damage.DeferredContraptionDamageEvent;
+import io.github.omegau371.trueimpact.damage.DeferredContraptionDamageQueue;
+import io.github.omegau371.trueimpact.damage.DeferredSublevelDamageEvent;
+import io.github.omegau371.trueimpact.damage.DeferredSublevelDamageQueue;
+import io.github.omegau371.trueimpact.damage.MaterialThresholdProfile;
 import io.github.omegau371.trueimpact.damage.VictimInfo;
 import io.github.omegau371.trueimpact.observation.BodySnapshot;
 import io.github.omegau371.trueimpact.physics.ContactType;
 import io.github.omegau371.trueimpact.physics.ImpactMetrics;
 import io.github.omegau371.trueimpact.physics.ImpactRecord;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -38,6 +46,8 @@ import java.util.Map;
  */
 public final class SableImpactCapture {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(SableImpactCapture.class);
+
     private SableImpactCapture() {}
 
     /**
@@ -47,6 +57,27 @@ public final class SableImpactCapture {
      */
     static final double IMPACT_IMPULSE_PER_CONTACT_THRESHOLD = 5.0;
     static final double PHASE_1C_PLACEHOLDER_MATERIAL_THRESHOLD_J = 50.0;
+
+    /**
+     * Minimum kImpact (Sable units) for any world contact to be recorded as damage.
+     * Calibrated for 72J typical moderate impact: detect at 40J.
+     * Intentionally LOWER than any materialThresholdJ so that impacts below the break
+     * threshold can still accumulate over multiple hits.
+     */
+    public static double GLOBAL_DETECTION_THRESHOLD_J = 40.0;
+
+    /**
+     * Multiplier applied to materialThresholdJ when constructing DeferredDamageEvents.
+     * Separates the per-material break threshold from the detection sensitivity:
+     *   break threshold (passed to accumulator) = materialThresholdJ * BREAK_THRESHOLD_MULTIPLIER
+     *   detection threshold (enqueue filter)    = GLOBAL_DETECTION_THRESHOLD_J
+     *
+     * With multiplier=10 and a typical 72J moderate impact:
+     *   STONE  break=500J → ratio 0.14 per hit → ~7 hits to CRITICAL
+     *   WOOD   break=200J → ratio 0.36 per hit → ~3 hits to CRITICAL
+     *   SOFT_SOIL break=50J → ratio 1.44 → CRITICAL in 1 hit (soil is soft)
+     */
+    static final double BREAK_THRESHOLD_MULTIPLIER = 10.0;
 
     // -- Phase 1E world kImpact diagnostic status --------------------------------
     // Reported per tick to explain why worldKImpact is NaN or finite.
@@ -267,12 +298,43 @@ public final class SableImpactCapture {
         boolean worldDiagHasStartVel = false;
         WorldKImpactStatus worldDiagStatus = WorldKImpactStatus.NOT_SEEN;
 
+        // Impact direction: normalized pre-impact velocity of the first active body that
+        // contacts a world block. Used to populate DeferredDamageEvent.impactDir*.
+        double worldImpactDirX = Double.NaN;
+        double worldImpactDirY = Double.NaN;
+        double worldImpactDirZ = Double.NaN;
+
+        // E: block outward face normal (world space) and sliding speed for friction/entity-damage.
+        // Captured from raw Rapier contact data: static bodies have identity orientation,
+        // so their contact normal is already in world space (no quaternion rotation needed).
+        double worldContactNormalX  = Double.NaN;
+        double worldContactNormalY  = Double.NaN;
+        double worldContactNormalZ  = Double.NaN;
+        double worldTangentialSpeedMs = Double.NaN;
+
+        // Phase 3A: per-sublevel world contact tracking.
+        // Maps each active sublevel (by runtimeId) to its first contact point (body-local)
+        // and its per-sublevel kImpact.  Replaces single-slot tracking so all sublevels
+        // that simultaneously hit the world each get their own damage event.
+        java.util.Map<Integer, double[]>     phase3aCpMap   = new java.util.LinkedHashMap<>();
+        java.util.Map<Integer, BodySnapshot> phase3aSnapMap = new java.util.LinkedHashMap<>();
+        java.util.Map<Integer, Double>       phase3aKMap    = new java.util.LinkedHashMap<>();
+        // Per-sublevel normalized pre-impact velocity direction (from tickStartVels).
+        // NaN entries mean vBefore was unavailable; ConfinementFactor falls back to isotropic.
+        java.util.Map<Integer, double[]>     phase3aDirMap  = new java.util.LinkedHashMap<>();
+        // Path 1: per-sublevel world-body contact positions (world-space BlockPos key → raw cp).
+        // Populated alongside phase3aCpMap; world body's local frame = world frame.
+        java.util.Map<Integer, java.util.Map<Long, double[]>> phase1WorldCpMap = new java.util.LinkedHashMap<>();
+
         for (int i = 0; i < count; i++) {
             int base = i * 15;
             int    idA      = (int) data[base];
             int    idB      = (int) data[base + 1];
             double forceRaw = data[base + 2];
+            // normalA (indices 3-5): points from A toward B, in A's local space.
+            // normalB (indices 6-8): points from B toward A, in B's local space.
             double nAx = data[base + 3], nAy = data[base + 4], nAz = data[base + 5];
+            double nBx = data[base + 6], nBy = data[base + 7], nBz = data[base + 8];
 
             BodySnapshot snapA = lastPostSnaps.get(idA);
             BodySnapshot snapB = lastPostSnaps.get(idB);
@@ -288,6 +350,68 @@ public final class SableImpactCapture {
                 BodySnapshot aSnap = (snapA != null) ? snapA : snapB;
                 int aId = (snapA != null) ? idA : idB;
                 worldDiagActiveId = aId; // last active id seen (diagnostic)
+
+                // E: block outward face normal (first contact wins).
+                // Static bodies (world) have identity orientation, so their local normal = world normal.
+                // normalB (B→A) when A=active; normalA (A→B) when B=active → both point block→active body.
+                if (Double.isNaN(worldContactNormalX)) {
+                    double nx, ny, nz;
+                    if (snapA != null) {
+                        // A is active, B is world: normalB points from world toward A (block outward)
+                        nx = nBx; ny = nBy; nz = nBz;
+                    } else {
+                        // A is world, B is active: normalA points from world toward B (block outward)
+                        nx = nAx; ny = nAy; nz = nAz;
+                    }
+                    double nMag = Math.sqrt(nx*nx + ny*ny + nz*nz);
+                    if (nMag > 1e-9) {
+                        worldContactNormalX = nx / nMag;
+                        worldContactNormalY = ny / nMag;
+                        worldContactNormalZ = nz / nMag;
+                    }
+                }
+
+                // Phase 3A: record first contact point + impact direction per sublevel.
+                if (!phase3aCpMap.containsKey(aId)) {
+                    double cpX, cpY, cpZ;
+                    if (snapA != null) {
+                        cpX = data[base + 9];  cpY = data[base + 10]; cpZ = data[base + 11];
+                    } else {
+                        cpX = data[base + 12]; cpY = data[base + 13]; cpZ = data[base + 14];
+                    }
+                    phase3aCpMap.put(aId, new double[]{cpX, cpY, cpZ});
+                    phase3aSnapMap.put(aId, aSnap);
+                    // Normalize pre-impact velocity as the impact direction for directional confinement.
+                    double[] vb = tickStartVels.get(aId);
+                    if (vb != null) {
+                        double mag = Math.sqrt(vb[0]*vb[0] + vb[1]*vb[1] + vb[2]*vb[2]);
+                        if (mag > 1e-9) {
+                            phase3aDirMap.put(aId, new double[]{vb[0]/mag, vb[1]/mag, vb[2]/mag});
+                        }
+                    }
+                }
+                // Path 1: record world body contact point (world-space) for each distinct BlockPos.
+                // World body local frame = world frame; opposite indices from active-body cp above.
+                {
+                    double wcpX, wcpY, wcpZ;
+                    if (snapA != null) {
+                        // A=active, B=world → B's local cp (indices 12-14) = world coords
+                        wcpX = data[base + 12]; wcpY = data[base + 13]; wcpZ = data[base + 14];
+                    } else {
+                        // A=world, B=active → A's local cp (indices 9-11) = world coords
+                        wcpX = data[base + 9]; wcpY = data[base + 10]; wcpZ = data[base + 11];
+                    }
+                    // Subtract epsilon on Y (0.1 block) to land below the top face of the block
+                    // being struck. Rapier contact points can be ~0.01 above the exact face due to
+                    // floating-point drift; 0.1 absorbs this without crossing into adjacent blocks.
+                    long bkey = worldBlockKey(
+                        (int) Math.floor(wcpX),
+                        (int) Math.floor(wcpY - 0.1),
+                        (int) Math.floor(wcpZ));
+                    phase1WorldCpMap
+                        .computeIfAbsent(aId, k -> new java.util.LinkedHashMap<>())
+                        .putIfAbsent(bkey, new double[]{wcpX, wcpY, wcpZ});
+                }
 
                 if (!aSnap.velocityReadValid()) {
                     // Only set failure status if we don't already have a better one.
@@ -310,9 +434,26 @@ public final class SableImpactCapture {
                         double vaSq = aSnap.linVelX()*aSnap.linVelX()
                                     + aSnap.linVelY()*aSnap.linVelY()
                                     + aSnap.linVelZ()*aSnap.linVelZ();
+                        // Capture normalized pre-impact velocity as impact direction (first hit wins).
+                        if (Double.isNaN(worldImpactDirX) && vbSq > 1e-18) {
+                            double mag = Math.sqrt(vbSq);
+                            worldImpactDirX = vb[0] / mag;
+                            worldImpactDirY = vb[1] / mag;
+                            worldImpactDirZ = vb[2] / mag;
+                        }
+                        // E: tangential speed = sqrt(|v|^2 - (v·n)^2); sign-independent of normal direction.
+                        if (Double.isNaN(worldTangentialSpeedMs) && !Double.isNaN(worldContactNormalX)) {
+                            double dot = vb[0]*worldContactNormalX
+                                       + vb[1]*worldContactNormalY
+                                       + vb[2]*worldContactNormalZ;
+                            worldTangentialSpeedMs = Math.sqrt(Math.max(0.0, vbSq - dot*dot));
+                        }
                         double k = 0.5 * aSnap.massKpg() * Math.abs(vbSq - vaSq);
                         if (Double.isNaN(worldKImpact) || k > worldKImpact) {
                             worldKImpact = k;
+                        }
+                        if (Double.isFinite(k)) {
+                            phase3aKMap.merge(aId, k, Math::max);
                         }
                         if (Double.isFinite(k)) {
                             worldDiagStatus = WorldKImpactStatus.OK; // once OK, stays OK
@@ -329,6 +470,47 @@ public final class SableImpactCapture {
 
             acc.sumForce += forceRaw;
             acc.contactCount++;
+
+            // First-contact-wins geometry for active-vs-active mutual damage.
+            // cpA = data[9..11] (body-A local), cpB = data[12..14] (body-B local).
+            // PairAccum stores idA/idB from the first contact; subsequent contacts may swap
+            // the bodies, so we check identity before assigning contact points.
+            if (!acc.contactGeomValid) {
+                boolean sameOrder = (idA == acc.idA);
+                BodySnapshot snpA = sameOrder ? snapA : snapB;  // snap for acc.idA
+                BodySnapshot snpB = sameOrder ? snapB : snapA;  // snap for acc.idB
+                int cpBaseA = sameOrder ? 9  : 12;              // data index for acc.idA cp
+                int cpBaseB = sameOrder ? 12 : 9;               // data index for acc.idB cp
+                acc.cpAx = data[base + cpBaseA];     acc.cpAy = data[base + cpBaseA + 1]; acc.cpAz = data[base + cpBaseA + 2];
+                acc.cpBx = data[base + cpBaseB];     acc.cpBy = data[base + cpBaseB + 1]; acc.cpBz = data[base + cpBaseB + 2];
+                acc.snapARef = snpA;
+                acc.snapBRef = snpB;
+                // Impact direction per body = its velocity RELATIVE to the other body.
+                // Each body's damaged face is its leading face in the RELATIVE motion:
+                // dirA = normalize(vA − vB), dirB = −dirA. The first implementation used
+                // the other body's ABSOLUTE velocity, which is the exact OPPOSITE for a
+                // struck (static) body — its surface snap walked THROUGH the body to the
+                // far face ("hit the south face, the north face broke") — and NaN for a
+                // striker hitting a resting victim (vA ≈ 0 → no direction → no face
+                // spread → the striker's full energy landed on one cell and broke it,
+                // "the striking side takes more damage").
+                double[] vbA = tickStartVels.get(acc.idA);
+                double[] vbB = tickStartVels.get(acc.idB);
+                double vAx = vbA != null ? vbA[0] : snpA.linVelX();
+                double vAy = vbA != null ? vbA[1] : snpA.linVelY();
+                double vAz = vbA != null ? vbA[2] : snpA.linVelZ();
+                double vBx = vbB != null ? vbB[0] : snpB.linVelX();
+                double vBy = vbB != null ? vbB[1] : snpB.linVelY();
+                double vBz = vbB != null ? vbB[2] : snpB.linVelZ();
+                double relX = vAx - vBx, relY = vAy - vBy, relZ = vAz - vBz;
+                acc.vRelSq = relX*relX + relY*relY + relZ*relZ;
+                double relSpd = Math.sqrt(acc.vRelSq);
+                if (relSpd > 1e-9) {
+                    acc.impDirAx =  relX/relSpd; acc.impDirAy =  relY/relSpd; acc.impDirAz =  relZ/relSpd;
+                    acc.impDirBx = -relX/relSpd; acc.impDirBy = -relY/relSpd; acc.impDirBz = -relZ/relSpd;
+                }
+                acc.contactGeomValid = true;
+            }
 
             if (!acc.massValid) {
                 acc.massA     = snapA.massKpg();
@@ -366,19 +548,37 @@ public final class SableImpactCapture {
                         ? SableVictimCapture.buildWorldVictimInfo()
                         : VictimInfo.worldContactNoCallback();
 
-                // Phase 1E: enqueue when WORLD_BLOCK + single-body kImpact exceeds threshold.
-                if (noActiveVictim.kind() == VictimInfo.Kind.WORLD_BLOCK
-                        && Double.isFinite(worldKImpact)
-                        && worldKImpact > noActiveVictim.materialThresholdJ()) {
-                    DeferredDamageQueue.enqueue(new DeferredDamageEvent(
-                            serverTick, levelKey,
-                            noActiveVictim.blockId(),
-                            noActiveVictim.posX(), noActiveVictim.posY(), noActiveVictim.posZ(),
-                            noActiveVictim.materialClass(),
-                            worldKImpact,
-                            noActiveVictim.materialThresholdJ(),
-                            noActiveVictim.source(),
-                            noActiveVictim.confidence()));
+                // Phase 2G: enqueue per-block events from onCollision registry when energy threshold met.
+                // Registry contains the exact BlockPos for each block the physics body touched this
+                // substep. Energy is distributed equally across all contacted blocks.
+                if (Double.isFinite(worldKImpact) && worldKImpact > GLOBAL_DETECTION_THRESHOLD_J) {
+                    enqueueFromRegistry(worldKImpact, serverTick, levelKey,
+                            worldImpactDirX, worldImpactDirY, worldImpactDirZ,
+                            worldContactNormalX, worldContactNormalY, worldContactNormalZ,
+                            worldTangentialSpeedMs);
+                    // Phase 3A: enqueue each world-touching sublevel individually.
+                    for (java.util.Map.Entry<Integer, BodySnapshot> ws : phase3aSnapMap.entrySet()) {
+                        int wsId = ws.getKey();
+                        double[] wsCp = phase3aCpMap.get(wsId);
+                        Double wsK = phase3aKMap.get(wsId);
+                        if (wsK != null && wsCp != null) {
+                            double[] wsDir = phase3aDirMap.get(wsId);
+                            java.util.Map<Long, double[]> wsWcpMap = phase1WorldCpMap.get(wsId);
+                            double wsKCapped = capKImpact(wsK, ws.getValue());
+                            if (isTerrainContact(wsWcpMap, ws.getValue())) {
+                                double[] twcp = wsWcpMap.values().iterator().next();
+                                enqueueEmbeddedContact(wsKCapped, serverTick, levelKey,
+                                        wsCp[0], wsCp[1], wsCp[2], wsId, ws.getValue(),
+                                        wsDir != null ? wsDir[0] : Double.NaN,
+                                        wsDir != null ? wsDir[1] : Double.NaN,
+                                        wsDir != null ? wsDir[2] : Double.NaN,
+                                        twcp[0], twcp[1], twcp[2]);
+                            }
+                            enqueueContraptionContact(wsKCapped, levelKey,
+                                    wsCp[0], wsCp[1], wsCp[2], wsId, ws.getValue());
+                            enqueueWorldBlockContact(wsKCapped, levelKey, wsWcpMap);
+                        }
+                    }
                 }
             }
             recordStats(serverTick, count, 0, 0, 0, null, null, noActiveVictim,
@@ -439,6 +639,30 @@ public final class SableImpactCapture {
             }
 
             DamageResolver.resolve(record);    // Phase 1C: still always NONE
+
+            // Phase 3A mutual: enqueue sublevel damage for BOTH bodies of an ACTIVE_IMPACT.
+            // Energy = dissipated KE of the pair, 0.5·μ·v_rel² (perfectly-plastic upper
+            // bound; μ = effective mass, so a light body limits the damage a heavy one
+            // takes — a wood block cannot wreck a stone slab regardless of who moves).
+            // Each face runs the normal apply pipeline (elastic floor, confinement,
+            // accumulation), which absorbs the plastic-bound overestimate.
+            // vis = NaN: the "terrain" here is the other BODY, so the phantom-terrain
+            // filter (and Phase 3C terrain penetration) must not see this event.
+            // First-wins dedup per (runtimeId, tick) still applies — a body that both
+            // hits terrain and another body this tick is charged only once.
+            if (io.github.omegau371.trueimpact.damage.ImpactRuntimeConfig.ENABLE_PHYSICS_STRUCTURE_DAMAGE
+                    && io.github.omegau371.trueimpact.damage.ImpactRuntimeConfig.ENABLE_STRUCTURE_VS_STRUCTURE
+                    && acc.contactGeomValid && type == ContactType.ACTIVE_IMPACT) {
+                double eDiss = Double.isFinite(effMass) ? 0.5 * effMass * acc.vRelSq : 0.0;
+                enqueueActiveVsActiveContact(eDiss, serverTick, levelKey,
+                        acc.idA, acc.snapARef, acc.cpAx, acc.cpAy, acc.cpAz,
+                        acc.impDirAx, acc.impDirAy, acc.impDirAz,
+                        acc.idB, acc.snapBRef, acc.cpBx, acc.cpBy, acc.cpBz);
+                enqueueActiveVsActiveContact(eDiss, serverTick, levelKey,
+                        acc.idB, acc.snapBRef, acc.cpBx, acc.cpBy, acc.cpBz,
+                        acc.impDirBx, acc.impDirBy, acc.impDirBz,
+                        acc.idA, acc.snapARef, acc.cpAx, acc.cpAy, acc.cpAz);
+            }
         }
 
         // Phase 1D: build VictimInfo for this tick.
@@ -454,24 +678,48 @@ public final class SableImpactCapture {
             tickVictim = VictimInfo.activeSublevel();
         }
 
-        // Phase 1E: enqueue when WORLD_BLOCK detected + energy exceeds threshold.
-        // Prefer active-vs-active kImpact (full pair measurement if available),
-        // fall back to single-body world estimate (worldKImpact, requires contacts on).
-        if (tickVictim.kind() == VictimInfo.Kind.WORLD_BLOCK) {
+        // Phase 2G: per-block events from onCollision registry.
+        // Uses kineticImpactEnergyJ from active-vs-active metrics when available;
+        // falls back to worldKImpact (single-body estimate) for world-only contacts.
+        if (sawWorldContact) {
             double kImpact = (latestRecordMetrics != null
                     && Double.isFinite(latestRecordMetrics.kineticImpactEnergyJ()))
                     ? latestRecordMetrics.kineticImpactEnergyJ()
                     : worldKImpact;
-            if (Double.isFinite(kImpact) && kImpact > tickVictim.materialThresholdJ()) {
-                DeferredDamageQueue.enqueue(new DeferredDamageEvent(
-                        serverTick, levelKey,
-                        tickVictim.blockId(),
-                        tickVictim.posX(), tickVictim.posY(), tickVictim.posZ(),
-                        tickVictim.materialClass(),
-                        kImpact,
-                        tickVictim.materialThresholdJ(),
-                        tickVictim.source(),
-                        tickVictim.confidence()));
+            if (Double.isFinite(kImpact) && kImpact > GLOBAL_DETECTION_THRESHOLD_J) {
+                enqueueFromRegistry(kImpact, serverTick, levelKey,
+                        worldImpactDirX, worldImpactDirY, worldImpactDirZ,
+                        worldContactNormalX, worldContactNormalY, worldContactNormalZ,
+                        worldTangentialSpeedMs);
+            }
+            // Phase 3A: enqueue each world-touching sublevel individually.
+            // Gate moved outside the active-vs-active kImpact check: Sable's own test
+            // sublevels (testgravity/testsnag) can create low-energy active-vs-active resting
+            // contacts in the same substep as a high-speed world impact, making kImpact < 40J
+            // even though worldKImpact is large. enqueueEmbeddedContact has its own
+            // per-sublevel gate (wsK > GLOBAL_DETECTION_THRESHOLD_J), so moving the loop here
+            // is safe — low-kImpact sublevels are still filtered by the inner guard.
+            for (java.util.Map.Entry<Integer, BodySnapshot> ws : phase3aSnapMap.entrySet()) {
+                int wsId = ws.getKey();
+                double[] wsCp = phase3aCpMap.get(wsId);
+                Double wsK = phase3aKMap.get(wsId);
+                if (wsK != null && wsCp != null) {
+                    double[] wsDir = phase3aDirMap.get(wsId);
+                    java.util.Map<Long, double[]> wsWcpMap = phase1WorldCpMap.get(wsId);
+                    double wsKCapped = capKImpact(wsK, ws.getValue());
+                    if (isTerrainContact(wsWcpMap, ws.getValue())) {
+                        double[] twcp = wsWcpMap.values().iterator().next();
+                        enqueueEmbeddedContact(wsKCapped, serverTick, levelKey,
+                                wsCp[0], wsCp[1], wsCp[2], wsId, ws.getValue(),
+                                wsDir != null ? wsDir[0] : Double.NaN,
+                                wsDir != null ? wsDir[1] : Double.NaN,
+                                wsDir != null ? wsDir[2] : Double.NaN,
+                                twcp[0], twcp[1], twcp[2]);
+                    }
+                    enqueueContraptionContact(wsKCapped, levelKey,
+                            wsCp[0], wsCp[1], wsCp[2], wsId, ws.getValue());
+                    enqueueWorldBlockContact(wsKCapped, levelKey, wsWcpMap);
+                }
             }
         }
 
@@ -698,6 +946,12 @@ public final class SableImpactCapture {
                 velocityDerivedImpulseJ);
     }
 
+    // Bit-packing identical to BlockPos.asLong — avoids a MC import in this class so unit
+    // tests (no MC runtime) can still call process() without ClassNotFoundException.
+    private static long worldBlockKey(int x, int y, int z) {
+        return ((long)(y & 0xFFFFF) << 44) | ((long)(x & 0x3FFFFFF) << 18) | (long)(z & 0x3FFFFFF);
+    }
+
     // Canonical pair key: min(idA,idB)<<32 | max(idA,idB) (matches ImpactRecord contract)
     static long pairKey(int idA, int idB) {
         int minId = Math.min(idA, idB);
@@ -718,6 +972,462 @@ public final class SableImpactCapture {
         };
     }
 
+    /**
+     * Rotate a WORLD-space vector into the body's local (plot-grid) frame — the inverse
+     * of rotateVec (conjugate quaternion). The plot block grid never rotates with the
+     * body, so any world-space offset or direction must pass through this before being
+     * used as grid coordinates. Falls back to identity when the orientation is invalid.
+     */
+    private static double[] rotateVecInverse(BodySnapshot s, double wx, double wy, double wz) {
+        double qx = -s.oriX(), qy = -s.oriY(), qz = -s.oriZ(), qw = s.oriW();
+        if (!Double.isFinite(qw) || (qx == 0 && qy == 0 && qz == 0 && qw == 0)) {
+            return new double[]{wx, wy, wz};
+        }
+        double tx = 2 * (qy * wz - qz * wy);
+        double ty = 2 * (qz * wx - qx * wz);
+        double tz = 2 * (qx * wy - qy * wx);
+        return new double[]{
+            wx + qw * tx + qy * tz - qz * ty,
+            wy + qw * ty + qz * tx - qx * tz,
+            wz + qw * tz + qx * ty - qy * tx
+        };
+    }
+
+    /**
+     * Phase 3A: velocity-delta enqueue for persistent contacts (resting body given impulse).
+     *
+     * Rapier's clearCollisions() only emits events for NEW contact establishment.
+     * Bodies already in contact with terrain (sleeping on floor) don't re-appear in that
+     * buffer when an external impulse is applied to them. This method detects such impacts
+     * by comparing the tick-start velocity (captured at substep-0 PRE_STEP, after any
+     * externally applied impulse) with the end-of-tick velocity from lastPostSnaps.
+     *
+     * Deduplication: DeferredSublevelDamageQueue deduplicates by
+     * (runtimeId, faceAwareRound(cpX), faceAwareRound(cpY), faceAwareRound(cpZ)).
+     * For single-block sublevels all three faceAwareRound(cp) values yield 0, producing
+     * the same key as the clearCollisions() path. If the contact was already enqueued
+     * via clearCollisions(), this call is a silent no-op -- no double damage.
+     *
+     * Called from SableEventBridge.onPostStep() at the final substep only, after
+     * lastPostSnaps is fully populated for the tick.
+     */
+    public static void tryEnqueueVelocityDelta(
+            int runtimeId, BodySnapshot snap, double[] vBefore,
+            long serverTick, String levelKey) {
+        if (!snap.velocityReadValid() || snap.massKpg() <= 0.0) return;
+        if (runtimeId < 0) return;
+
+        double vbx = vBefore[0], vby = vBefore[1], vbz = vBefore[2];
+        double vax = snap.linVelX(), vay = snap.linVelY(), vaz = snap.linVelZ();
+
+        // Gravity compensation: a body coasting UPWARD decelerates by g·dt every tick with
+        // zero contact — that kinetic energy became potential energy, not damage. Comparing
+        // vaSq against raw vbSq fired a synthetic "impact" on every post-bounce ascent tick,
+        // with dir = up → surface snap walked to the TOP face → "hit the bottom, the top
+        // cracked". Predict the free-flight end-of-tick velocity under gravity alone and
+        // only treat energy MISSING relative to that prediction as contact dissipation.
+        // (For a falling body the prediction is FASTER than vb, so landing detection keeps
+        // working and gets slightly more accurate.)
+        final double GRAVITY_DV_PER_TICK = 9.81 * 0.05; // one full server tick
+        double vaExpY  = vby - GRAVITY_DV_PER_TICK;
+        double vaExpSq = vbx*vbx + vaExpY*vaExpY + vbz*vbz;
+        double vaSq    = vax*vax + vay*vay + vaz*vaz;
+
+        // Only trigger when the body lost kinetic energy versus free flight
+        // (contact dissipation). Gravity-only coasting matches the prediction → no event.
+        if (vaSq >= vaExpSq) return;
+
+        // Resting-body filter: a SUPPORTED body has va = 0 while the free-flight prediction
+        // is −g·dt, so the deficit is (g·dt)² ≈ 0.24 m²/s² EVERY tick — that "missing" energy
+        // is the ground's support force, not damage. For heavy bodies 0.5·m·0.24 exceeds the
+        // 40 J detection threshold (observed: 2200+ constant-120 J events from one resting
+        // 1000 kpg structure). Require the deficit to exceed a real contact Δv of ~1 m/s;
+        // a genuine landing from even half a block (3.1 m/s) gives a deficit of ~9.6.
+        final double MIN_CONTACT_DV_SQ = 1.0; // (1 m/s)²
+        if (vaExpSq - vaSq < MIN_CONTACT_DV_SQ) return;
+
+        double k = capKImpact(
+                0.5 * snap.massKpg() * (vaExpSq - vaSq), snap); // positive since vaExpSq > vaSq
+
+        // Infer contact face from dominant pre-impact velocity direction.
+        // Placed at ±0.5 on the dominant axis (face of the block).
+        // faceAwareRound(±0.5) = 0, so local block index is always (0,0,0)
+        // for a single-block sublevel -- same as the clearCollisions() path.
+        double absX = Math.abs(vbx), absY = Math.abs(vby), absZ = Math.abs(vbz);
+        double cpX = 0.0, cpY = 0.0, cpZ = 0.0;
+        if (absY >= absX && absY >= absZ) {
+            cpY = (vby < 0.0) ? -0.5 : 0.5;
+        } else if (absX >= absZ) {
+            cpX = (vbx < 0.0) ? -0.5 : 0.5;
+        } else {
+            cpZ = (vbz < 0.0) ? -0.5 : 0.5;
+        }
+
+        double mag = Math.sqrt(vbx*vbx + vby*vby + vbz*vbz);
+        double dX = mag > 1e-9 ? vbx/mag : Double.NaN;
+        double dY = mag > 1e-9 ? vby/mag : Double.NaN;
+        double dZ = mag > 1e-9 ? vbz/mag : Double.NaN;
+        // The synthetic cp is fabricated in WORLD-ALIGNED axes (dominant world travel axis
+        // ± 0.5), so the synthetic terrain contact is snap.pos + cp directly. Applying the
+        // body rotation here (old code) double-rotated it: enqueueEmbeddedContact converts
+        // world→grid with R⁻¹, and R⁻¹(R(cp)) put tumbling bodies' contacts back at the
+        // raw cp while the vis position swung mid-air (genuine landings phantom-dropped).
+        double tWcpX = snap.posX() + cpX;
+        double tWcpY = snap.posY() + cpY;
+        double tWcpZ = snap.posZ() + cpZ;
+        // Fallback only: when Rapier already reported a real contact for this body this tick,
+        // the synthetic event is a duplicate at a WRONG position (COM±0.5 single-block
+        // assumption maps to a near-COM block, not the contact face, on multi-block bodies).
+        if (!wasEmbeddedEnqueuedThisTick(serverTick, runtimeId)) {
+            enqueueEmbeddedContact(k, serverTick, levelKey, cpX, cpY, cpZ, runtimeId, snap, dX, dY, dZ,
+                    tWcpX, tWcpY, tWcpZ);
+        }
+        enqueueContraptionContact(k, levelKey, cpX, cpY, cpZ, runtimeId, snap);
+
+        // Path 1: estimate world body contact position from sublevel world coords + rotated body-local cp.
+        // snap.posX/Y/Z is the sublevel's Minecraft world-space position; rotate(cpXYZ) gives the
+        // contact offset in world space. Subtract epsilon on Y to land in the floor block being struck.
+        if (snap.posX() != 0.0 || snap.posY() != 0.0) { // guard: snap position available
+            double wcpX = tWcpX;
+            double wcpY = tWcpY;
+            double wcpZ = tWcpZ;
+            long bkey = worldBlockKey(
+                (int) Math.floor(wcpX),
+                (int) Math.floor(wcpY - 0.1),
+                (int) Math.floor(wcpZ));
+            java.util.Map<Long, double[]> wcpMap = new java.util.LinkedHashMap<>();
+            wcpMap.put(bkey, new double[]{wcpX, wcpY, wcpZ});
+            enqueueWorldBlockContact(k, levelKey, wcpMap);
+        }
+    }
+
+    /**
+     * Returns true when the static-body contact map contains at least one point within 50 blocks
+     * of the body's visual Minecraft position (snap.posX/Z).
+     *
+     * Embedded plot-wall contacts have world-body coordinates at ~20 000 000 (far from any real
+     * Minecraft position), so their distance to snap.posX/Z always exceeds the threshold.
+     * Real terrain contacts are within a few blocks of the structure's visual position.
+     */
+    private static boolean isTerrainContact(java.util.Map<Long, double[]> wcpMap, BodySnapshot snap) {
+        if (wcpMap == null || wcpMap.isEmpty() || snap == null) return false;
+        double pvX = snap.posX(), pvZ = snap.posZ();
+        for (double[] wcp : wcpMap.values()) {
+            if (Math.abs(wcp[0] - pvX) < 50.0 && Math.abs(wcp[2] - pvZ) < 50.0) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Phase 3A: Enqueues a DeferredSublevelDamageEvent for the active sublevel body.
+     *
+     * terrainWcp is the Minecraft-world contact point on the static terrain body (from
+     * phase1WorldCpMap, the first entry for this sublevel's runtimeId). This is the
+     * ground-truth contact position — it doesn't change when the body bounces.
+     *
+     * plotCp formula derivation (rotation and bounce cancel):
+     *   At contact time: visCenter_c + rotate(bodyLocalCp) = terrainWcp
+     *   → visCenter_c = terrainWcp - rotate(bodyLocalCp)
+     *   comOff_c = comOff_snap + (visCenter_c - snap.pos) = comOff_snap + (terrainWcp - rotate(cp) - snap.pos)
+     *   plotCp = comOff_c + rotate(bodyLocalCp) = terrainWcp + comOff_snap - snap.pos
+     * The rotate terms cancel — plotCp depends only on terrain contact position and translational state.
+     */
+    /**
+     * runtimeIds that already got an embedded damage event this tick (any source).
+     * One landing produces the same body-ΔKE twice: once from the real Rapier contact
+     * and once from the velocity-delta synthetic path — and dev-server testing showed
+     * the synthetic one can enqueue FIRST within a tick, so per-source gating is not
+     * enough. enqueueEmbeddedContact enforces first-wins per (runtimeId, tick): the
+     * duplicate carries no extra information, only double-counted damage. The synthetic
+     * event's near-COM contact point is corrected at apply time by the surface snap in
+     * TrueImpactMod.tryBreakSublevelBlock.
+     */
+    private static final java.util.Set<Integer> EMBEDDED_ENQUEUED_THIS_TICK = new java.util.HashSet<>();
+    private static long embeddedEnqueueTick = Long.MIN_VALUE;
+
+    private static void markEmbeddedEnqueued(long serverTick, int runtimeId) {
+        if (serverTick != embeddedEnqueueTick) {
+            EMBEDDED_ENQUEUED_THIS_TICK.clear();
+            embeddedEnqueueTick = serverTick;
+        }
+        EMBEDDED_ENQUEUED_THIS_TICK.add(runtimeId);
+    }
+
+    private static boolean wasEmbeddedEnqueuedThisTick(long serverTick, int runtimeId) {
+        return serverTick == embeddedEnqueueTick && EMBEDDED_ENQUEUED_THIS_TICK.contains(runtimeId);
+    }
+
+    /**
+     * Δv sanity cap: constraint yanks (grab tool) and post-break angular whip report
+     * velocity changes of 100+ m/s, producing absurd kImpact (534 000 J observed).
+     * Clamps to the energy of a maxΔv impact for this body's mass. Applied to EVERY
+     * damage path fed by body ΔKE (sublevel, world block, contraption) — capping only
+     * the sublevel path let an uncapped Path 1 turn a swung wooden skeleton into a
+     * stone-crushing hammer that itself took capped (negligible) damage.
+     */
+    private static double capKImpact(double kImpact, BodySnapshot snap) {
+        if (snap == null) return kImpact;
+        double bodyMass = (snap.massKpg() > 0 && Double.isFinite(snap.massKpg())) ? snap.massKpg() : 0.0;
+        double maxDv = io.github.omegau371.trueimpact.damage.ImpactRuntimeConfig.SUBLEVEL_MAX_DELTA_V_MS;
+        if (bodyMass > 0 && maxDv > 0) {
+            return Math.min(kImpact, 0.5 * bodyMass * maxDv * maxDv);
+        }
+        return kImpact;
+    }
+
+    private static void enqueueEmbeddedContact(double kImpact, long serverTick, String levelKey,
+                                                double cpX, double cpY, double cpZ,
+                                                int runtimeId, BodySnapshot snap,
+                                                double impactDirX, double impactDirY, double impactDirZ,
+                                                double terrainWcpX, double terrainWcpY, double terrainWcpZ) {
+        if (!Double.isFinite(kImpact) || kImpact <= GLOBAL_DETECTION_THRESHOLD_J) return;
+        if (Double.isNaN(cpX) || snap == null || runtimeId < 0) return;
+        // First-wins per (runtimeId, tick): real and synthetic events for the same landing
+        // carry the same body ΔKE — a second enqueue is pure double-counting.
+        if (wasEmbeddedEnqueuedThisTick(serverTick, runtimeId)) return;
+        markEmbeddedEnqueued(serverTick, runtimeId);
+        kImpact = capKImpact(kImpact, snap);
+        try { kImpact *= io.github.omegau371.trueimpact.TrueImpactConfig.effectivePhysicsStructureMultiplier(); } catch (Throwable ignored) {}
+        double comOffX = snap.comValid() ? snap.comX() - snap.plotCenterX() : 0.0;
+        double comOffY = snap.comValid() ? snap.comY() - snap.plotCenterY() : 0.0;
+        double comOffZ = snap.comValid() ? snap.comZ() - snap.plotCenterZ() : 0.0;
+        // plotCp = comOff + R⁻¹(terrainWcp − snap.pos).
+        // Derivation: a grid point g maps to world as  world(g) = comWorld + R(g − comPlot),
+        // with comWorld ≈ snap.pos and comPlot = plotCenter + comOff. Solving for g at the
+        // terrain contact:  g − plotCenter = comOff + R⁻¹(terrainWcp − snap.pos).
+        // The old formula omitted R⁻¹ ("rotate terms cancel" — false for R ≠ identity):
+        // correct for axis-aligned drops, but a tumbling corner landing mapped the contact
+        // to a rotated grid position — observed as damage on the OPPOSITE corner.
+        double[] gridOff = rotateVecInverse(snap,
+                terrainWcpX - snap.posX(), terrainWcpY - snap.posY(), terrainWcpZ - snap.posZ());
+        double plotCpX = comOffX + gridOff[0];
+        double plotCpY = comOffY + gridOff[1];
+        double plotCpZ = comOffZ + gridOff[2];
+        // Impact direction in plot-grid space, for all grid-walk consumers downstream.
+        double gridDirX = Double.NaN, gridDirY = Double.NaN, gridDirZ = Double.NaN;
+        if (Double.isFinite(impactDirX) && Double.isFinite(impactDirY) && Double.isFinite(impactDirZ)) {
+            double[] gd = rotateVecInverse(snap, impactDirX, impactDirY, impactDirZ);
+            gridDirX = gd[0]; gridDirY = gd[1]; gridDirZ = gd[2];
+        }
+        // Visual contact = terrain contact position (it IS the Minecraft-world contact).
+        double visX = terrainWcpX;
+        double visY = terrainWcpY;
+        double visZ = terrainWcpZ;
+        if (io.github.omegau371.trueimpact.damage.ImpactRuntimeConfig.LOG_PHASE3A)
+            LOGGER.info("[TI3A-D] enqueue: kImpact={} massKpg={} plotCp=({},{},{}) bodyLocalCp=({},{},{}) comOff=({},{},{}) runtimeId={} plotCenter=({},{},{}) dir=({},{},{}) vis=({},{},{})",
+                    String.format("%.2f", kImpact),
+                    String.format("%.3f", snap.massKpg()),
+                    String.format("%.3f", plotCpX), String.format("%.3f", plotCpY), String.format("%.3f", plotCpZ),
+                    String.format("%.3f", cpX), String.format("%.3f", cpY), String.format("%.3f", cpZ),
+                    String.format("%.3f", comOffX), String.format("%.3f", comOffY), String.format("%.3f", comOffZ),
+                    runtimeId,
+                    snap.plotCenterX(), snap.plotCenterY(), snap.plotCenterZ(),
+                    String.format("%.3f", impactDirX), String.format("%.3f", impactDirY), String.format("%.3f", impactDirZ),
+                    String.format("%.2f", visX), String.format("%.2f", visY), String.format("%.2f", visZ));
+        // Face energy distribution happens at APPLY time (TrueImpactMod.tryBreakSublevelBlock):
+        // it needs block access to spread energy over SOLID face cells only, which is not
+        // available on the physics thread. Enqueue the single contact with full energy.
+        DeferredSublevelDamageQueue.enqueue(new DeferredSublevelDamageEvent(
+                serverTick, levelKey, runtimeId,
+                plotCpX, plotCpY, plotCpZ,
+                kImpact,
+                impactDirX, impactDirY, impactDirZ,
+                visX, visY, visZ,
+                gridDirX, gridDirY, gridDirZ,
+                (snap.massKpg() > 0 && Double.isFinite(snap.massKpg())) ? snap.massKpg() : 0.0,
+                -1, Double.NaN, Double.NaN, Double.NaN));
+    }
+
+    /**
+     * Phase 3A mutual: enqueues sublevel damage for ONE side of an active-vs-active pair.
+     *
+     * Unlike enqueueEmbeddedContact, the contact point arrives already in the body's
+     * COM-local frame (Rapier pair data[9..11]/[12..14]), so the grid mapping is simply
+     * plotCp = comOff + cp — no world round-trip, no R⁻¹ (the local frame IS the grid
+     * frame up to the COM offset). impactDir stays world-space for the event contract;
+     * gridDir = R⁻¹(impactDir) as usual.
+     *
+     * vis = NaN by design: there is no Minecraft-world terrain at this contact (the other
+     * side is a physics body), so the phantom filter must skip and Phase 3C terrain
+     * penetration must not fire (both check Double.isFinite(visX)).
+     */
+    private static void enqueueActiveVsActiveContact(double kImpact, long serverTick, String levelKey,
+                                                     int runtimeId, BodySnapshot snap,
+                                                     double cpX, double cpY, double cpZ,
+                                                     double impactDirX, double impactDirY, double impactDirZ,
+                                                     int otherRuntimeId, BodySnapshot otherSnap,
+                                                     double otherCpX, double otherCpY, double otherCpZ) {
+        if (!Double.isFinite(kImpact) || kImpact <= GLOBAL_DETECTION_THRESHOLD_J) return;
+        if (Double.isNaN(cpX) || snap == null || runtimeId < 0) return;
+        if (wasEmbeddedEnqueuedThisTick(serverTick, runtimeId)) return;
+        markEmbeddedEnqueued(serverTick, runtimeId);
+        kImpact = capKImpact(kImpact, snap);
+        try { kImpact *= io.github.omegau371.trueimpact.TrueImpactConfig.effectivePhysicsStructureMultiplier(); } catch (Throwable ignored) {}
+        double comOffX = snap.comValid() ? snap.comX() - snap.plotCenterX() : 0.0;
+        double comOffY = snap.comValid() ? snap.comY() - snap.plotCenterY() : 0.0;
+        double comOffZ = snap.comValid() ? snap.comZ() - snap.plotCenterZ() : 0.0;
+        double plotCpX = comOffX + cpX;
+        double plotCpY = comOffY + cpY;
+        double plotCpZ = comOffZ + cpZ;
+        // Other body's contact point in ITS plot-local frame, for apply-time face lookup.
+        double otherPlotCpX = Double.NaN, otherPlotCpY = Double.NaN, otherPlotCpZ = Double.NaN;
+        if (otherSnap != null && !Double.isNaN(otherCpX)) {
+            double oComX = otherSnap.comValid() ? otherSnap.comX() - otherSnap.plotCenterX() : 0.0;
+            double oComY = otherSnap.comValid() ? otherSnap.comY() - otherSnap.plotCenterY() : 0.0;
+            double oComZ = otherSnap.comValid() ? otherSnap.comZ() - otherSnap.plotCenterZ() : 0.0;
+            otherPlotCpX = oComX + otherCpX;
+            otherPlotCpY = oComY + otherCpY;
+            otherPlotCpZ = oComZ + otherCpZ;
+        }
+        double gridDirX = Double.NaN, gridDirY = Double.NaN, gridDirZ = Double.NaN;
+        if (Double.isFinite(impactDirX) && Double.isFinite(impactDirY) && Double.isFinite(impactDirZ)) {
+            double[] gd = rotateVecInverse(snap, impactDirX, impactDirY, impactDirZ);
+            gridDirX = gd[0]; gridDirY = gd[1]; gridDirZ = gd[2];
+        }
+        if (io.github.omegau371.trueimpact.damage.ImpactRuntimeConfig.LOG_PHASE3A)
+            LOGGER.info("[TI3A-AA] enqueue: kImpact={} runtimeId={} plotCp=({},{},{}) dir=({},{},{})",
+                    String.format("%.2f", kImpact), runtimeId,
+                    String.format("%.3f", plotCpX), String.format("%.3f", plotCpY), String.format("%.3f", plotCpZ),
+                    String.format("%.3f", impactDirX), String.format("%.3f", impactDirY), String.format("%.3f", impactDirZ));
+        DeferredSublevelDamageQueue.enqueue(new DeferredSublevelDamageEvent(
+                serverTick, levelKey, runtimeId,
+                plotCpX, plotCpY, plotCpZ,
+                kImpact,
+                impactDirX, impactDirY, impactDirZ,
+                Double.NaN, Double.NaN, Double.NaN,
+                gridDirX, gridDirY, gridDirZ,
+                (snap.massKpg() > 0 && Double.isFinite(snap.massKpg())) ? snap.massKpg() : 0.0,
+                otherRuntimeId, otherPlotCpX, otherPlotCpY, otherPlotCpZ));
+    }
+
+    /**
+     * Enqueues a contraption damage check alongside an embedded sublevel contact.
+     * Gated on ENABLE_CREATE_INTERACTION; fast-path if Create is absent or gate is off.
+     * The application phase (TrueImpactMod) does the entity search and anchor destruction.
+     *
+     * snap.posX/Y/Z are the body's Minecraft world-space coordinates at the time of contact
+     * (BodySnapshot coordinate space: "WORLD [block]"). Stored in the event so the application
+     * phase can AABB-search for contraption entities at the correct real-world position
+     * (not at the embedded plot offset ~20M from origin).
+     */
+    private static void enqueueContraptionContact(double kImpact, String levelKey,
+                                                   double cpX, double cpY, double cpZ,
+                                                   int sublevelRuntimeId, BodySnapshot snap) {
+        if (!Double.isFinite(kImpact) || kImpact <= GLOBAL_DETECTION_THRESHOLD_J) return;
+        if (!io.github.omegau371.trueimpact.damage.ImpactRuntimeConfig.ENABLE_CREATE_INTERACTION) return;
+        if (io.github.omegau371.trueimpact.damage.ImpactRuntimeConfig.LOG_PHASE4A)
+            LOGGER.info("[TI4A-ENQ] kImpact={} runtimeId={}", String.format("%.2f", kImpact), sublevelRuntimeId);
+        double wx = (snap != null) ? snap.posX() : Double.NaN;
+        double wy = (snap != null) ? snap.posY() : Double.NaN;
+        double wz = (snap != null) ? snap.posZ() : Double.NaN;
+        DeferredContraptionDamageQueue.enqueue(new DeferredContraptionDamageEvent(
+                levelKey, cpX, cpY, cpZ, wx, wy, wz, kImpact, sublevelRuntimeId));
+    }
+
+    /**
+     * Path 1: enqueues world block contact positions derived from Rapier clearCollisions() data.
+     * Each distinct BlockPos in wcpMap gets kImpact / N energy.
+     * Gated on ENABLE_BLOCK_BREAKING so it's a no-op when block damage is disabled.
+     */
+    private static void enqueueWorldBlockContact(double kImpact, String levelKey,
+                                                  java.util.Map<Long, double[]> wcpMap) {
+        if (!Double.isFinite(kImpact) || kImpact <= GLOBAL_DETECTION_THRESHOLD_J) return;
+        if (wcpMap == null || wcpMap.isEmpty()) return;
+        if (!io.github.omegau371.trueimpact.damage.ImpactRuntimeConfig.ENABLE_BLOCK_BREAKING) return;
+        double kPerBlock = kImpact / wcpMap.size();
+        for (double[] wcp : wcpMap.values()) {
+            if (io.github.omegau371.trueimpact.damage.ImpactRuntimeConfig.LOG_PATH1)
+                LOGGER.info("[TI-P1-ENQ] kPerBlock={} worldCp=({},{},{})",
+                    String.format("%.2f", kPerBlock),
+                    String.format("%.3f", wcp[0]), String.format("%.3f", wcp[1]), String.format("%.3f", wcp[2]));
+            io.github.omegau371.trueimpact.damage.DeferredWorldContactQueue.enqueue(
+                new io.github.omegau371.trueimpact.damage.DeferredWorldContactEvent(
+                    levelKey, wcp[0], wcp[1], wcp[2], kPerBlock));
+        }
+    }
+
+    /**
+     * Drains TrueImpactBlockCallbackRegistry and enqueues one DeferredDamageEvent per
+     * distinct block that was contacted this substep.
+     *
+     * Total energy (totalEnergyJ) is divided equally across all contacted blocks.
+     * For a single-block hit: full energy to that block.
+     * For N blocks (e.g. 4 legs): totalEnergyJ/N per block -- physically correct since
+     * each contact absorbs its share of the total impulse.
+     *
+     * Fallback: if registry is empty (callback never fired, e.g. on 1.x Sable or bake not
+     * yet complete), falls back to SableVictimCapture single-block path for compatibility.
+     */
+    private static void enqueueFromRegistry(double totalEnergyJ, long serverTick, String levelKey,
+                                             double dirX, double dirY, double dirZ,
+                                             double normalX, double normalY, double normalZ,
+                                             double tangentialSpeedMs) {
+        java.util.List<TrueImpactBlockCallbackRegistry.BlockContact> contacts =
+                TrueImpactBlockCallbackRegistry.snapshotAndClear();
+
+        double worldMult = 1.0;
+        try { worldMult = io.github.omegau371.trueimpact.TrueImpactConfig.effectiveWorldBlockMultiplier(); } catch (Throwable ignored) {}
+
+        if (!contacts.isEmpty()) {
+            // Speed²-weighted energy attribution. The registry is GLOBAL — it holds every
+            // world block ANY physics body touched this tick, including the resting support
+            // blocks of bodies far from the actual impact. Equal division charged a digging
+            // body's per-tick ΔKE to a bystander's support blocks tens of blocks away, in
+            // lockstep, every tick ("entanglement" co-destruction, observed 2026-07-08:
+            // two block clusters 14+ blocks apart with identical kImpact/accumulated/hitCount).
+            // KE flux through a contact scales with v² — weight each block by its own
+            // recorded contact speed², and drop resting-support entries (< 1 m/s) entirely.
+            final double MIN_CONTACT_SPEED_MS = 1.0;
+            double sumSpeedSq = 0.0;
+            for (TrueImpactBlockCallbackRegistry.BlockContact c : contacts) {
+                double s = c.speed();
+                if (Double.isFinite(s) && s >= MIN_CONTACT_SPEED_MS) sumSpeedSq += s * s;
+            }
+            if (sumSpeedSq <= 0.0) return; // all contacts are static bearing — no impact
+            for (TrueImpactBlockCallbackRegistry.BlockContact c : contacts) {
+                double s = c.speed();
+                if (!Double.isFinite(s) || s < MIN_CONTACT_SPEED_MS) continue;
+                double energyPerBlock = totalEnergyJ * worldMult * (s * s / sumSpeedSq);
+                MaterialThresholdProfile.MaterialClass mc =
+                        MaterialThresholdProfile.classify(c.blockId());
+                DeferredDamageQueue.enqueue(new DeferredDamageEvent(
+                        serverTick, levelKey,
+                        c.blockId(), c.posX(), c.posY(), c.posZ(),
+                        mc,
+                        energyPerBlock,
+                        MaterialThresholdProfile.threshold(mc)
+                                * MaterialThresholdProfile.breakMultiplier(mc),
+                        VictimInfo.Source.CALLBACK_BLOCK_POS,
+                        VictimInfo.Confidence.APPROX,
+                        dirX, dirY, dirZ,
+                        normalX, normalY, normalZ,
+                        tangentialSpeedMs));
+            }
+            return;
+        }
+
+        // Fallback: registry empty (no onCollision fired this substep).
+        // Uses legacy SableVictimCapture single-block result.
+        VictimInfo fallback = SableVictimCapture.hasCaptureThisTick()
+                ? SableVictimCapture.buildWorldVictimInfo()
+                : VictimInfo.worldContactNoCallback();
+        if (fallback.kind() == VictimInfo.Kind.WORLD_BLOCK) {
+            DeferredDamageQueue.enqueue(new DeferredDamageEvent(
+                    serverTick, levelKey,
+                    fallback.blockId(),
+                    fallback.posX(), fallback.posY(), fallback.posZ(),
+                    fallback.materialClass(),
+                    totalEnergyJ * worldMult,
+                    MaterialThresholdProfile.threshold(fallback.materialClass())
+                            * MaterialThresholdProfile.breakMultiplier(fallback.materialClass()),
+                    fallback.source(),
+                    fallback.confidence(),
+                    dirX, dirY, dirZ,
+                    normalX, normalY, normalZ,
+                    tangentialSpeedMs));
+        }
+    }
+
     private static final class PairAccum {
         final int idA;
         final int idB;
@@ -727,6 +1437,18 @@ public final class SableImpactCapture {
         double massA;
         double massB;
         boolean massValid;
+
+        // Active-vs-active contact geometry (first-contact-wins).
+        // cpA/B: body-local contact point for acc.idA / acc.idB.
+        // impDirA: world-space direction B was moving (impact felt by A).
+        // impDirB: world-space direction A was moving (impact felt by B).
+        boolean contactGeomValid = false;
+        double cpAx = Double.NaN, cpAy = Double.NaN, cpAz = Double.NaN;
+        double cpBx = Double.NaN, cpBy = Double.NaN, cpBz = Double.NaN;
+        double impDirAx = Double.NaN, impDirAy = Double.NaN, impDirAz = Double.NaN;
+        double impDirBx = Double.NaN, impDirBy = Double.NaN, impDirBz = Double.NaN;
+        double vRelSq = 0.0; // |vA − vB|² pre-contact, for dissipated energy 0.5·μ·v_rel²
+        BodySnapshot snapARef = null, snapBRef = null;
 
         PairAccum(int idA, int idB) {
             this.idA = idA;

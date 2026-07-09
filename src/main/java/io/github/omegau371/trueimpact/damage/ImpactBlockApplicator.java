@@ -25,12 +25,23 @@ public final class ImpactBlockApplicator {
 
     private ImpactBlockApplicator() {}
 
-    // Phase 2A: SOFT_SOIL compaction targets.
-    // Key: victim block ID (what was hit). Value: what it becomes.
-    // Blocks not listed but classified as SOFT_SOIL get APPLIED_NO_OP.
+    // Phase 2A: surface-layer transformation targets.
+    // These blocks convert to a more basic form under impact (one-step only, no chain).
+    // All other SOFT_SOIL blocks (dirt, sand, gravel, etc.) return APPLIED_NO_OP and
+    // accumulate damage normally until CRITICAL, at which point they break.
     private static final Map<String, String> COMPACTION_TARGETS = Map.of(
-            "minecraft:grass_block", "minecraft:dirt"
+            "minecraft:grass_block",       "minecraft:dirt",
+            "minecraft:farmland",          "minecraft:dirt",
+            "minecraft:podzol",            "minecraft:dirt",
+            "minecraft:mycelium",          "minecraft:dirt",
+            "minecraft:suspicious_sand",   "minecraft:sand",
+            "minecraft:suspicious_gravel", "minecraft:gravel"
     );
+
+    /** Returns the transformation target for the given block ID, or null if none. */
+    public static String compactionTarget(String blockId) {
+        return COMPACTION_TARGETS.get(blockId);
+    }
 
     /**
      * Fast pre-check: validates all gates without world access.
@@ -47,7 +58,11 @@ public final class ImpactBlockApplicator {
         if (!Double.isFinite(event.kImpact())) {
             return ApplyOutcome.SKIP_INVALID_ENERGY;
         }
-        if (event.kImpact() <= event.threshold()) {
+        // Use the material's crack threshold (5J for SOFT_SOIL), NOT event.threshold().
+        // event.threshold() is the dynamic break threshold (~72J for dirt after
+        // BlockHardnessProfile override) and would gate out all reasonable impacts.
+        // Any impact above the crack threshold is significant enough to compact.
+        if (event.kImpact() <= MaterialThresholdProfile.threshold(event.materialClass())) {
             return ApplyOutcome.SKIP_BELOW_THRESHOLD;
         }
         if (event.materialClass() != MaterialThresholdProfile.MaterialClass.SOFT_SOIL) {

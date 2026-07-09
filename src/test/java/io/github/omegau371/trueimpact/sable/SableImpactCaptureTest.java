@@ -1,5 +1,6 @@
 package io.github.omegau371.trueimpact.sable;
 
+import io.github.omegau371.trueimpact.damage.DeferredDamageEvent;
 import io.github.omegau371.trueimpact.observation.BodySnapshot;
 import io.github.omegau371.trueimpact.observation.BodyType;
 import io.github.omegau371.trueimpact.observation.SnapshotPhase;
@@ -36,6 +37,7 @@ class SableImpactCaptureTest {
                 0.0, 0.0, 0.0,
                 0.0, 0.0, 0.0, 1.0,  // identity quaternion
                 0.0, 0.0, 0.0,
+                0, 0, 0,
                 false, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
     }
 
@@ -49,6 +51,7 @@ class SableImpactCaptureTest {
                 0.0, 0.0, 0.0,
                 0.0, 0.0, 0.0, 1.0,  // identity quaternion
                 0.0, 0.0, 0.0,
+                0, 0, 0,
                 true, vx, vy, vz, 0.0, 0.0, 0.0);
     }
 
@@ -1676,5 +1679,100 @@ class SableImpactCaptureTest {
         assertEquals(io.github.omegau371.trueimpact.damage.DamageResolver.DamageEvent.NONE,
                 io.github.omegau371.trueimpact.damage.DamageResolver.resolve(records.get(0)),
                 "DamageResolver must always return NONE in Phase 1C regardless of canonical energy");
+    }
+
+    // -- E: contact normal and tangential speed ----------------------------------------
+    // oneContact layout: normalA at indices 3-5 = (1,0,0), normalB at indices 6-8 = (-1,0,0).
+    // Block outward normal: when A=active use normalB; when A=world use normalA.
+    // kImpact = 0.5 * mass * |vbSq - vaSq|. Tests use mass=5, vb=10, va=2 → kImpact=240J > 40J.
+
+    @Test
+    void world_contact_captures_block_outward_normal_when_A_is_active() {
+        // A(10)=active, B(99)=world. Block outward normal = normalB = (-1,0,0).
+        SableVictimCapture.captureContactPointBlock("minecraft:dirt", 5, 63, 5);
+        Map<Integer, BodySnapshot> snaps = Map.of(10, snapWithVel(10, 5.0, 2.0, 0.0, 0.0));
+        Map<Integer, double[]> sv = Map.of(10, new double[]{10.0, 0.0, 0.0});
+
+        SableImpactCapture.process(oneContact(10, 99, 100.0), 980L, 2, snaps, sv);
+
+        List<DeferredDamageEvent> events =
+                io.github.omegau371.trueimpact.damage.DeferredDamageQueue.drainAll();
+        assertEquals(1, events.size());
+        DeferredDamageEvent e = events.get(0);
+
+        assertTrue(e.hasContactNormal(), "contact normal must be captured");
+        assertEquals(-1.0, e.contactNormalX(), 1e-9, "block outward normal X = normalB[0] = -1");
+        assertEquals(0.0,  e.contactNormalY(), 1e-9);
+        assertEquals(0.0,  e.contactNormalZ(), 1e-9);
+    }
+
+    @Test
+    void world_contact_captures_block_outward_normal_when_A_is_world() {
+        // A(99)=world, B(10)=active. Block outward normal = normalA = (1,0,0).
+        SableVictimCapture.captureContactPointBlock("minecraft:dirt", 5, 63, 5);
+        Map<Integer, BodySnapshot> snaps = Map.of(10, snapWithVel(10, 5.0, -2.0, 0.0, 0.0));
+        Map<Integer, double[]> sv = Map.of(10, new double[]{-10.0, 0.0, 0.0});
+
+        SableImpactCapture.process(oneContact(99, 10, 100.0), 981L, 2, snaps, sv);
+
+        List<DeferredDamageEvent> events =
+                io.github.omegau371.trueimpact.damage.DeferredDamageQueue.drainAll();
+        assertEquals(1, events.size());
+        DeferredDamageEvent e = events.get(0);
+
+        assertTrue(e.hasContactNormal(), "contact normal must be captured");
+        assertEquals(1.0, e.contactNormalX(), 1e-9, "block outward normal X = normalA[0] = +1");
+        assertEquals(0.0, e.contactNormalY(), 1e-9);
+        assertEquals(0.0, e.contactNormalZ(), 1e-9);
+    }
+
+    @Test
+    void tangential_speed_zero_for_head_on_collision() {
+        // vb=(10,0,0), normal=(-1,0,0). dot=-10, tangentialSq=100-100=0.
+        SableVictimCapture.captureContactPointBlock("minecraft:dirt", 5, 63, 5);
+        Map<Integer, BodySnapshot> snaps = Map.of(10, snapWithVel(10, 5.0, 2.0, 0.0, 0.0));
+        Map<Integer, double[]> sv = Map.of(10, new double[]{10.0, 0.0, 0.0});
+
+        SableImpactCapture.process(oneContact(10, 99, 100.0), 982L, 2, snaps, sv);
+
+        List<DeferredDamageEvent> events =
+                io.github.omegau371.trueimpact.damage.DeferredDamageQueue.drainAll();
+        assertEquals(1, events.size());
+        DeferredDamageEvent e = events.get(0);
+
+        assertTrue(e.hasTangentialSpeed(), "tangential speed must be captured when velocity is available");
+        assertEquals(0.0, e.tangentialSpeedMs(), 1e-9, "head-on impact: no sliding component");
+    }
+
+    @Test
+    void tangential_speed_equals_speed_for_grazing_collision() {
+        // vb=(0,10,0), normal=(-1,0,0). dot=0, tangentialSq=100 → tangentialSpeed=10.
+        SableVictimCapture.captureContactPointBlock("minecraft:dirt", 5, 63, 5);
+        Map<Integer, BodySnapshot> snaps = Map.of(10, snapWithVel(10, 5.0, 0.0, 2.0, 0.0));
+        Map<Integer, double[]> sv = Map.of(10, new double[]{0.0, 10.0, 0.0});
+
+        SableImpactCapture.process(oneContact(10, 99, 100.0), 983L, 2, snaps, sv);
+
+        List<DeferredDamageEvent> events =
+                io.github.omegau371.trueimpact.damage.DeferredDamageQueue.drainAll();
+        assertEquals(1, events.size());
+        DeferredDamageEvent e = events.get(0);
+
+        assertTrue(e.hasTangentialSpeed());
+        assertEquals(10.0, e.tangentialSpeedMs(), 1e-9,
+                "pure grazing impact: tangential speed equals full velocity magnitude");
+    }
+
+    @Test
+    void tangential_speed_nan_when_start_velocity_unavailable() {
+        // No startVels -> NaN kImpact -> not enqueued. Verify no spurious events.
+        SableVictimCapture.captureContactPointBlock("minecraft:dirt", 5, 63, 5);
+        Map<Integer, BodySnapshot> snaps = Map.of(10, snapWithVel(10, 5.0, 2.0, 0.0, 0.0));
+
+        SableImpactCapture.process(oneContact(10, 99, 100.0), 984L, 2, snaps, Map.of());
+
+        assertEquals(0L,
+                io.github.omegau371.trueimpact.damage.DeferredDamageQueue.stats().totalEnqueued(),
+                "no start vels -> NaN kImpact -> not enqueued; tangentialSpeed would also be NaN");
     }
 }

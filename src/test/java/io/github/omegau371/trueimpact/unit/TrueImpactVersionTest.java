@@ -25,9 +25,14 @@ class TrueImpactVersionTest {
                 || TrueImpactVersion.VERSION.contains("sable-study")
                 || TrueImpactVersion.VERSION.contains("phase1")
                 || TrueImpactVersion.VERSION.contains("phase2")
+                || TrueImpactVersion.VERSION.contains("phase3")
+                || TrueImpactVersion.VERSION.contains("config")
+                || TrueImpactVersion.VERSION.contains("mining")
+                || TrueImpactVersion.VERSION.contains("dynstruct")
                 || TrueImpactVersion.VERSION.contains("alpha")
-                || TrueImpactVersion.VERSION.contains("beta"),
-                "Version must contain a phase marker (foundation, sable-study, phase1x, phase2x, alpha, beta, ...)");
+                || TrueImpactVersion.VERSION.contains("beta")
+                || TrueImpactVersion.VERSION.contains("delta"),
+                "Version must contain a phase marker (foundation, sable-study, phase1x, phase2x, phase3x, config, alpha, beta, ...)");
     }
 
     @Test

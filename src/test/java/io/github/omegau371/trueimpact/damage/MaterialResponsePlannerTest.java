@@ -17,11 +17,16 @@ class MaterialResponsePlannerTest {
         MaterialResponsePlanner.clear();
         ImpactRuntimeConfig.ENABLE_DEBRIS_DROPS = true;
         BlockDamageAccumulator.clear();
+        // Snapshots at exact ratios are built via accumulation; disable floor/relaxation.
+        ImpactRuntimeConfig.SUBLEVEL_ELASTIC_FLOOR = 0.0;
+        ImpactRuntimeConfig.SUBLEVEL_DAMAGE_HALF_LIFE_TICKS = 0;
     }
 
     @AfterEach
     void restoreDefaults() {
         ImpactRuntimeConfig.ENABLE_DEBRIS_DROPS = false; // production default since Phase 2E hotfix
+        ImpactRuntimeConfig.SUBLEVEL_ELASTIC_FLOOR = 0.2;
+        ImpactRuntimeConfig.SUBLEVEL_DAMAGE_HALF_LIFE_TICKS = 60;
     }
 
     // -- helper: build a snapshot at a specific ratio via accumulation ------------
@@ -45,6 +50,7 @@ class MaterialResponsePlannerTest {
     private static String blockIdFor(MaterialThresholdProfile.MaterialClass mc) {
         return switch (mc) {
             case SOFT_SOIL     -> "minecraft:grass_block";
+            case BRITTLE       -> "minecraft:glass";
             case WOOD          -> "minecraft:oak_planks";
             case STONE         -> "minecraft:stone";
             case METAL         -> "minecraft:iron_block";
@@ -101,7 +107,8 @@ class MaterialResponsePlannerTest {
         MaterialResponsePlan plan = MaterialResponsePlanner.plan(snap);
         assertEquals(MaterialResponseType.COMPACT_SOFT_SOIL, plan.responseType());
         assertFalse(plan.shouldDropDebris(), "SOFT_SOIL compaction does not drop debris");
-        assertFalse(plan.futureBreakEligible());
+        assertTrue(plan.futureBreakEligible(),
+                "SOFT_SOIL at CRITICAL: futureBreakEligible=true allows breaking when chain exhausted");
     }
 
     // -- CRITICAL + STONE/GENERIC -------------------------------------------------

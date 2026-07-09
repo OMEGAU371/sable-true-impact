@@ -6,15 +6,17 @@ import java.util.Map;
 /**
  * Per-block cumulative damage accumulator for deferred impact events.
  *
- * Phase 2C: accumulates bounded effective damage (EffectiveDamageModel) rather than raw
- * kImpact. Each entry is keyed on (levelKey, posX, posY, posZ, victimBlock) so damage
+ * Unified formula (matches SublevelDamageAccumulator for Phase 3A):
+ *   effectiveJ = min(rawKImpact, breakThreshold)
+ *
+ * breakThreshold comes from DeferredDamageEvent.threshold(), which is computed by
+ * BlockHardnessProfile.breakThresholdJ(hardness, blastResist) × (1 + confinement)
+ * in TrueImpactMod.onServerTickPost. A single hit at or above the threshold
+ * immediately saturates (ratio ≥ 1.0 → CRITICAL); sub-threshold hits accumulate.
+ *
+ * Each entry is keyed on (levelKey, posX, posY, posZ, victimBlock) so damage
  * from different block types at the same position stays in separate entries.
- *
- * Effective damage = min(rawKImpact, threshold * capMultiplier).
  * Raw kImpact is preserved per-hit for diagnostic display.
- * DamageState classifies the ratio (accumulatedEffective / threshold) for status coloring.
- *
- * Phase 2C scope: accumulation + diagnostics only. No block mutation for STONE/WOOD/etc.
  *
  * Threading: all operations called on the server thread. No synchronization needed.
  * No Minecraft imports -- safe to unit-test without the game runtime.
@@ -75,6 +77,15 @@ public final class BlockDamageAccumulator {
             damageState = DamageState.of(accumulatedEffectiveDamageJ / thresholdJ);
         }
 
+        /** Exponential stress relaxation between hits (same model as SublevelDamageAccumulator). */
+        void decayTo(long nowTick, int halfLifeTicks) {
+            if (halfLifeTicks <= 0) return;
+            long dt = nowTick - lastUpdatedTick;
+            if (dt <= 0) return;
+            accumulatedEffectiveDamageJ *= Math.pow(0.5, (double) dt / halfLifeTicks);
+            damageState = DamageState.of(accumulatedEffectiveDamageJ / thresholdJ);
+        }
+
         Snapshot toSnapshot(AccKey key) {
             return new Snapshot(key, materialClass, accumulatedEffectiveDamageJ, thresholdJ,
                     lastRawImpactJ, lastEffectiveDamageJ, lastUpdatedTick, hitCount, damageState);
@@ -85,27 +96,35 @@ public final class BlockDamageAccumulator {
     private static Snapshot lastUpdatedSnapshot;
 
     /**
-     * Accumulates bounded effective damage from a drained DeferredDamageEvent.
+     * Accumulates effective damage from a drained DeferredDamageEvent.
      *
-     * Calls EffectiveDamageModel.compute() to cap raw kImpact per material class.
+     * effectiveJ = min(rawKImpact, event.threshold()) — unified with SublevelDamageAccumulator.
+     * event.threshold() is the vanilla-data-driven break threshold including ConfinementFactor
+     * scaling, computed by TrueImpactMod.onServerTickPost before this call.
+     *
      * Creates a new entry if none exists for this (levelKey, pos, victimBlock) triplet;
      * otherwise adds effectiveDamageJ to the running total.
-     *
-     * Called from TrueImpactMod.onServerTickPost() before ImpactBlockApplicator.tryApply().
-     * DiagnosticConfig state does not affect whether accumulation occurs.
      */
     public static void accumulate(DeferredDamageEvent event) {
-        EffectiveDamageModel.Result eff = EffectiveDamageModel.compute(
-                event.kImpact(), event.materialClass(), event.threshold());
+        double rawImpact  = event.kImpact();
+        double effectiveJ = Math.min(rawImpact, event.threshold());
+        // Elastic floor (fatigue limit), same model as the sublevel side: a single hit
+        // below floor × threshold is purely elastic — no accumulation, no entry. Without
+        // it, unbounded accumulation let arbitrarily small repeated contacts grind world
+        // blocks to CRITICAL (observed: 2.74 J hits on a 130 J sand threshold, 12 hits
+        // marching every resting-contact block toward destruction in lockstep).
+        if (effectiveJ < ImpactRuntimeConfig.SUBLEVEL_ELASTIC_FLOOR * event.threshold()) return;
         AccKey key = new AccKey(event.levelKey(),
                 event.posX(), event.posY(), event.posZ(), event.victimBlock());
         Entry entry = entries.get(key);
         if (entry == null) {
             entry = new Entry(event.materialClass(), event.threshold(),
-                    eff.rawImpactJ(), eff.effectiveDamageJ(), event.serverTick());
+                    rawImpact, effectiveJ, event.serverTick());
             entries.put(key, entry);
         } else {
-            entry.addImpact(eff.rawImpactJ(), eff.effectiveDamageJ(), event.serverTick());
+            // Stress relaxation: accumulated damage halves every N ticks between hits.
+            entry.decayTo(event.serverTick(), ImpactRuntimeConfig.SUBLEVEL_DAMAGE_HALF_LIFE_TICKS);
+            entry.addImpact(rawImpact, effectiveJ, event.serverTick());
         }
         lastUpdatedSnapshot = entry.toSnapshot(key);
     }
@@ -125,6 +144,19 @@ public final class BlockDamageAccumulator {
 
     /** Returns the number of distinct (levelKey, pos, victimBlock) entries tracked. */
     public static int entryCount() { return entries.size(); }
+
+    /**
+     * Removes the entry for a single (levelKey, pos, victimBlock) key.
+     * Called by TrueImpactMod after a block is destroyed by the damage pipeline,
+     * so stale damage state for that position does not persist.
+     * Clears lastUpdatedSnapshot if it references the removed key.
+     */
+    public static void removeEntry(AccKey key) {
+        entries.remove(key);
+        if (lastUpdatedSnapshot != null && lastUpdatedSnapshot.key().equals(key)) {
+            lastUpdatedSnapshot = null;
+        }
+    }
 
     /**
      * Clears all accumulated damage state.

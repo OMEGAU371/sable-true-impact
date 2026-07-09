@@ -16,33 +16,31 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Map;
 
 /**
  * Intercepts Rapier3D.clearCollisions() to feed the damage pipeline and diagnostic logs.
  *
- * Dual-path injection for Sable 1.x / 2.0.x compatibility:
+ * Dual-path injection for Sable 1.x / 2.0.x compatibility.
+ * Both paths redirect the clearCollisions() call inside processCollisionEffects();
+ * only the method signature differs between versions.
  *
  *   SABLE 1.x PATH (@Redirect, require=0):
- *     clearCollisions(int sceneId) is called from inside processCollisionEffects().
- *     @Redirect intercepts the call; sceneId passed to Rapier3D.clearCollisions via
- *     reflection (avoids compile error on 2.0.x where the method is package-private).
- *     Returns the real data so Sable can continue processing.
+ *     clearCollisions(int sceneId) -- static, takes scene integer ID.
+ *     Target: Rapier3D.clearCollisions(I)[D
  *
- *   SABLE 2.0.x PATH (@Inject at HEAD, require=0):
- *     clearCollisions() is a separate method that caches its result in recentCollisions
- *     before processCollisionEffects() runs.  Inject at HEAD reads the cached field
- *     via reflection (avoids @Shadow crash when field is in a parent class).
+ *   SABLE 2.0.x PATH (@Redirect, require=0):
+ *     clearCollisions(long sceneHandle) -- static, takes native scene handle (long).
+ *     Target: Rapier3D.clearCollisions(J)[D
+ *     NOTE: recentCollisions in 2.0.x is Long2LongOpenHashMap (NOT double[]).
+ *     The actual double[] collision data is still obtained from clearCollisions().
  *
- * Both paths call TI$doProcess(data); a tick-scoped guard prevents double execution.
- * On each Sable version, exactly one path fires; the other degrades silently (require=0
- * + null check in TI$doProcess).
+ * Both paths call TI$doProcess(data) and return the data to Sable unchanged.
+ * A tick-scoped guard prevents double execution (defensive only; at runtime exactly
+ * one path fires because each version has only one of the two INVOKE instructions).
  *
  * PATH A (damage pipeline): runs unconditionally, no diagnostic gate.
  * PATH B (ContactLogger):   gated on LOG_RAW_CONTACTS.
@@ -53,40 +51,19 @@ public abstract class DiagnosticContactCaptureMixin {
 
     @Shadow @Final private ServerLevel level;
 
-    // ── Tick-scoped dedup: prevents double-processing if both injectors somehow fire ──
-    @Unique private long TI$lastProcessedTick = -1L;
+    // Note: tick-scoped dedup was removed. processCollisionEffects fires once per substep;
+    // with multiple substeps per tick, contacts in substep K>0 would have been silently dropped
+    // when substep-0 already set TI$lastProcessedTick (e.g. Sable's own testgravity bodies).
+    // DeferredSublevelDamageQueue has its own per-(tick,sublevel,block) dedup, so processing
+    // the same sublevel's contact in multiple substeps is safe — first enqueue wins.
 
-    // ── Sable 2.0.x: recentCollisions field (may be in a parent class) ────────────
-    @Unique private static volatile Field   TI$recentCollisionsField;
-    @Unique private static volatile boolean TI$fieldSearchDone;
-
-    @Unique
-    private double[] TI$getRecentCollisions() {
-        if (!TI$fieldSearchDone) {
-            Field found = null;
-            try {
-                for (Class<?> c = getClass(); c != null && c != Object.class; c = c.getSuperclass()) {
-                    try {
-                        Field f = c.getDeclaredField("recentCollisions");
-                        if (f.getType() == double[].class) { f.setAccessible(true); found = f; break; }
-                    } catch (NoSuchFieldException ignored) {}
-                }
-            } catch (Throwable ignored) {}
-            TI$recentCollisionsField = found;
-            TI$fieldSearchDone = true;
-        }
-        Field f = TI$recentCollisionsField;
-        if (f == null) return null;
-        try { return (double[]) f.get(this); } catch (Throwable ignored) { return null; }
-    }
-
-    // ── Sable 1.x: Rapier3D.clearCollisions(int) static method ───────────────────
-    @Unique private static volatile Method  TI$legacyClearCollisionsMethod;
-    @Unique private static volatile boolean TI$legacyMethodSearchDone;
+    // ── Sable 1.x: Rapier3D.clearCollisions(int sceneId) static method ────────────
+    @Unique private static volatile Method  TI$clearCollisions1xMethod;
+    @Unique private static volatile boolean TI$clearCollisions1xSearchDone;
 
     @Unique
-    private double[] TI$callClearCollisionsLegacy(int sceneId) {
-        if (!TI$legacyMethodSearchDone) {
+    private double[] TI$callClearCollisions1x(int sceneId) {
+        if (!TI$clearCollisions1xSearchDone) {
             Method found = null;
             try {
                 Class<?> cls = Class.forName(
@@ -94,18 +71,39 @@ public abstract class DiagnosticContactCaptureMixin {
                 found = cls.getDeclaredMethod("clearCollisions", int.class);
                 found.setAccessible(true);
             } catch (Throwable ignored) {}
-            TI$legacyClearCollisionsMethod = found;
-            TI$legacyMethodSearchDone      = true;
+            TI$clearCollisions1xMethod  = found;
+            TI$clearCollisions1xSearchDone = true;
         }
-        Method m = TI$legacyClearCollisionsMethod;
+        Method m = TI$clearCollisions1xMethod;
         if (m == null) return null;
         try { return (double[]) m.invoke(null, sceneId); } catch (Throwable ignored) { return null; }
     }
 
+    // ── Sable 2.0.x: Rapier3D.clearCollisions(long sceneHandle) static method ─────
+    @Unique private static volatile Method  TI$clearCollisions2xMethod;
+    @Unique private static volatile boolean TI$clearCollisions2xSearchDone;
+
+    @Unique
+    private double[] TI$callClearCollisions2x(long sceneHandle) {
+        if (!TI$clearCollisions2xSearchDone) {
+            Method found = null;
+            try {
+                Class<?> cls = Class.forName(
+                        "dev.ryanhcode.sable.physics.impl.rapier.Rapier3D");
+                found = cls.getDeclaredMethod("clearCollisions", long.class);
+                found.setAccessible(true);
+            } catch (Throwable ignored) {}
+            TI$clearCollisions2xMethod  = found;
+            TI$clearCollisions2xSearchDone = true;
+        }
+        Method m = TI$clearCollisions2xMethod;
+        if (m == null) return null;
+        try { return (double[]) m.invoke(null, sceneHandle); } catch (Throwable ignored) { return null; }
+    }
+
     // ── SABLE 1.x INJECTION ────────────────────────────────────────────────────────
-    // Intercepts the clearCollisions(int) call inside processCollisionEffects.
-    // require=0: silently skips on Sable 2.0.x (call no longer present there).
-    // Returns the real data array so Sable can continue processing unmodified.
+    // Intercepts clearCollisions(int sceneId) inside processCollisionEffects.
+    // require=0: silently skips on Sable 2.0.x (signature changed to (J)[D there).
     @Redirect(
             method = "processCollisionEffects",
             at = @At(value = "INVOKE",
@@ -114,33 +112,36 @@ public abstract class DiagnosticContactCaptureMixin {
             require = 0,
             remap = false
     )
-    private double[] captureViaRedirect(int sceneId) {
-        double[] data = TI$callClearCollisionsLegacy(sceneId);
+    private double[] captureVia1x(int sceneId) {
+        double[] data = TI$callClearCollisions1x(sceneId);
         TI$doProcess(data);
         return (data != null) ? data : new double[0];
     }
 
     // ── SABLE 2.0.x INJECTION ──────────────────────────────────────────────────────
-    // Reads the recentCollisions field populated by the preceding clearCollisions() call.
-    // require=0: silently skips on Sable 1.x (no recentCollisions field → returns null
-    // → TI$doProcess no-ops).
-    @Inject(
+    // Intercepts clearCollisions(long sceneHandle) inside processCollisionEffects.
+    // require=0: silently skips on Sable 1.x (signature there is (I)[D).
+    // NOTE: recentCollisions in 2.0.x is Long2LongOpenHashMap, NOT the double[] data.
+    //       The actual collision data still comes from clearCollisions() as double[N*15].
+    @Redirect(
             method = "processCollisionEffects",
-            at = @At("HEAD"),
+            at = @At(value = "INVOKE",
+                     target = "Ldev/ryanhcode/sable/physics/impl/rapier/Rapier3D;clearCollisions(J)[D",
+                     remap = false),
             require = 0,
             remap = false
     )
-    private void captureViaInject(CallbackInfo ci) {
-        double[] data = TI$getRecentCollisions();
+    private double[] captureVia2x(long sceneHandle) {
+        double[] data = TI$callClearCollisions2x(sceneHandle);
         TI$doProcess(data);
+        return (data != null) ? data : new double[0];
     }
 
-    // ── shared processing (called by both paths) ───────────────────────────────────
+    // ── shared processing (called by both redirect paths) ──────────────────────────
     @Unique
     private void TI$doProcess(double[] data) {
+        if (data == null || data.length == 0) return;
         long tick = level.getGameTime();
-        if (tick == TI$lastProcessedTick) return; // already processed this tick
-        TI$lastProcessedTick = tick;
 
         SubLevelPhysicsSystem system = SubLevelPhysicsSystem.get(level);
         int substepCount = (system != null) ? system.getConfig().substepsPerTick : -1;

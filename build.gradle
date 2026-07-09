@@ -54,7 +54,20 @@ neoForge {
         server {
             server()
             programArgument '--nogui'
-            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+            systemProperty 'neoforge.enabledGameTestNamespaces', "${project.mod_id},sable"
+        }
+        gameTestServer {
+            type = "gameTestServer"
+            programArgument '--nogui'
+            // true_impact: our @GameTestHolder namespace (enables registration filter).
+            // sable: REQUIRED — NeoForge filters tests by BOTH test namespace AND templateNamespace.
+            //        Our @GameTest(templateNamespace="sable") tests are filtered out if "sable"
+            //        is absent, resulting in "No test functions were given!" crash.
+            //        NOTE: with Create in run/mods, Sable's assemblytest.testallblocks (Create compat)
+            //        also runs (optional) and registers many Create block sublevels in the shared
+            //        Rapier world, which can intermittently interfere with our -120 m/s tests via
+            //        broad-phase contamination. Without Create, all 8 TI tests pass consistently.
+            systemProperty 'neoforge.enabledGameTestNamespaces', "${project.mod_id},sable"
         }
         configureEach {
             systemProperty 'forge.logging.markers', 'REGISTRIES'
@@ -230,7 +243,7 @@ tasks.register('copySableToRunMods') {
     description = 'Copy Sable NeoForge JAR to run/mods/ for with-Sable runServer verification. run/ is git-ignored.'
     notCompatibleWithConfigurationCache('Accesses file system at execution time for dev-only helper')
     doLast {
-        def sableJar = file('D:\\.minecraft\\versions\\1.21.1-NeoForge_21.1.228\\mods\\sable-neoforge-1.21.1-2.0.1.jar')
+        def sableJar = file('libs/sable-neoforge-1.21.1-2.0.1.jar')
         if (!sableJar.exists()) {
             throw new GradleException(
                 "Sable JAR not found at expected path: ${sableJar}\n" +

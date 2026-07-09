@@ -485,6 +485,8 @@ public final class DiagnosticCommand {
                 + " debris=" + ps.totalDebrisDropped()
                 + " debrisKeys=" + ps.debrisDroppedKeyCount()
                 + " fbe=" + ps.totalFutureBreakEligible()
+                + " broken=" + ps.totalBlocksBroken()
+                + " brokenKeys=" + ps.breakScheduledKeyCount()
                 + " last=" + ps.lastResponseType())
                 .withStyle(plannerColor), false);
 

@@ -7,6 +7,7 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import io.github.omegau371.trueimpact.damage.BlockDamageAccumulator;
 import io.github.omegau371.trueimpact.damage.CrackOverlayTracker;
 import io.github.omegau371.trueimpact.damage.DamageState;
+import io.github.omegau371.trueimpact.damage.ImpactRuntimeConfig;
 import io.github.omegau371.trueimpact.damage.MaterialResponsePlan;
 import io.github.omegau371.trueimpact.damage.MaterialResponsePlanner;
 import net.minecraft.ChatFormatting;
@@ -61,7 +62,12 @@ public final class DamageCommand {
                                         .then(Commands.literal("here")
                                                 .executes(DamageCommand::inspectHere)))
                                 .then(Commands.literal("clear")
-                                        .executes(DamageCommand::clear)))
+                                        .executes(DamageCommand::clear))
+                                .then(Commands.literal("breaking")
+                                        .then(Commands.literal("on")
+                                                .executes(DamageCommand::breakingOn))
+                                        .then(Commands.literal("off")
+                                                .executes(DamageCommand::breakingOff))))
         );
     }
 
@@ -141,6 +147,24 @@ public final class DamageCommand {
                 () -> Component.literal("[TI damage] accumulator cleared ("
                         + count + " entries, " + cracksCleared + " crack overlays)")
                         .withStyle(ChatFormatting.AQUA), false);
+        return 1;
+    }
+
+    // -- breaking on/off ----------------------------------------------------------
+
+    private static int breakingOn(CommandContext<CommandSourceStack> ctx) {
+        ImpactRuntimeConfig.ENABLE_BLOCK_BREAKING = true;
+        ctx.getSource().sendSuccess(
+                () -> Component.literal("[TI damage] block breaking ENABLED")
+                        .withStyle(ChatFormatting.GREEN), false);
+        return 1;
+    }
+
+    private static int breakingOff(CommandContext<CommandSourceStack> ctx) {
+        ImpactRuntimeConfig.ENABLE_BLOCK_BREAKING = false;
+        ctx.getSource().sendSuccess(
+                () -> Component.literal("[TI damage] block breaking DISABLED")
+                        .withStyle(ChatFormatting.GRAY), false);
         return 1;
     }
 

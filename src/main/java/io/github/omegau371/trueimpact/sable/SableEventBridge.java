@@ -3,6 +3,8 @@ package io.github.omegau371.trueimpact.sable;
 import dev.ryanhcode.sable.api.physics.handle.RigidBodyHandle;
 import dev.ryanhcode.sable.api.sublevel.ServerSubLevelContainer;
 import dev.ryanhcode.sable.api.sublevel.SubLevelContainer;
+import dev.ryanhcode.sable.neoforge.event.ForgeSablePostPhysicsTickEvent;
+import dev.ryanhcode.sable.neoforge.event.ForgeSablePrePhysicsTickEvent;
 import dev.ryanhcode.sable.sublevel.ServerSubLevel;
 import dev.ryanhcode.sable.sublevel.system.SubLevelPhysicsSystem;
 import io.github.omegau371.trueimpact.damage.DeferredDamageQueue;
@@ -90,6 +92,18 @@ public final class SableEventBridge {
         lastT4DiagLogTick = -1L;
     }
 
+    // ── NeoForge event handlers (Sable 2.0.x) ────────────────────────────────────
+    // Replaces DiagnosticPhysicsStepMixin. Registered only when Sable is loaded.
+    // Fires once per substep on the server thread (same semantics as the old mixin).
+
+    public static void onForgePrePhysics(ForgeSablePrePhysicsTickEvent event) {
+        onPreStep(event.getPhysicsSystem());
+    }
+
+    public static void onForgePostPhysics(ForgeSablePostPhysicsTickEvent event) {
+        onPostStep(event.getPhysicsSystem());
+    }
+
     /** Called from TrueImpactMod.onServerTick to capture server thread identity for T-1. */
     public static void captureServerThread() {
         if (capturedServerThread == null) {
@@ -112,10 +126,12 @@ public final class SableEventBridge {
     public static void onPreStep(SubLevelPhysicsSystem system) {
         int substep = SableBodyReader.substepIndex(system);
 
-        // Always clear victim capture at tick start (substep 0) so stale block data
-        // from the previous tick does not carry forward. Independent of diagnostic flags.
+        // Always clear victim capture and block callback registry at tick start (substep 0).
+        // TrueImpactBlockCallbackRegistry: cleared here so each tick starts fresh;
+        // onCollision callbacks fired during Rapier3D.step() fill it before clearCollisions().
         if (substep == 0) {
             SableVictimCapture.clearForTick();
+            TrueImpactBlockCallbackRegistry.clear();
         }
 
         boolean needSnapshots = DiagnosticConfig.ENABLED && DiagnosticConfig.LOG_BODY_SNAPSHOTS;
@@ -230,6 +246,23 @@ public final class SableEventBridge {
                 logSnap(snap);
                 if (DiagnosticConfig.LOG_T7_VELOCITY_RATIO) {
                     logT7(rid, snap, dt, tick, substep, substepCount);
+                }
+            }
+        }
+
+        // Phase 3A: velocity-delta scan for persistent contacts (resting body given impulse).
+        // clearCollisions() only fires for NEW contact establishment; bodies already resting
+        // on terrain won't re-appear there when an external impulse wakes them.
+        // Runs at the final substep only, after lastPostSnaps is fully populated.
+        if (substepCount > 0 && substep == substepCount - 1) {
+            for (ServerSubLevel sl : subLevels) {
+                if (sl.isRemoved()) continue;
+                int rid = sl.getRuntimeId();
+                if (rid < 0) continue;
+                BodySnapshot snap = lastPostSnaps.get(rid);
+                double[] vb = tickStartVelById.get(rid);
+                if (snap != null && vb != null) {
+                    SableImpactCapture.tryEnqueueVelocityDelta(rid, snap, vb, tick, levelKey);
                 }
             }
         }

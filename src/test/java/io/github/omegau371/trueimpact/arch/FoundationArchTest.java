@@ -119,4 +119,19 @@ public class FoundationArchTest {
             noClasses().that().haveSimpleName("SableImpactCapture")
                     .should().dependOnClassesThat()
                     .haveSimpleName("DiagnosticConfig");
+
+    // R14: stress/ must not read diagnostic or observation state.
+    // Stress propagation is production physics logic, not diagnostic tooling.
+    @ArchTest
+    static final ArchRule stress_must_not_depend_on_diagnostic_or_observation =
+            noClasses().that().resideInAPackage("..stress..")
+                    .should().dependOnClassesThat()
+                    .resideInAnyPackage("..diagnostic..", "..observation..");
+
+    // R15: stress/ must not use client-only classes.
+    @ArchTest
+    static final ArchRule stress_must_not_use_client_classes =
+            noClasses().that().resideInAPackage("..stress..")
+                    .should().dependOnClassesThat()
+                    .resideInAPackage("net.minecraft.client..");
 }

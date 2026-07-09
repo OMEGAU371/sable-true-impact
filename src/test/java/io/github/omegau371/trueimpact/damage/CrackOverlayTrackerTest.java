@@ -306,6 +306,41 @@ class CrackOverlayTrackerTest {
         assertTrue(CrackOverlayTracker.fakeBreakerIdFor(k2) < 0);
     }
 
+    // -- removeEntry sentinel ------------------------------------------------------
+
+    @Test
+    void removeEntry_missing_key_returns_MIN_VALUE_not_minus_one() {
+        // fakeBreakerId range is [FAKE_BREAKER_BASE, -1]; -1 is a valid real ID,
+        // so the "not found" sentinel must be Integer.MIN_VALUE (outside that range).
+        BlockDamageAccumulator.AccKey key = new BlockDamageAccumulator.AccKey(
+                "minecraft:overworld", 10, 64, 10, "minecraft:stone");
+        int result = CrackOverlayTracker.removeEntry(key);
+        assertEquals(Integer.MIN_VALUE, result,
+                "removeEntry must return Integer.MIN_VALUE for non-existent key, not -1");
+    }
+
+    @Test
+    void removeEntry_existing_key_returns_fakeBreakerId() {
+        BlockDamageAccumulator.AccKey key = new BlockDamageAccumulator.AccKey(
+                "minecraft:overworld", 10, 64, 10, "minecraft:stone");
+        CrackOverlayTracker.tryUpdate(key, DamageState.CRITICAL, 1.5, 1L);
+        int expected = CrackOverlayTracker.fakeBreakerIdFor(key);
+        int result = CrackOverlayTracker.removeEntry(key);
+        assertEquals(expected, result, "removeEntry must return the stored fakeBreakerId");
+        assertEquals(0, CrackOverlayTracker.activeCrackOverlays(), "entry removed after removeEntry");
+    }
+
+    @Test
+    void fakeBreakerIdFor_range_never_reaches_Integer_MIN_VALUE() {
+        // Sentinel is Integer.MIN_VALUE; valid IDs must not reach it.
+        // FAKE_BREAKER_BASE = Integer.MIN_VALUE/2 = -1073741824, max offset = 0x3FFFFFFF = 1073741823
+        // Range: [-1073741824, -1]. Integer.MIN_VALUE = -2147483648 is outside this range.
+        BlockDamageAccumulator.AccKey k = new BlockDamageAccumulator.AccKey(
+                "minecraft:overworld", 10, 64, 10, "minecraft:stone");
+        assertNotEquals(Integer.MIN_VALUE, CrackOverlayTracker.fakeBreakerIdFor(k),
+                "fakeBreakerId must never equal Integer.MIN_VALUE (sentinel)");
+    }
+
     // -- counter accuracy ---------------------------------------------------------
 
     @Test

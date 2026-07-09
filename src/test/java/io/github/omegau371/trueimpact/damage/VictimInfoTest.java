@@ -44,8 +44,8 @@ class VictimInfoTest {
     }
 
     @Test
-    void unknown_has_GENERIC_threshold_50() {
-        assertEquals(50.0, VictimInfo.unknown().materialThresholdJ(), 0.001);
+    void unknown_has_GENERIC_threshold_40() {
+        assertEquals(40.0, VictimInfo.unknown().materialThresholdJ(), 0.001);
     }
 
     // -- activeSublevel() ----------------------------------------------------------
@@ -72,7 +72,7 @@ class VictimInfoTest {
 
     @Test
     void activeSublevel_uses_GENERIC_threshold() {
-        assertEquals(50.0, VictimInfo.activeSublevel().materialThresholdJ(), 0.001);
+        assertEquals(40.0, VictimInfo.activeSublevel().materialThresholdJ(), 0.001);
     }
 
     // -- worldBlock: dirt -> SOFT_SOIL threshold 5 ---------------------------------
@@ -148,10 +148,10 @@ class VictimInfoTest {
     // -- worldBlock: unknown block -> GENERIC threshold 50 -------------------------
 
     @Test
-    void worldBlock_unknown_id_falls_back_to_GENERIC_threshold_50() {
-        VictimInfo vi = worldBlockAt("minecraft:glass");
+    void worldBlock_unknown_id_falls_back_to_GENERIC_threshold_40() {
+        VictimInfo vi = worldBlockAt("minecraft:sponge"); // sponge -> GENERIC
         assertEquals(MaterialThresholdProfile.MaterialClass.GENERIC, vi.materialClass());
-        assertEquals(50.0, vi.materialThresholdJ(), 0.001);
+        assertEquals(40.0, vi.materialThresholdJ(), 0.001);
     }
 
     // -- worldBlockNoPos -----------------------------------------------------------
@@ -209,7 +209,7 @@ class VictimInfoTest {
 
     @Test
     void worldContactNoCallback_has_GENERIC_threshold() {
-        assertEquals(50.0, VictimInfo.worldContactNoCallback().materialThresholdJ(), 0.001);
+        assertEquals(40.0, VictimInfo.worldContactNoCallback().materialThresholdJ(), 0.001);
     }
 
     @Test

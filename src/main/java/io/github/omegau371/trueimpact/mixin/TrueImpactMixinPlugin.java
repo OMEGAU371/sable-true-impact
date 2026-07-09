@@ -21,8 +21,7 @@ public final class TrueImpactMixinPlugin implements IMixinConfigPlugin {
     /** Mixins that must only be applied when Sable is loaded and compatible. */
     private static final Set<String> SABLE_MIXINS = Set.of(
             "io.github.omegau371.trueimpact.mixin.DiagnosticCallbackWrapperMixin",
-            "io.github.omegau371.trueimpact.mixin.DiagnosticContactCaptureMixin",
-            "io.github.omegau371.trueimpact.mixin.DiagnosticPhysicsStepMixin"
+            "io.github.omegau371.trueimpact.mixin.DiagnosticContactCaptureMixin"
     );
 
     @Override
@@ -39,12 +38,9 @@ public final class TrueImpactMixinPlugin implements IMixinConfigPlugin {
             var sableFile = net.neoforged.fml.loading.FMLLoader
                     .getLoadingModList()
                     .getModFileById(MOD_ID_SABLE);
-            if (sableFile == null) return false;
-            // Version compatibility check: require 1.2.x
-            String version = sableFile.versionString();
-            if (version == null) return false;
-            // Accept 1.2.x; reject anything else rather than crashing
-            return version.startsWith("1.2.");
+            // Accept any Sable version; per-version API differences are handled by
+            // require=0 on all injectors in the mixin classes.
+            return sableFile != null;
         } catch (Throwable t) {
             // Any problem → safely skip Sable mixins
             return false;
