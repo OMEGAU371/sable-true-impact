@@ -499,7 +499,7 @@ public final class DiagnosticCommand {
                 + " updates=" + CrackOverlayTracker.totalCrackOverlayUpdates()
                 + " active=" + CrackOverlayTracker.activeCrackOverlays()
                 + " lastProgress=" + CrackOverlayTracker.lastCrackProgress()
-                + " overlay=" + ImpactRuntimeConfig.ENABLE_VANILLA_CRACK_OVERLAY)
+                + " accumulation=" + ImpactRuntimeConfig.ENABLE_DAMAGE_ACCUMULATION)
                 .withStyle(crackColor), false);
 
         return 1;

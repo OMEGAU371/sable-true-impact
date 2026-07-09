@@ -125,6 +125,10 @@ public final class SublevelDamageAccumulator {
     /**
      * Tick-aware accumulate with elastic floor and stress relaxation (the production path).
      *
+     * When {@code ImpactRuntimeConfig.ENABLE_DAMAGE_ACCUMULATION} is false: single-hit mode
+     * -- no persistent state. This hit alone is judged against breakThresholdJ; no carry-over,
+     * no crack overlay (the caller skips overlay dispatch entirely in this mode).
+     *
      * Elastic floor (fatigue limit): a single hit below
      * {@code ImpactRuntimeConfig.SUBLEVEL_ELASTIC_FLOOR × breakThresholdJ} is a purely
      * elastic contact — it causes ZERO damage and does not create an entry. Real materials
@@ -140,6 +144,14 @@ public final class SublevelDamageAccumulator {
             MaterialThresholdProfile.MaterialClass mc,
             double kImpact, double breakThresholdJ, long serverTick) {
         AccKey key = new AccKey(runtimeId, localX, localY, localZ, mc);
+
+        if (!ImpactRuntimeConfig.ENABLE_DAMAGE_ACCUMULATION) {
+            entries.remove(key);
+            double effectiveJ = Math.min(kImpact, breakThresholdJ);
+            return new Snapshot(key, mc, effectiveJ, breakThresholdJ, 1,
+                    DamageState.of(effectiveJ / breakThresholdJ));
+        }
+
         Entry e = entries.get(key);
         if (e != null) {
             e.decayTo(serverTick, ImpactRuntimeConfig.SUBLEVEL_DAMAGE_HALF_LIFE_TICKS);

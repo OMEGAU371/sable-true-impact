@@ -97,13 +97,13 @@ public final class CrackOverlayTracker {
      * Updates internal tracking state when it returns >= 0.
      *
      * Suppressed when:
-     * - ImpactRuntimeConfig.ENABLE_VANILLA_CRACK_OVERLAY is false
+     * - ImpactRuntimeConfig.ENABLE_DAMAGE_ACCUMULATION is false
      * - The state maps to -1 (INTACT/BRUISED)
      * - Same progress already sent within the cooldown window
      */
     public static int tryUpdate(BlockDamageAccumulator.AccKey key, DamageState state,
                                 double ratio, long serverTick) {
-        if (!ImpactRuntimeConfig.ENABLE_VANILLA_CRACK_OVERLAY) return -1;
+        if (!ImpactRuntimeConfig.ENABLE_DAMAGE_ACCUMULATION) return -1;
         int newProgress = ratioToProgress(state, ratio);
         if (newProgress < 0) return -1;
 

@@ -31,7 +31,7 @@ class DamageCommandTest {
     @AfterEach
     void restoreDefaults() {
         io.github.omegau371.trueimpact.damage.ImpactRuntimeConfig.ENABLE_DAMAGE_FEEDBACK = true;
-        io.github.omegau371.trueimpact.damage.ImpactRuntimeConfig.ENABLE_VANILLA_CRACK_OVERLAY = true;
+        io.github.omegau371.trueimpact.damage.ImpactRuntimeConfig.ENABLE_DAMAGE_ACCUMULATION = true;
         io.github.omegau371.trueimpact.damage.ImpactRuntimeConfig.ENABLE_DEBRIS_DROPS = false;
     }
 

@@ -30,7 +30,7 @@ class CrackProgressDataFlowTest {
     void reset() {
         BlockDamageAccumulator.clear();
         CrackOverlayTracker.clear();
-        ImpactRuntimeConfig.ENABLE_VANILLA_CRACK_OVERLAY = true;
+        ImpactRuntimeConfig.ENABLE_DAMAGE_ACCUMULATION = true;
         // Exact-value data-flow assertions: disable elastic floor and relaxation.
         ImpactRuntimeConfig.SUBLEVEL_ELASTIC_FLOOR = 0.0;
         ImpactRuntimeConfig.SUBLEVEL_DAMAGE_HALF_LIFE_TICKS = 0;

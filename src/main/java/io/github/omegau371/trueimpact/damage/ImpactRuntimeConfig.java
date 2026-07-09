@@ -40,12 +40,17 @@ public final class ImpactRuntimeConfig {
     public static volatile boolean ENABLE_DEBRIS_DROPS = false;
 
     /**
-     * Controls the vanilla block-breaking crack overlay (progress 0..9) for CRACKED/CRITICAL blocks.
-     * When true: sends destroyBlockProgress packets via CrackOverlayTracker (rate-limited).
-     * Does not destroy blocks -- purely visual feedback.
+     * Whether damage persists and accumulates across multiple hits, with crack overlays
+     * (progress 0..9, via CrackOverlayTracker) showing intermediate progress.
+     * When false: no accumulator state is kept. Each hit is judged in isolation -- if it
+     * alone reaches the break threshold the block is destroyed outright (subject to
+     * ENABLE_BLOCK_BREAKING), otherwise nothing happens and no crack is ever shown.
+     * Consumed directly by BlockDamageAccumulator/SublevelDamageAccumulator (single-hit
+     * branch) and by the Phase 3A crack-overlay call site; CrackOverlayTracker.tryUpdate
+     * (Path 1 + Phase 4A) also checks it as a backstop.
      * Default: true.
      */
-    public static volatile boolean ENABLE_VANILLA_CRACK_OVERLAY = true;
+    public static volatile boolean ENABLE_DAMAGE_ACCUMULATION = true;
 
     /**
      * Phase 2F: controls actual block destruction for CRITICAL blocks.

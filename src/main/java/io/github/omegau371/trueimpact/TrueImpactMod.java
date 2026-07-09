@@ -225,6 +225,10 @@ public class TrueImpactMod {
         // Drain deferred damage queue -- safe world-access window (after all physics ticks).
         java.util.List<DeferredDamageEvent> events = DeferredDamageQueue.drainAll();
         if (events.isEmpty()) return;
+        // Master switch for world blocks -- mirrors ENABLE_PHYSICS_STRUCTURE_DAMAGE's early
+        // return in applyDeferredSublevelDamage. Must gate everything (accumulation, crack
+        // overlay, destruction, compaction), not just one narrow sub-effect.
+        if (!ImpactRuntimeConfig.APPLY_BLOCK_EFFECTS) return;
         MinecraftServer server = event.getServer();
 
         // LOG_ENERGY_SUMMARY: low-frequency one-liner per tick showing kImpact range + paths.
@@ -312,13 +316,9 @@ public class TrueImpactMod {
                         String.format("%.2f", e.threshold()));
             }
 
-            // Phase 2C: accumulate effective damage.
-            BlockDamageAccumulator.accumulate(e);
-
-            // Phase 2E: get snapshot immediately after accumulation so the compaction
-            // decision can inspect the current damage state.
-            BlockDamageAccumulator.Snapshot snap = BlockDamageAccumulator.getSnapshot(
-                    e.levelKey(), e.posX(), e.posY(), e.posZ(), e.victimBlock());
+            // Phase 2C: accumulate effective damage (or, when 裂纹积累 is off, judge this
+            // hit alone -- see BlockDamageAccumulator.accumulate for the single-hit branch).
+            BlockDamageAccumulator.Snapshot snap = BlockDamageAccumulator.accumulate(e);
 
             // Phase 2A: surface-layer transformation (grass→dirt etc.).
             // Skipped when CRITICAL so the block breaks directly without transforming first.
@@ -416,7 +416,9 @@ public class TrueImpactMod {
         if (ImpactRuntimeConfig.LOG_PHASE3A)
             LOGGER.info("[TI3A-D] applyDeferred: {} events, ENABLE_BLOCK_BREAKING={}",
                     events.size(), ImpactRuntimeConfig.ENABLE_BLOCK_BREAKING);
-        if (!ImpactRuntimeConfig.ENABLE_BLOCK_BREAKING) return;
+        // NOTE: ENABLE_BLOCK_BREAKING is intentionally NOT checked here -- it must only
+        // gate the final destroyBlock call (see applySublevelCellDamage), mirroring the
+        // world-block path where accumulation/crack-display run independent of it.
         if (!ImpactRuntimeConfig.ENABLE_PHYSICS_STRUCTURE_DAMAGE) return;
 
         try {
@@ -1511,7 +1513,9 @@ public class TrueImpactMod {
                     center.getX() + localX, center.getY() + localY, center.getZ() + localZ);
             int fakeBreakerId = SublevelDamageAccumulator.fakeBreakerIdFor(accKey);
 
-            if (snap.damageState() == DamageState.CRITICAL) {
+            // ENABLE_BLOCK_BREAKING gates ONLY the final destruction, mirroring the world-block
+            // path -- accumulation and crack display above already ran unconditionally.
+            if (snap.damageState() == DamageState.CRITICAL && ImpactRuntimeConfig.ENABLE_BLOCK_BREAKING) {
                 net.minecraft.core.BlockPos localBlockPos = new net.minecraft.core.BlockPos(localX, localY, localZ);
                 ItemStack dropTool = resolveDropTool(cellK);
                 if (dropTool != null) {
@@ -1534,7 +1538,9 @@ public class TrueImpactMod {
                     }
                     return adjustedBreakJ;
                 }
-            } else {
+            } else if (ImpactRuntimeConfig.ENABLE_DAMAGE_ACCUMULATION) {
+                // Crack overlay only makes sense when damage persists across hits (single-hit
+                // mode has nothing intermediate to show — see SublevelDamageAccumulator).
                 int progress = CrackOverlayTracker.ratioToProgress(snap.damageState(), snap.ratio());
                 // Monotonic display: hold the highest crack reached, so stress relaxation
                 // does not visually heal the block between hits ("crack reversal").
@@ -1840,7 +1846,7 @@ public class TrueImpactMod {
 
     private static void applyConfig() {
         ImpactRuntimeConfig.ENABLE_BLOCK_BREAKING           = TrueImpactConfig.ENABLE_BLOCK_BREAKING.get();
-        ImpactRuntimeConfig.ENABLE_VANILLA_CRACK_OVERLAY    = TrueImpactConfig.ENABLE_CRACK_OVERLAY.get();
+        ImpactRuntimeConfig.ENABLE_DAMAGE_ACCUMULATION      = TrueImpactConfig.ENABLE_DAMAGE_ACCUMULATION.get();
         ImpactRuntimeConfig.APPLY_BLOCK_EFFECTS             = TrueImpactConfig.ENABLE_WORLD_BLOCK_DAMAGE.get();
         ImpactRuntimeConfig.ENABLE_PHYSICS_STRUCTURE_DAMAGE = TrueImpactConfig.ENABLE_PHYSICS_STRUCTURE_DAMAGE.get();
         ImpactRuntimeConfig.ENABLE_STRUCTURE_VS_STRUCTURE   = TrueImpactConfig.ENABLE_STRUCTURE_VS_STRUCTURE.get();
@@ -1874,9 +1880,9 @@ public class TrueImpactMod {
             ImpactRuntimeConfig.PENETRATION_LOSS_FACTOR          = TrueImpactConfig.PENETRATION_LOSS_FACTOR.get();
             ImpactRuntimeConfig.PENETRATION_FOOTPRINT_RADIUS     = TrueImpactConfig.PENETRATION_FOOTPRINT_RADIUS.get();
         } catch (Throwable ignored) {}
-        LOGGER.info("[TI] Config applied: breaking={} crack={} worldDamage={} threshold={}J",
+        LOGGER.info("[TI] Config applied: breaking={} accumulation={} worldDamage={} threshold={}J",
                 ImpactRuntimeConfig.ENABLE_BLOCK_BREAKING,
-                ImpactRuntimeConfig.ENABLE_VANILLA_CRACK_OVERLAY,
+                ImpactRuntimeConfig.ENABLE_DAMAGE_ACCUMULATION,
                 ImpactRuntimeConfig.APPLY_BLOCK_EFFECTS,
                 io.github.omegau371.trueimpact.sable.SableImpactCapture.GLOBAL_DETECTION_THRESHOLD_J);
     }

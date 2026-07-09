@@ -96,7 +96,10 @@ public final class BlockDamageAccumulator {
     private static Snapshot lastUpdatedSnapshot;
 
     /**
-     * Accumulates effective damage from a drained DeferredDamageEvent.
+     * Accumulates effective damage from a drained DeferredDamageEvent, or — when
+     * ImpactRuntimeConfig.ENABLE_DAMAGE_ACCUMULATION is false — judges this hit alone with
+     * no persistent state (single-hit mode: the hit either clears the threshold by itself
+     * or nothing happens; no crack ever shows, no memory of sub-threshold hits).
      *
      * effectiveJ = min(rawKImpact, event.threshold()) — unified with SublevelDamageAccumulator.
      * event.threshold() is the vanilla-data-driven break threshold including ConfinementFactor
@@ -104,18 +107,37 @@ public final class BlockDamageAccumulator {
      *
      * Creates a new entry if none exists for this (levelKey, pos, victimBlock) triplet;
      * otherwise adds effectiveDamageJ to the running total.
+     *
+     * @return the updated snapshot, or null if the hit was rejected by the elastic floor
+     *         and no prior entry exists for this key.
      */
-    public static void accumulate(DeferredDamageEvent event) {
+    public static Snapshot accumulate(DeferredDamageEvent event) {
         double rawImpact  = event.kImpact();
         double effectiveJ = Math.min(rawImpact, event.threshold());
+        AccKey key = new AccKey(event.levelKey(),
+                event.posX(), event.posY(), event.posZ(), event.victimBlock());
+
+        if (!ImpactRuntimeConfig.ENABLE_DAMAGE_ACCUMULATION) {
+            // Single-hit mode: no persistent state. Clear any stale entry left over from
+            // a session where accumulation was previously enabled, then judge this hit
+            // alone — hitCount=1, accumulated=effectiveJ, no carry-over.
+            entries.remove(key);
+            Snapshot oneShot = new Snapshot(key, event.materialClass(), effectiveJ, event.threshold(),
+                    rawImpact, effectiveJ, event.serverTick(), 1,
+                    DamageState.of(effectiveJ / event.threshold()));
+            lastUpdatedSnapshot = oneShot;
+            return oneShot;
+        }
+
         // Elastic floor (fatigue limit), same model as the sublevel side: a single hit
         // below floor × threshold is purely elastic — no accumulation, no entry. Without
         // it, unbounded accumulation let arbitrarily small repeated contacts grind world
         // blocks to CRITICAL (observed: 2.74 J hits on a 130 J sand threshold, 12 hits
         // marching every resting-contact block toward destruction in lockstep).
-        if (effectiveJ < ImpactRuntimeConfig.SUBLEVEL_ELASTIC_FLOOR * event.threshold()) return;
-        AccKey key = new AccKey(event.levelKey(),
-                event.posX(), event.posY(), event.posZ(), event.victimBlock());
+        if (effectiveJ < ImpactRuntimeConfig.SUBLEVEL_ELASTIC_FLOOR * event.threshold()) {
+            Entry existing = entries.get(key);
+            return existing != null ? existing.toSnapshot(key) : null;
+        }
         Entry entry = entries.get(key);
         if (entry == null) {
             entry = new Entry(event.materialClass(), event.threshold(),
@@ -127,6 +149,7 @@ public final class BlockDamageAccumulator {
             entry.addImpact(rawImpact, effectiveJ, event.serverTick());
         }
         lastUpdatedSnapshot = entry.toSnapshot(key);
+        return lastUpdatedSnapshot;
     }
 
     /**

@@ -18,12 +18,12 @@ class CrackOverlayTrackerTest {
     @BeforeEach
     void reset() {
         CrackOverlayTracker.clear();
-        ImpactRuntimeConfig.ENABLE_VANILLA_CRACK_OVERLAY = true;
+        ImpactRuntimeConfig.ENABLE_DAMAGE_ACCUMULATION = true;
     }
 
     @AfterEach
     void restoreDefaults() {
-        ImpactRuntimeConfig.ENABLE_VANILLA_CRACK_OVERLAY = true;
+        ImpactRuntimeConfig.ENABLE_DAMAGE_ACCUMULATION = true;
     }
 
     // -- ratioToProgress: INTACT ---------------------------------------------------
@@ -230,7 +230,7 @@ class CrackOverlayTrackerTest {
 
     @Test
     void overlay_disabled_config_suppresses_all_updates() {
-        ImpactRuntimeConfig.ENABLE_VANILLA_CRACK_OVERLAY = false;
+        ImpactRuntimeConfig.ENABLE_DAMAGE_ACCUMULATION = false;
         BlockDamageAccumulator.AccKey key = new BlockDamageAccumulator.AccKey(
                 "minecraft:overworld", 10, 64, 10, "minecraft:stone");
         int result = CrackOverlayTracker.tryUpdate(key, DamageState.CRITICAL, 1.5, 1L);

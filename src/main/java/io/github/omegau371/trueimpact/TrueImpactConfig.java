@@ -7,10 +7,10 @@ import net.neoforged.neoforge.common.ModConfigSpec;
  * Stored per-world under saves/<world>/serverconfig/true_impact-server.toml.
  *
  * Structure:
- *   [总体]                 — basic toggles for casual users (block breaking, crack overlay,
+ *   [总体]                 — basic toggles for casual users (block breaking, damage accumulation,
  *                            world/structure damage, structure-vs-structure damage, drop mode)
  *   [高级.材质]             — per-material break multipliers
- *   [高级.物理结构]         — penetration dynamics tuning
+ *   [高级.贯穿动力学]       — penetration dynamics tuning
  *   [高级.平衡]             — damage preset + detection threshold
  *   [高级.受伤倍率]         — global/per-category damage multipliers
  *   [高级.兼容性.Create]    — Create mod integration toggles
@@ -26,7 +26,7 @@ public final class TrueImpactConfig {
     // ── [总体] ────────────────────────────────────────────────────────────────
 
     public static final ModConfigSpec.BooleanValue ENABLE_BLOCK_BREAKING;
-    public static final ModConfigSpec.BooleanValue ENABLE_CRACK_OVERLAY;
+    public static final ModConfigSpec.BooleanValue ENABLE_DAMAGE_ACCUMULATION;
     public static final ModConfigSpec.BooleanValue ENABLE_WORLD_BLOCK_DAMAGE;
     public static final ModConfigSpec.BooleanValue ENABLE_PHYSICS_STRUCTURE_DAMAGE;
     public static final ModConfigSpec.BooleanValue ENABLE_STRUCTURE_VS_STRUCTURE;
@@ -48,7 +48,7 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.DoubleValue METAL_BREAK_MULTIPLIER;
     public static final ModConfigSpec.DoubleValue HIGH_STRENGTH_BREAK_MULTIPLIER;
 
-    // ── [高级.物理结构] ───────────────────────────────────────────────────────
+    // ── [高级.贯穿动力学] ─────────────────────────────────────────────────────
 
     /** Master switch for penetration dynamics. */
     public static final ModConfigSpec.BooleanValue ENABLE_PENETRATION;
@@ -77,9 +77,6 @@ public final class TrueImpactConfig {
     // ── [高级.兼容性] ─────────────────────────────────────────────────────────
 
     public static final ModConfigSpec.BooleanValue ENABLE_CREATE_INTERACTION;
-    public static final ModConfigSpec.BooleanValue DYNAMIC_STRUCTURE_DAMAGES_PHYSICS_STRUCTURE;
-    public static final ModConfigSpec.BooleanValue DYNAMIC_STRUCTURE_DAMAGES_WORLD_BLOCK;
-    public static final ModConfigSpec.DoubleValue CONTRAPTION_DAMAGE_THRESHOLD_J;
     public static final ModConfigSpec.DoubleValue CONTRAPTION_ANCHOR_STRENGTH_MULTIPLIER;
     public static final ModConfigSpec.DoubleValue TRAIN_DERAIL_THRESHOLD_J;
     public static final ModConfigSpec.DoubleValue MINECART_KILL_THRESHOLD_J;
@@ -120,13 +117,20 @@ public final class TrueImpactConfig {
 
         b.push("总体");
         ENABLE_BLOCK_BREAKING = b
-                .comment("Whether physical impacts can destroy blocks.")
+                .comment("Whether damaged blocks are actually destroyed. Does NOT gate damage",
+                         "accumulation or crack display -- those are controlled by 裂纹积累 below.")
                 .define("方块破坏", true);
-        ENABLE_CRACK_OVERLAY = b
-                .comment("Whether crack overlays are shown on damaged blocks.")
-                .define("裂纹贴图", true);
+        ENABLE_DAMAGE_ACCUMULATION = b
+                .comment("Whether damage persists and accumulates across multiple hits (with crack",
+                         "overlays showing intermediate progress). When OFF, there is no accumulated",
+                         "state at all: each hit is judged alone -- if it alone reaches the break",
+                         "threshold the block is destroyed outright (subject to 方块破坏), otherwise",
+                         "nothing happens and no crack is shown.")
+                .define("裂纹积累", true);
         ENABLE_WORLD_BLOCK_DAMAGE = b
-                .comment("Whether world blocks take damage from impacts.")
+                .comment("Master switch for whether world blocks are affected by impacts at all",
+                         "(damage accumulation, crack overlay, destruction, and surface compaction",
+                         "such as grass -> dirt). Mirrors 物理结构受损 for physics structures.")
                 .define("世界方块受损", true);
         ENABLE_PHYSICS_STRUCTURE_DAMAGE = b
                 .comment("Whether physics structures take damage when colliding with terrain.")
@@ -159,7 +163,7 @@ public final class TrueImpactConfig {
                 .defineInRange("高强度材质破坏倍率", 1.0, 0.1, 20.0);
         b.pop();
 
-        b.push("物理结构");
+        b.push("贯穿动力学");
         ENABLE_PENETRATION = b
                 .comment("Penetration dynamics: when a high-energy impact crushes the structure's",
                          "leading face, leftover kinetic energy is re-injected as velocity so heavy",
@@ -242,16 +246,6 @@ public final class TrueImpactConfig {
                          "When enabled, damage is transferred to the anchor block of the dynamic structure",
                          "(the block/entity that, when destroyed, collapses the structure — e.g. bearings, rails).")
                 .define("对动态结构生效", true);
-        DYNAMIC_STRUCTURE_DAMAGES_PHYSICS_STRUCTURE = b
-                .comment("Whether a Create dynamic structure can damage a physics structure it collides with.")
-                .define("动态结构损坏物理结构", true);
-        DYNAMIC_STRUCTURE_DAMAGES_WORLD_BLOCK = b
-                .comment("Whether a Create dynamic structure can damage world blocks it collides with.")
-                .define("动态结构损坏世界方块", true);
-        CONTRAPTION_DAMAGE_THRESHOLD_J = b
-                .comment("Minimum impact energy (J) required to destroy a dynamic structure's anchor block.",
-                         "Default 200 J ≈ a moderate collision. Lower = more fragile contraptions.")
-                .defineInRange("动态结构锚点破坏阈值", 200.0, 1.0, 100000.0);
         CONTRAPTION_ANCHOR_STRENGTH_MULTIPLIER = b
                 .comment("Multiplier applied to the auto-computed anchor break threshold.",
                          "Threshold = (Σ block breakThresholdJ + anchor breakThresholdJ) × this value.",

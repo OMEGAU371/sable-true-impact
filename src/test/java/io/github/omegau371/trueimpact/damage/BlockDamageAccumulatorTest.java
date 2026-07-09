@@ -392,4 +392,63 @@ class BlockDamageAccumulatorTest {
         assertEquals(45.0, snap.accumulatedEffectiveDamageJ(), 0.001, "30/2 + 30");
         assertEquals(2, snap.hitCount());
     }
+
+    // -- single-hit mode (ENABLE_DAMAGE_ACCUMULATION = false) ----------------------
+
+    @org.junit.jupiter.api.Nested
+    class SingleHitMode {
+        @BeforeEach
+        void disableAccumulation() {
+            ImpactRuntimeConfig.ENABLE_DAMAGE_ACCUMULATION = false;
+        }
+
+        @AfterEach
+        void restoreAccumulation() {
+            ImpactRuntimeConfig.ENABLE_DAMAGE_ACCUMULATION = true;
+        }
+
+        @Test
+        void single_hit_at_or_above_threshold_reaches_critical_immediately() {
+            // STONE threshold=50J. A single 50J hit alone must reach CRITICAL,
+            // with no accumulator entry persisted (entryCount stays 0).
+            BlockDamageAccumulator.Snapshot snap = BlockDamageAccumulator.accumulate(
+                    stoneAt(10, 64, 10, 50.0, 1L));
+            assertNotNull(snap);
+            assertEquals(DamageState.CRITICAL, snap.damageState());
+            assertEquals(1.0, snap.ratio(), 0.001);
+            assertEquals(1, snap.hitCount());
+            assertEquals(0, BlockDamageAccumulator.entryCount(),
+                    "single-hit mode must never persist an entry");
+        }
+
+        @Test
+        void repeated_sub_threshold_hits_never_accumulate() {
+            // Ten 30J hits (well above elastic floor, well below 50J threshold) in a
+            // row: each one must be judged alone. If this were accumulating, 10x30=300J
+            // would blow past the 50J threshold and reach CRITICAL -- it must not.
+            BlockDamageAccumulator.Snapshot snap = null;
+            for (long t = 1; t <= 10; t++) {
+                snap = BlockDamageAccumulator.accumulate(stoneAt(10, 64, 10, 30.0, t));
+            }
+            assertNotNull(snap);
+            assertEquals(DamageState.CRACKED, snap.damageState(), "single 30J hit alone: ratio=0.6 -> CRACKED, never CRITICAL");
+            assertEquals(1, snap.hitCount(), "no carry-over between hits");
+            assertEquals(0, BlockDamageAccumulator.entryCount());
+        }
+
+        @Test
+        void stale_entry_from_accumulation_mode_is_cleared_on_switch() {
+            // Accumulate normally first (mode on), then flip off mid-session and confirm
+            // the old persisted entry doesn't leak into single-hit-mode results.
+            ImpactRuntimeConfig.ENABLE_DAMAGE_ACCUMULATION = true;
+            BlockDamageAccumulator.accumulate(stoneAt(10, 64, 10, 40.0, 1L));
+            assertEquals(1, BlockDamageAccumulator.entryCount());
+
+            ImpactRuntimeConfig.ENABLE_DAMAGE_ACCUMULATION = false;
+            BlockDamageAccumulator.Snapshot snap = BlockDamageAccumulator.accumulate(
+                    stoneAt(10, 64, 10, 10.0, 2L));
+            assertEquals(DamageState.INTACT, snap.damageState(), "10J alone, no leftover 40J from before");
+            assertEquals(0, BlockDamageAccumulator.entryCount(), "stale entry must be cleared");
+        }
+    }
 }
