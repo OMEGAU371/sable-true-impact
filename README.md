@@ -6,6 +6,8 @@ NeoForge 1.21.1 · Java 21 · Mod ID: `true_impact` · Current: `0.4.0-delta`
 
 💬 **QQ 交流群 / QQ Group:`775113798`** — bugs, feedback, discussion welcome / 欢迎反馈问题、交流想法
 
+<img width="2672" height="1024" alt="TICOVER" src="https://github.com/user-attachments/assets/99aa9a21-0592-42d1-9043-d6e72821609a" />
+
 ---
 
 <details open>
