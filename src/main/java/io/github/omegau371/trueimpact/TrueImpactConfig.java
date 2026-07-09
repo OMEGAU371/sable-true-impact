@@ -7,14 +7,15 @@ import net.neoforged.neoforge.common.ModConfigSpec;
  * Stored per-world under saves/<world>/serverconfig/true_impact-server.toml.
  *
  * Structure:
- *   [总体]           — basic toggles for casual users
- *   [高级.材质]       — per-material break multipliers
- *   [高级.物理结构]   — physics-structure-specific settings
- *   [高级.平衡]       — damage preset + detection threshold
- *   [高级.受伤倍率]   — global/per-category damage multipliers
- *   [高级.兼容性]     — Create mod integration toggles
- *   [高级.裂纹]       — crack overlay timing
- *   [高级.掘取]       — per-tool-tier impact energy thresholds (used when 掉落模式=BY_FORCE)
+ *   [总体]                 — basic toggles for casual users (block breaking, crack overlay,
+ *                            world/structure damage, structure-vs-structure damage, drop mode)
+ *   [高级.材质]             — per-material break multipliers
+ *   [高级.物理结构]         — penetration dynamics tuning
+ *   [高级.平衡]             — damage preset + detection threshold
+ *   [高级.受伤倍率]         — global/per-category damage multipliers
+ *   [高级.兼容性.Create]    — Create mod integration toggles
+ *   [高级.裂纹]             — crack overlay timing
+ *   [高级.掘取]             — per-tool-tier impact energy thresholds (used when 掉落模式=BY_FORCE)
  */
 public final class TrueImpactConfig {
 
@@ -26,8 +27,9 @@ public final class TrueImpactConfig {
 
     public static final ModConfigSpec.BooleanValue ENABLE_BLOCK_BREAKING;
     public static final ModConfigSpec.BooleanValue ENABLE_CRACK_OVERLAY;
-    public static final ModConfigSpec.BooleanValue ENABLE_PHYSICS_STRUCTURE_DAMAGE;
     public static final ModConfigSpec.BooleanValue ENABLE_WORLD_BLOCK_DAMAGE;
+    public static final ModConfigSpec.BooleanValue ENABLE_PHYSICS_STRUCTURE_DAMAGE;
+    public static final ModConfigSpec.BooleanValue ENABLE_STRUCTURE_VS_STRUCTURE;
     public static final ModConfigSpec.EnumValue<DropMode> DROP_MODE;
 
     // ── [高级.掘取] ───────────────────────────────────────────────────────────
@@ -48,8 +50,7 @@ public final class TrueImpactConfig {
 
     // ── [高级.物理结构] ───────────────────────────────────────────────────────
 
-    public static final ModConfigSpec.BooleanValue ENABLE_STRUCTURE_VS_STRUCTURE;
-    /** Phase 3C 贯穿动力学总开关。 */
+    /** Master switch for penetration dynamics. */
     public static final ModConfigSpec.BooleanValue ENABLE_PENETRATION;
     /** 进入贯穿模式的单次接触能量下限（J）。 */
     public static final ModConfigSpec.DoubleValue PENETRATION_TRIGGER_J;
@@ -88,22 +89,22 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.IntValue CRACK_UPDATE_COOLDOWN_TICKS;
 
     // ── [高级.调试] ───────────────────────────────────────────────────────────
-    /** Phase 3A 超详细：每个方块完整计算路径（硬度/阈值/围压/比率）。需同时开启物理结构损伤。 */
+    /** Verbose physics structure damage: full per-block calc path (hardness/threshold/confinement/ratio). Requires 物理结构损伤 also enabled. */
     public static final ModConfigSpec.BooleanValue LOG_PHASE3A_VERBOSE;
-    /** Phase 3A 弹性下限：单次冲击低于「破坏阈值 × 此比例」时完全无损伤（疲劳极限）。 */
+    /** Elastic floor: a hit below "break threshold × this ratio" causes zero damage (fatigue limit). */
     public static final ModConfigSpec.DoubleValue SUBLEVEL_ELASTIC_FLOOR;
-    /** Phase 3A 应力松弛半衰期（tick）：累积损伤每 N tick 减半；0 = 不衰减。 */
+    /** Stress-relaxation half-life (ticks): accumulated damage halves every N ticks; 0 = no decay. */
     public static final ModConfigSpec.IntValue SUBLEVEL_DAMAGE_HALF_LIFE_TICKS;
-    /** Phase 3A 单次接触速度变化上限（m/s）：封杀抓取约束猛拽产生的非物理能量尖峰。 */
+    /** Cap on per-contact velocity change (m/s): guards against non-physical energy spikes from grab-constraint yanks. */
     public static final ModConfigSpec.DoubleValue SUBLEVEL_MAX_DELTA_V_MS;
 
-    /** 每次 Sable sable$onCollision 触发：blockId、pos、speed、薄方块过滤结果。极高频。 */
+    /** Fires on every Sable sable$onCollision callback: blockId, pos, speed, thin-block filter result. Extremely high frequency. */
     public static final ModConfigSpec.BooleanValue LOG_BLOCK_CALLBACK;
-    /** Path 1 入队 + 应用：kImpact、confinement、blockId、pos、ratio、damageState、破坏结果。 */
+    /** World block damage enqueue + apply: kImpact, confinement, blockId, pos, ratio, damage state, break result. */
     public static final ModConfigSpec.BooleanValue LOG_PATH1;
-    /** Phase 3A 物理结构：入队（plotCp/bodyLocalCp/com）、tryBreak（blockId/local/ratio/state）、destroyBlock 结果。 */
+    /** Physics structure damage: enqueue (plotCp/bodyLocalCp/com), break attempt (blockId/local/ratio/state), destroyBlock result. */
     public static final ModConfigSpec.BooleanValue LOG_PHASE3A;
-    /** Phase 4A 动态结构：contraption 搜索、锚点积累/破坏、列车脱轨、矿车摧毁。 */
+    /** Dynamic structure damage: contraption search, anchor accumulation/break, train derailment, minecart destruction. */
     public static final ModConfigSpec.BooleanValue LOG_PHASE4A;
     /** SableImpactCapture.process() 内部：pairMap 条目数、sawWorldContact、phase3aSnapMap 大小。极高频。 */
     public static final ModConfigSpec.BooleanValue LOG_IMPACT_CAPTURE;
@@ -124,12 +125,15 @@ public final class TrueImpactConfig {
         ENABLE_CRACK_OVERLAY = b
                 .comment("Whether crack overlays are shown on damaged blocks.")
                 .define("裂纹贴图", true);
-        ENABLE_PHYSICS_STRUCTURE_DAMAGE = b
-                .comment("Whether physics structures take damage when colliding with terrain.")
-                .define("物理结构受损", true);
         ENABLE_WORLD_BLOCK_DAMAGE = b
                 .comment("Whether world blocks take damage from impacts.")
                 .define("世界方块受损", true);
+        ENABLE_PHYSICS_STRUCTURE_DAMAGE = b
+                .comment("Whether physics structures take damage when colliding with terrain.")
+                .define("物理结构受损", true);
+        ENABLE_STRUCTURE_VS_STRUCTURE = b
+                .comment("Whether physics structures take damage when colliding with each other.")
+                .define("互相碰撞受损", true);
         DROP_MODE = b
                 .comment("Block drop mode: DISABLED=no drops, BY_FORCE=drops depend on impact energy (see [高级.掘取]), ALL=always drop as if mined by netherite pickaxe.")
                 .defineEnum("掉落模式", DropMode.BY_FORCE);
@@ -156,14 +160,11 @@ public final class TrueImpactConfig {
         b.pop();
 
         b.push("物理结构");
-        ENABLE_STRUCTURE_VS_STRUCTURE = b
-                .comment("Whether physics structures take damage when colliding with each other.")
-                .define("互相碰撞受损", true);
         ENABLE_PENETRATION = b
-                .comment("Phase 3C penetration dynamics: when a high-energy impact crushes the",
-                         "structure's leading face, leftover kinetic energy is re-injected as velocity",
-                         "so heavy bodies smash THROUGH material layer by layer (meteor craters)",
-                         "instead of stopping elastically at first contact.")
+                .comment("Penetration dynamics: when a high-energy impact crushes the structure's",
+                         "leading face, leftover kinetic energy is re-injected as velocity so heavy",
+                         "bodies smash THROUGH material layer by layer (meteor craters) instead of",
+                         "stopping elastically at first contact.")
                 .define("启用贯穿动力学", true);
         PENETRATION_TRIGGER_J = b
                 .comment("Minimum per-contact impact energy (J) to enter penetration mode.",
@@ -235,6 +236,7 @@ public final class TrueImpactConfig {
         b.pop();
 
         b.push("兼容性");
+        b.push("Create");
         ENABLE_CREATE_INTERACTION = b
                 .comment("Whether impacts involving Create mod dynamic structures are processed.",
                          "When enabled, damage is transferred to the anchor block of the dynamic structure",
@@ -263,7 +265,8 @@ public final class TrueImpactConfig {
                 .comment("Minimum impact energy (J) required to destroy a minecart contraption.",
                          "Default 500 J ≈ a moderate-to-heavy collision. Lower = more fragile minecarts.")
                 .defineInRange("矿车摧毁阈值", 500.0, 1.0, 100000.0);
-        b.pop();
+        b.pop(); // Create
+        b.pop(); // 兼容性
 
         b.push("裂纹");
         CRACK_UPDATE_COOLDOWN_TICKS = b
@@ -291,37 +294,45 @@ public final class TrueImpactConfig {
 
         b.push("调试");
         LOG_BLOCK_CALLBACK = b
-                .comment("世界方块碰撞回调 — 每次 sable$onCollision 触发时输出：blockId、pos、speed、是否为薄方块。",
-                         "警告: 极高频，每次物理步每个接触面都会输出一行。仅在短时间测试中开启。")
+                .comment("World block collision callback — logs blockId, pos, speed, and thin-block filter",
+                         "result on every collision. WARNING: extremely high frequency (one line per contact",
+                         "face, every physics step). Only enable for short test sessions.")
                 .define("世界方块碰撞回调", false);
         LOG_PATH1 = b
-                .comment("世界方块损伤 — Path 1 入队 + 应用全过程：kImpact、confinement 系数、blockId、pos、ratio、damageState、破坏结果。")
+                .comment("World block damage — full enqueue + apply pipeline: kImpact, confinement factor,",
+                         "blockId, pos, ratio, damage state, and destruction result.")
                 .define("世界方块损伤", false);
         LOG_PHASE3A = b
-                .comment("物理结构损伤 — Phase 3A 完整流水线：入队（plotCp/bodyLocalCp/com/plotCenter）、",
-                         "匹配 sublevel、tryBreak（blockId/localXYZ/ratio/damageState）、destroyBlock 结果。")
+                .comment("Physics structure damage — full pipeline: enqueue (plotCp/bodyLocalCp/com/",
+                         "plotCenter), sublevel matching, break attempt (blockId/local coords/ratio/state),",
+                         "and destroy-block result.")
                 .define("物理结构损伤", false);
         LOG_PHASE4A = b
-                .comment("动态结构损伤 — Phase 4A 完整流水线：contraption 搜索、锚点积累/破坏阈值对比、",
-                         "列车脱轨（kImpact/threshold/脚下轨道）、矿车摧毁（vehicle类型/kImpact）。")
+                .comment("Dynamic structure damage — full pipeline: contraption search, anchor",
+                         "accumulation/break threshold comparison, train derailment (kImpact/threshold/",
+                         "track beneath), minecart destruction (vehicle type/kImpact).")
                 .define("动态结构损伤", false);
         LOG_IMPACT_CAPTURE = b
-                .comment("物理捕获详情 — SableImpactCapture.process() 内部：pairMap 条目数、sawWorldContact、",
-                         "phase3aSnapMap 大小、每对接触的 kImpact。警告: 极高频，每次 Rapier 物理步触发。")
+                .comment("Raw physics capture — internals of the collision-processing pipeline: pair map",
+                         "size, whether a world contact was seen, snapshot map size. WARNING: extremely",
+                         "high frequency, fires every Rapier physics step.")
                 .define("物理捕获详情", false);
         LOG_BODY_SNAPSHOT = b
-                .comment("刚体快照 — 每次采样 BodySnapshot 时输出：position、linVel、angVel、mass、com、rotation 四元数。",
-                         "警告: 高频，每次物理步每个活动刚体都会输出。")
+                .comment("Rigid body snapshots — logs position, linear/angular velocity, mass, center of",
+                         "mass, and rotation quaternion every time a body is sampled. WARNING: high",
+                         "frequency, one line per active body per physics step.")
                 .define("刚体快照", false);
         LOG_ENERGY_SUMMARY = b
-                .comment("能量汇总 — 每次 tick 有碰撞事件时输出汇总一行：事件总数、kImpact 范围（min/max/sum）、",
-                         "被激活的路径（Path1/3A/4A）。低频，默认开启。")
+                .comment("Energy summary — one summary line per tick with any collision: event count,",
+                         "kImpact range (min/max/sum), and which damage paths were active. Low frequency,",
+                         "enabled by default.")
                 .define("能量汇总", true);
         LOG_PHASE3A_VERBOSE = b
-                .comment("超详细物理结构损伤 — 在「物理结构损伤」之上输出完整计算路径：",
-                         "massKpg、质量归一化系数、硬度、爆炸抗性、单块裂缝/破坏阈值、围压系数、",
-                         "调整后阈值、当前累积 kImpact、比率、损伤状态。",
-                         "需同时开启「物理结构损伤」。默认关闭。")
+                .comment("Verbose physics structure damage — adds the full per-block calculation path on",
+                         "top of 物理结构损伤: mass, mass-normalization factor, hardness, blast resistance,",
+                         "per-block crack/break threshold, confinement factor, adjusted threshold, current",
+                         "accumulated kImpact, ratio, and damage state. Requires 物理结构损伤 also enabled.",
+                         "Disabled by default.")
                 .define("超详细物理结构损伤", false);
         b.pop(); // 调试
 

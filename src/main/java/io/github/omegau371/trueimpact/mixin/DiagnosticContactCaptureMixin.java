@@ -1,6 +1,7 @@
 package io.github.omegau371.trueimpact.mixin;
 
 import dev.ryanhcode.sable.sublevel.system.SubLevelPhysicsSystem;
+import io.github.omegau371.trueimpact.TrueImpactMod;
 import io.github.omegau371.trueimpact.diagnostic.ContactLogger;
 import io.github.omegau371.trueimpact.observation.BodySnapshot;
 import io.github.omegau371.trueimpact.observation.DiagnosticConfig;
@@ -138,8 +139,28 @@ public abstract class DiagnosticContactCaptureMixin {
     }
 
     // ── shared processing (called by both redirect paths) ──────────────────────────
+    // This runs INSIDE a @Redirect on Rapier3D.clearCollisions(), i.e. synchronously
+    // in the middle of native physics-step processing. An uncaught exception here does
+    // NOT behave like a normal Java crash: it unwinds back through the JNI boundary into
+    // Rust, where a panic in a context that cannot unwind aborts the whole process
+    // (observed upstream: "panicked... on an Err value: JavaException... thread caused
+    // non-unwinding panic. aborting." -- a dedicated-server crash on any impact, with no
+    // usable Java-side crash report). The damage pipeline below does a lot of unguarded
+    // map/array access across many contact records; a single malformed contact must not
+    // take down the whole server. Catch broadly and keep going -- Sable's native step
+    // must always return cleanly to Rust regardless of what happens on the Java side.
     @Unique
     private void TI$doProcess(double[] data) {
+        try {
+            TI$doProcessUnsafe(data);
+        } catch (Throwable t) {
+            TrueImpactMod.LOGGER.warn("[TI] TI$doProcess failed (native callback context -- swallowed to avoid a JNI unwind abort): {} {}",
+                    t.getClass().getSimpleName(), t.getMessage());
+        }
+    }
+
+    @Unique
+    private void TI$doProcessUnsafe(double[] data) {
         if (data == null || data.length == 0) return;
         long tick = level.getGameTime();
 
