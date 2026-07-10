@@ -1,0 +1,67 @@
+{
+  "true_impact.configuration.title": "True Impact Configuration",
+
+  "true_impact.configuration.general": "General",
+  "true_impact.configuration.enableBlockBreaking": "Enable Block Breaking",
+  "true_impact.configuration.damageAccumulation": "Damage Accumulation",
+  "true_impact.configuration.worldBlockDamage": "World Block Damage",
+  "true_impact.configuration.physicsStructureDamage": "Physics Structure Damage",
+  "true_impact.configuration.structureVsStructureDamage": "Structure-vs-Structure Damage",
+  "true_impact.configuration.dropMode": "Drop Mode",
+
+  "true_impact.configuration.advanced": "Advanced",
+
+  "true_impact.configuration.materials": "Materials",
+  "true_impact.configuration.brittleBreakMultiplier": "Brittle Break Multiplier",
+  "true_impact.configuration.woodBreakMultiplier": "Wood Break Multiplier",
+  "true_impact.configuration.stoneBreakMultiplier": "Stone Break Multiplier",
+  "true_impact.configuration.metalBreakMultiplier": "Metal Break Multiplier",
+  "true_impact.configuration.highStrengthBreakMultiplier": "High-Strength Break Multiplier",
+
+  "true_impact.configuration.penetrationDynamics": "Penetration Dynamics",
+  "true_impact.configuration.enablePenetration": "Enable Penetration Dynamics",
+  "true_impact.configuration.penetrationTriggerEnergy": "Penetration Trigger Energy",
+  "true_impact.configuration.penetrationMaxSpeed": "Penetration Max Re-injection Speed",
+  "true_impact.configuration.penetrationMinSpeed": "Penetration Min Trigger Speed",
+  "true_impact.configuration.penetrationLossFactor": "Penetration Energy Loss Factor",
+  "true_impact.configuration.penetrationFootprintRadius": "Penetration Footprint Radius",
+
+  "true_impact.configuration.balance": "Balance",
+  "true_impact.configuration.damagePreset": "Damage Preset",
+  "true_impact.configuration.detectionThreshold": "Detection Threshold",
+
+  "true_impact.configuration.damageMultipliers": "Damage Multipliers",
+  "true_impact.configuration.totalDamageMultiplier": "Total Damage Multiplier",
+  "true_impact.configuration.physicsStructureDamageMultiplier": "Physics Structure Damage Multiplier",
+  "true_impact.configuration.worldBlockDamageMultiplier": "World Block Damage Multiplier",
+  "true_impact.configuration.physicsStructureElasticFloor": "Physics Structure Elastic Floor",
+  "true_impact.configuration.physicsStructureDamageHalfLife": "Physics Structure Damage Half-Life",
+  "true_impact.configuration.physicsStructureMaxImpactSpeed": "Physics Structure Max Impact Speed",
+
+  "true_impact.configuration.compatibility": "Compatibility",
+  "true_impact.configuration.create": "Create",
+  "true_impact.configuration.enableContraptionInteraction": "Enable Contraption Interaction",
+  "true_impact.configuration.anchorStrengthMultiplier": "Anchor Strength Multiplier",
+  "true_impact.configuration.trainDerailThreshold": "Train Derail Threshold",
+  "true_impact.configuration.minecartKillThreshold": "Minecart Kill Threshold",
+
+  "true_impact.configuration.crackOverlay": "Crack Overlay",
+  "true_impact.configuration.crackUpdateCooldown": "Crack Update Cooldown",
+
+  "true_impact.configuration.mining": "Mining",
+  "true_impact.configuration.netheritePickaxeMax": "Netherite Pickaxe Max Energy",
+  "true_impact.configuration.diamondPickaxeMax": "Diamond Pickaxe Max Energy",
+  "true_impact.configuration.ironPickaxeMax": "Iron Pickaxe Max Energy",
+  "true_impact.configuration.stonePickaxeMax": "Stone Pickaxe Max Energy",
+  "true_impact.configuration.woodenPickaxeMax": "Wooden Pickaxe Max Energy",
+
+  "true_impact.configuration.debug": "Debug",
+  "true_impact.configuration.worldBlockCollisionCallback": "World Block Collision Callback Log",
+  "true_impact.configuration.worldBlockDamageLog": "World Block Damage Log",
+  "true_impact.configuration.physicsStructureDamageLog": "Physics Structure Damage Log",
+  "true_impact.configuration.dynamicStructureDamageLog": "Dynamic Structure Damage Log",
+  "true_impact.configuration.impactCaptureDetail": "Impact Capture Detail Log",
+  "true_impact.configuration.rigidBodySnapshot": "Rigid Body Snapshot Log",
+  "true_impact.configuration.energySummary": "Energy Summary Log",
+  "true_impact.configuration.physicsStructureDamageVerbose": "Verbose Physics Structure Damage Log"
+}
