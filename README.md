@@ -2,7 +2,7 @@
 
 **Physics-based structural damage for [Sable](https://github.com/ryanhcode/sable) — damage thresholds derived from real block data, mutual structure-vs-structure damage, and energy-driven terrain penetration.**
 
-NeoForge 1.21.1 · Java 21 · Mod ID: `true_impact` · Current: `0.4.0-delta`
+NeoForge 1.21.1 · Java 21 · Mod ID: `true_impact` · Current: `0.5.0-delta`
 
 💬 **QQ 交流群 / QQ Group:`775113798`** — bugs, feedback, discussion welcome / 欢迎反馈问题、交流想法
 

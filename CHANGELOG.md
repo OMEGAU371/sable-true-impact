@@ -6,6 +6,60 @@ Version scheme: `MAJOR.MINOR.PATCH-PHASE[-build]`
 
 ---
 
+## [0.5.0-delta] — 2026-07-10
+
+Config redesign: clearer section layout, single-hit vs. accumulation crack semantics, gate consistency
+between the world-block and physics-structure damage paths.
+
+### Changed
+- Reordered `[总体]` config section: 方块破坏 → 裂纹积累 → 世界方块受损 → 物理结构受损 → 互相碰撞受损 → 掉落模式;
+  moved `ENABLE_STRUCTURE_VS_STRUCTURE` into this section
+- Renamed 裂纹贴图/`ENABLE_VANILLA_CRACK_OVERLAY` → 裂纹积累/`ENABLE_DAMAGE_ACCUMULATION`. When disabled, damage
+  no longer accumulates across hits — a block breaks outright the instant a single hit reaches its threshold
+- Fixed `ENABLE_WORLD_BLOCK_DAMAGE` to act as a true comprehensive gate for the world-block damage path
+  (previously did not fully suppress cracking/breaking when disabled)
+- Fixed `ENABLE_BLOCK_BREAKING` scope inconsistency between the world-block and physics-structure paths —
+  now consistently only gates final destruction in both, matching accumulation/crack behavior otherwise
+- Renamed `[高级.物理结构]` config section → `[高级.贯穿动力学]` (now exclusively holds penetration-dynamics fields)
+- Removed dead config fields: `DYNAMIC_STRUCTURE_DAMAGES_PHYSICS_STRUCTURE`, `DYNAMIC_STRUCTURE_DAMAGES_WORLD_BLOCK`,
+  `CONTRAPTION_DAMAGE_THRESHOLD_J`
+
+### Added
+- `SublevelDamageAccumulatorTest` (previously untested directly)
+- Single-hit-mode unit test coverage for both `BlockDamageAccumulator` and `SublevelDamageAccumulator`
+
+---
+
+## [0.4.0-delta] — 2026-07-09
+
+### Changed
+- Stripped internal development-phase jargon ("Phase 3A/3C" etc.) from user-facing docs and config comments
+- README rewritten as bilingual (English/Chinese) wiki-style documentation covering all config-exposed features
+- Repository reorganized: legacy gamma branch archived as `gamma-legacy`, delta rewrite promoted to `main`
+
+---
+
+## [0.3.9-delta] — 2026-07-09
+
+Squashed commit covering the full delta-rewrite arc from Phase 1D through 3C (multiple prior development
+sessions, condensed into one commit during the gamma→delta branch reorganization).
+
+### Added
+- Vanilla-hardness-derived damage threshold formula
+- `ConfinementFactor` — structural confinement / contextual strength for embedded world blocks (D-3)
+- Sublevel stress accumulation and penetration dynamics (deep terrain punch-through with velocity
+  re-injection into the surviving rigid body)
+- Structure-vs-structure mutual impact damage (active-vs-active, Newton's-third-law directionality)
+- Create contraption impact interactions: anchor damage/destruction, anchor crack accumulation, train
+  derailment, minecart-contraption destruction
+
+### Fixed
+- Dedicated-server crash on impact processing (GitHub issue #3, `hooks.rs:240`) — wrapped
+  `DiagnosticContactCaptureMixin.TI$doProcess` in a try/catch so a single bad impact-processing exception
+  can no longer bring down the server
+
+---
+
 ## [0.4.9-phase1c] — 2026-06-12
 
 Gate 1C (automated): Phase 1C damage calculation diagnostics. All outputs diagnostic-only.
