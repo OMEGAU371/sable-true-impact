@@ -27,13 +27,14 @@ package io.github.omegau371.trueimpact.damage;
 public final class ConfinementFactor {
     private ConfinementFactor() {}
 
-    /** Maximum contribution of a single neighbor relative to the victim's crack threshold. */
-    public static final double PER_FACE_CAP = 3.0;
+    /** Standard gravity (m/s²), used for the lithostatic/overburden pressure calculation. */
+    static final double GRAVITY = 9.8;
 
-    /** Isotropic baseline weight per face when no direction is available. */
-    static final double DIRECTION_BASE      = 0.5;
-    /** Amplitude of directional modulation added to DIRECTION_BASE × dot product. */
-    static final double DIRECTION_AMPLITUDE = 0.5;
+    // PER_FACE_CAP, OVERBURDEN_EFFICIENCY, DIRECTION_BASE, DIRECTION_AMPLITUDE now live in
+    // ImpactRuntimeConfig (CONFINEMENT_PER_FACE_CAP / OVERBURDEN_EFFICIENCY /
+    // CONFINEMENT_DIRECTION_BASE / CONFINEMENT_DIRECTION_AMPLITUDE) so they're configurable
+    // from [advanced.calibration]. See ImpactRuntimeConfig for calibration rationale
+    // (in particular why OVERBURDEN_EFFICIENCY isn't the undamped physical value of 1.0).
 
     /**
      * Face outward normals in the order used by TrueImpactMod.sampleNeighborCrackThresholds:
@@ -87,7 +88,9 @@ public final class ConfinementFactor {
             if (directional) {
                 double[] fn = FACE_NORMALS[i];
                 double dot = fn[0] * dirX + fn[1] * dirY + fn[2] * dirZ;
-                weight = Math.max(0.0, Math.min(1.0, DIRECTION_BASE + DIRECTION_AMPLITUDE * dot));
+                weight = Math.max(0.0, Math.min(1.0,
+                        ImpactRuntimeConfig.CONFINEMENT_DIRECTION_BASE
+                                + ImpactRuntimeConfig.CONFINEMENT_DIRECTION_AMPLITUDE * dot));
             } else {
                 weight = 1.0; // isotropic: equal weight per face
             }
@@ -96,12 +99,36 @@ public final class ConfinementFactor {
             if (neighborCrackJ[i] > 0 && weight > 0) {
                 double ratio = Double.isFinite(neighborCrackJ[i])
                         ? neighborCrackJ[i] / victimCrackJ
-                        : PER_FACE_CAP;
-                sum += weight * Math.min(ratio, PER_FACE_CAP);
+                        : ImpactRuntimeConfig.CONFINEMENT_PER_FACE_CAP;
+                sum += weight * Math.min(ratio, ImpactRuntimeConfig.CONFINEMENT_PER_FACE_CAP);
             }
         }
 
         return weightSum > 0 ? sum / weightSum : 0.0;
+    }
+
+    /**
+     * Overburden resistance energy (J) from real lithostatic pressure above a point
+     * (D-3 extension). Deliberately returned as an ADDITIVE Joules quantity, not folded
+     * into the dimensionless neighbor-ratio confinementFactor from compute(): the yield
+     * decision at the call site compares the victim's effective threshold directly against
+     * the STRIKER's own break threshold (an absolute J value, e.g. ~28,000 J for obsidian),
+     * not against the impact energy. Multiplying confinementFactor into a SOFT_SOIL victim's
+     * tiny base threshold (~70 J for sand) can never cross a multi-thousand-J striker
+     * threshold no matter how large the multiplier gets -- it has to be added as a real
+     * energy quantity of comparable magnitude instead.
+     *
+     * pressure(Pa) = density(kg/m³) × gravity × depth(m); energy(J) = pressure × 1 m³.
+     *
+     * @param overburdenDepthBlocks vertical distance (blocks) from this point up to
+     *                              undisturbed ground surface; ≤0 → no contribution
+     * @param densityKgM3           mass of a 1 m³ block of the overlying material
+     */
+    public static double overburdenEnergyJ(double overburdenDepthBlocks, double densityKgM3) {
+        if (overburdenDepthBlocks <= 0 || densityKgM3 <= 0 || !Double.isFinite(overburdenDepthBlocks)) {
+            return 0.0;
+        }
+        return overburdenDepthBlocks * densityKgM3 * GRAVITY * ImpactRuntimeConfig.OVERBURDEN_EFFICIENCY;
     }
 
     /**

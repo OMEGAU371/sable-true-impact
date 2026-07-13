@@ -24,6 +24,29 @@ public final class ImpactRuntimeConfig {
     public static volatile boolean APPLY_BLOCK_EFFECTS = true;
 
     /**
+     * Surface-layer compaction (grass -> dirt, farmland -> dirt, etc. -- see
+     * ImpactBlockApplicator.findRule()). Independent of APPLY_BLOCK_EFFECTS: compaction
+     * is a transformation, not damage, so it can stay on even with world block damage disabled
+     * (and vice versa). Default: true.
+     */
+    public static volatile boolean ENABLE_COMPACTION = true;
+
+    /**
+     * Player-configurable compaction rules, parsed from [advanced.compaction] compactionRules
+     * ("fromId;toId;thresholdJ;probability" lines) by TrueImpactMod.applyConfig(). The default
+     * value here (matching the config's own default list) keeps this usable in unit tests that
+     * run without a loaded config.
+     */
+    public static volatile java.util.List<CompactionRule> COMPACTION_RULES = java.util.List.of(
+            new CompactionRule("minecraft:grass_block",       "minecraft:dirt",   5.0, 1.0),
+            new CompactionRule("minecraft:farmland",          "minecraft:dirt",   5.0, 1.0),
+            new CompactionRule("minecraft:podzol",             "minecraft:dirt",   5.0, 1.0),
+            new CompactionRule("minecraft:mycelium",           "minecraft:dirt",   5.0, 1.0),
+            new CompactionRule("minecraft:suspicious_sand",    "minecraft:sand",   5.0, 1.0),
+            new CompactionRule("minecraft:suspicious_gravel",  "minecraft:gravel", 5.0, 1.0)
+    );
+
+    /**
      * Controls cosmetic damage feedback (particles/sounds) for CRACKED/CRITICAL blocks.
      * When false: DamageFeedbackTracker.shouldEmit() always returns false.
      * Rate limiting and state classification still occur; only the MC-side emission is suppressed.
@@ -210,4 +233,64 @@ public final class ImpactRuntimeConfig {
      * to the energy budget. 0 disables footprint mode (patch-only). Default 8.
      */
     public static volatile int PENETRATION_FOOTPRINT_RADIUS = 8;
+
+    // ── Calibration: BlockHardnessProfile formula ─────────────────────────────
+    // crackThresholdJ = clamp(CRACK_COEFF × blastResist^CRACK_EXPONENT, CRACK_MIN, CRACK_MAX)
+    // breakThresholdJ = crackThresholdJ × (BREAK_BASE + blastResist^BREAK_EXPONENT × BREAK_COEFF)
+    // Defaults match the original hardcoded values, calibrated against in-game targets.
+
+    public static volatile double CRACK_MIN      =   3.0;
+    public static volatile double CRACK_MAX      = 500.0;
+    public static volatile double CRACK_COEFF    =  15.0;
+    public static volatile double CRACK_EXPONENT =   0.6;
+    public static volatile double BREAK_BASE     =   5.0;
+    public static volatile double BREAK_COEFF    =   3.0;
+    public static volatile double BREAK_EXPONENT =   0.4;
+
+    // ── Calibration: ConfinementFactor ────────────────────────────────────────
+
+    /** Max contribution of a single neighbor relative to the victim's crack threshold. */
+    public static volatile double CONFINEMENT_PER_FACE_CAP = 3.0;
+    /** Isotropic baseline weight per face when no impact direction is available. */
+    public static volatile double CONFINEMENT_DIRECTION_BASE = 0.5;
+    /** Amplitude of directional modulation added to CONFINEMENT_DIRECTION_BASE × dot product. */
+    public static volatile double CONFINEMENT_DIRECTION_AMPLITUDE = 0.5;
+    /** Fraction of raw hydrostatic overburden pressure (ρ·g·depth) that becomes resistance energy. */
+    public static volatile double OVERBURDEN_EFFICIENCY = 0.15;
+
+    // ── Calibration: material yield ───────────────────────────────────────────
+
+    /**
+     * Material-yield immunity ratio: a victim survives when its (unconfined) break
+     * threshold exceeds the striker's own break threshold × this tolerance. Used across
+     * Path 1, Phase 3A, penetration, and active-vs-active structure collisions.
+     * Default 1.5.
+     */
+    public static volatile double STRIKER_YIELD_TOLERANCE = 1.5;
+
+    /**
+     * Structure-vs-structure (active-vs-active) hardness-split coefficient: the softer
+     * body's share of dissipated energy is coefficient × otherBreakJ / (myBreakJ + otherBreakJ).
+     * Default 2.0.
+     */
+    public static volatile double STRUCTURE_VS_STRUCTURE_SPLIT_COEFFICIENT = 2.0;
+
+    // ── Calibration: MaterialThresholdProfile base thresholds (J) ─────────────
+    // Scaled by the per-class break multiplier from [advanced.materials]; these are the
+    // BASE values before that multiplier is applied.
+
+    public static volatile double SOFT_SOIL_THRESHOLD_J     =   5.0;
+    public static volatile double BRITTLE_THRESHOLD_J        =  15.0;
+    public static volatile double WOOD_THRESHOLD_J           =  20.0;
+    public static volatile double STONE_THRESHOLD_J          =  50.0;
+    public static volatile double METAL_THRESHOLD_J          = 120.0;
+    public static volatile double HIGH_STRENGTH_THRESHOLD_J  = 300.0;
+    public static volatile double GENERIC_THRESHOLD_J        =  40.0;
+
+    // ── Calibration: cosmetic feedback rate limiting ──────────────────────────
+
+    /** Minimum ticks between particle/sound feedback for the same block position. */
+    public static volatile int FEEDBACK_COOLDOWN_TICKS = 10;
+    /** Max feedback emissions per tick across all blocks (global rate limit). */
+    public static volatile int FEEDBACK_BUDGET_PER_TICK = 16;
 }

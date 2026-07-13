@@ -17,14 +17,20 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class ImpactBlockApplicatorTest {
 
+    private static final java.util.List<CompactionRule> DEFAULT_RULES = ImpactRuntimeConfig.COMPACTION_RULES;
+
     @BeforeEach
     void ensureEffectsEnabled() {
         ImpactRuntimeConfig.APPLY_BLOCK_EFFECTS = true;
+        ImpactRuntimeConfig.ENABLE_COMPACTION = true;
+        ImpactRuntimeConfig.COMPACTION_RULES = DEFAULT_RULES;
     }
 
     @AfterEach
     void restoreDefaults() {
         ImpactRuntimeConfig.APPLY_BLOCK_EFFECTS = true;
+        ImpactRuntimeConfig.ENABLE_COMPACTION = true;
+        ImpactRuntimeConfig.COMPACTION_RULES = DEFAULT_RULES;
     }
 
     // ---- helper: minimal DeferredDamageEvent construction ----------------------
@@ -80,11 +86,22 @@ class ImpactBlockApplicatorTest {
     // ---- checkGates (no world access) ------------------------------------------
 
     @Test
-    void checkGates_effects_disabled_returns_SKIP_EFFECTS_DISABLED() {
-        ImpactRuntimeConfig.APPLY_BLOCK_EFFECTS = false;
+    void checkGates_compaction_disabled_returns_SKIP_EFFECTS_DISABLED() {
+        ImpactRuntimeConfig.ENABLE_COMPACTION = false;
         DeferredDamageEvent event = softSoilEvent("minecraft:grass_block", 100.0);
         assertEquals(ApplyOutcome.SKIP_EFFECTS_DISABLED,
                 ImpactBlockApplicator.checkGates(event));
+    }
+
+    @Test
+    void checkGates_ignores_APPLY_BLOCK_EFFECTS_compaction_is_independent() {
+        // Compaction is a transformation, not damage -- must not be gated by the
+        // world-block-damage master switch.
+        ImpactRuntimeConfig.APPLY_BLOCK_EFFECTS = false;
+        ImpactRuntimeConfig.ENABLE_COMPACTION = true;
+        DeferredDamageEvent event = softSoilEvent("minecraft:grass_block", 100.0);
+        assertNull(ImpactBlockApplicator.checkGates(event),
+                "compaction must proceed even with APPLY_BLOCK_EFFECTS=false");
     }
 
     @Test
@@ -305,8 +322,8 @@ class ImpactBlockApplicatorTest {
     }
 
     @Test
-    void ImpactRuntimeConfig_effects_disabled_blocks_all_mutations() {
-        ImpactRuntimeConfig.APPLY_BLOCK_EFFECTS = false;
+    void ImpactRuntimeConfig_compaction_disabled_blocks_all_mutations() {
+        ImpactRuntimeConfig.ENABLE_COMPACTION = false;
 
         MockBlockView view = new MockBlockView();
         view.put(5, 63, 5, "minecraft:grass_block");
@@ -315,6 +332,153 @@ class ImpactBlockApplicatorTest {
         ApplyOutcome outcome = ImpactBlockApplicator.tryApply(view, event);
 
         assertEquals(ApplyOutcome.SKIP_EFFECTS_DISABLED, outcome);
-        assertNull(view.getLastSetId(), "no mutation when APPLY_BLOCK_EFFECTS=false");
+        assertNull(view.getLastSetId(), "no mutation when ENABLE_COMPACTION=false");
+    }
+
+    @Test
+    void compaction_still_applies_when_world_block_damage_disabled() {
+        // Decoupling check: compaction (transformation) must not depend on
+        // APPLY_BLOCK_EFFECTS (damage master switch).
+        ImpactRuntimeConfig.APPLY_BLOCK_EFFECTS = false;
+        ImpactRuntimeConfig.ENABLE_COMPACTION = true;
+
+        MockBlockView view = new MockBlockView();
+        view.put(5, 63, 5, "minecraft:grass_block");
+        DeferredDamageEvent event = softSoilEvent("minecraft:grass_block", 100.0);
+
+        ApplyOutcome outcome = ImpactBlockApplicator.tryApply(view, event);
+
+        assertEquals(ApplyOutcome.APPLIED, outcome,
+                "compaction must still apply with APPLY_BLOCK_EFFECTS=false");
+        assertEquals("minecraft:dirt", view.getLastSetId());
+    }
+
+    // ---- custom rules (player-configurable list) --------------------------------
+
+    @Test
+    void custom_rule_transforms_a_block_with_no_default_rule() {
+        ImpactRuntimeConfig.COMPACTION_RULES = java.util.List.of(
+                new CompactionRule("minecraft:sand", "minecraft:sandstone", 500.0, 1.0));
+
+        MockBlockView view = new MockBlockView();
+        view.put(5, 63, 5, "minecraft:sand");
+        DeferredDamageEvent event = softSoilEvent("minecraft:sand", 600.0);
+
+        ApplyOutcome outcome = ImpactBlockApplicator.tryApply(view, event);
+
+        assertEquals(ApplyOutcome.APPLIED, outcome);
+        assertEquals("minecraft:sandstone", view.getLastSetId());
+    }
+
+    @Test
+    void custom_rule_per_rule_threshold_overrides_default() {
+        ImpactRuntimeConfig.COMPACTION_RULES = java.util.List.of(
+                new CompactionRule("minecraft:sand", "minecraft:sandstone", 500.0, 1.0));
+
+        MockBlockView view = new MockBlockView();
+        view.put(5, 63, 5, "minecraft:sand");
+        DeferredDamageEvent event = softSoilEvent("minecraft:sand", 400.0); // above SOFT_SOIL default (5J) but below this rule's 500J
+
+        ApplyOutcome outcome = ImpactBlockApplicator.tryApply(view, event);
+
+        assertEquals(ApplyOutcome.SKIP_BELOW_THRESHOLD, outcome,
+                "per-rule threshold (500J) must gate even though the flat SOFT_SOIL threshold is cleared");
+        assertNull(view.getLastSetId());
+    }
+
+    @Test
+    void probability_zero_never_transforms() {
+        ImpactRuntimeConfig.COMPACTION_RULES = java.util.List.of(
+                new CompactionRule("minecraft:sand", "minecraft:sandstone", 5.0, 0.0));
+
+        MockBlockView view = new MockBlockView();
+        view.put(5, 63, 5, "minecraft:sand");
+        DeferredDamageEvent event = softSoilEvent("minecraft:sand", 100.0);
+
+        for (int i = 0; i < 20; i++) {
+            ApplyOutcome outcome = ImpactBlockApplicator.tryApply(view, event);
+            assertEquals(ApplyOutcome.APPLIED_NO_OP, outcome, "probability=0 must never transform");
+            assertNull(view.getLastSetId());
+        }
+    }
+
+    @Test
+    void probability_one_always_transforms() {
+        ImpactRuntimeConfig.COMPACTION_RULES = java.util.List.of(
+                new CompactionRule("minecraft:sand", "minecraft:sandstone", 5.0, 1.0));
+
+        for (int i = 0; i < 20; i++) {
+            MockBlockView view = new MockBlockView();
+            view.put(5, 63, 5, "minecraft:sand");
+            DeferredDamageEvent event = softSoilEvent("minecraft:sand", 100.0);
+
+            assertEquals(ApplyOutcome.APPLIED, ImpactBlockApplicator.tryApply(view, event),
+                    "probability=1.0 must always transform");
+        }
+    }
+
+    @Test
+    void empty_rule_list_leaves_all_soft_soil_as_no_op() {
+        ImpactRuntimeConfig.COMPACTION_RULES = java.util.List.of();
+
+        MockBlockView view = new MockBlockView();
+        view.put(5, 63, 5, "minecraft:grass_block");
+        DeferredDamageEvent event = softSoilEvent("minecraft:grass_block", 100.0);
+
+        assertEquals(ApplyOutcome.APPLIED_NO_OP, ImpactBlockApplicator.tryApply(view, event));
+        assertNull(view.getLastSetId());
+    }
+
+    // ---- CompactionRule.parse() ---------------------------------------------------
+
+    @Test
+    void parse_valid_rule_line() {
+        CompactionRule rule = CompactionRule.parse("minecraft:sand;minecraft:sandstone;500.0;0.5");
+        assertNotNull(rule);
+        assertEquals("minecraft:sand", rule.fromBlockId());
+        assertEquals("minecraft:sandstone", rule.toBlockId());
+        assertEquals(500.0, rule.thresholdJ(), 1e-9);
+        assertEquals(0.5, rule.probability(), 1e-9);
+    }
+
+    @Test
+    void parse_round_trips_through_toConfigLine() {
+        CompactionRule rule = new CompactionRule("minecraft:sand", "minecraft:sandstone", 500.0, 0.5);
+        CompactionRule reparsed = CompactionRule.parse(rule.toConfigLine());
+        assertEquals(rule, reparsed);
+    }
+
+    @Test
+    void parse_rejects_wrong_field_count() {
+        assertNull(CompactionRule.parse("minecraft:sand;minecraft:sandstone;500.0"));
+        assertNull(CompactionRule.parse("minecraft:sand;minecraft:sandstone;500.0;0.5;extra"));
+    }
+
+    @Test
+    void parse_rejects_unparseable_numbers() {
+        assertNull(CompactionRule.parse("minecraft:sand;minecraft:sandstone;notanumber;0.5"));
+        assertNull(CompactionRule.parse("minecraft:sand;minecraft:sandstone;500.0;notanumber"));
+    }
+
+    @Test
+    void parse_rejects_out_of_range_probability() {
+        assertNull(CompactionRule.parse("minecraft:sand;minecraft:sandstone;500.0;1.5"));
+        assertNull(CompactionRule.parse("minecraft:sand;minecraft:sandstone;500.0;-0.1"));
+    }
+
+    @Test
+    void parse_rejects_negative_threshold() {
+        assertNull(CompactionRule.parse("minecraft:sand;minecraft:sandstone;-1.0;0.5"));
+    }
+
+    @Test
+    void parse_rejects_empty_block_ids() {
+        assertNull(CompactionRule.parse(";minecraft:sandstone;500.0;0.5"));
+        assertNull(CompactionRule.parse("minecraft:sand;;500.0;0.5"));
+    }
+
+    @Test
+    void parse_rejects_null_line() {
+        assertNull(CompactionRule.parse(null));
     }
 }

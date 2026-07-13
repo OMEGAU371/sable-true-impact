@@ -40,16 +40,19 @@ public final class MaterialThresholdProfile {
      * Accumulation denominator for this material class.
      * ratio = accumulatedJ / (threshold * breakMultiplier).
      * Ratio >= 1.0 -> CRITICAL.
+     *
+     * Base values live in ImpactRuntimeConfig (configurable from [advanced.calibration]);
+     * defaults below match the original hand-picked table.
      */
     public static double threshold(MaterialClass mat) {
         return switch (mat) {
-            case SOFT_SOIL     ->   5.0;
-            case BRITTLE       ->  15.0;
-            case WOOD          ->  20.0;
-            case STONE         ->  50.0;
-            case METAL         -> 120.0;
-            case HIGH_STRENGTH -> 300.0;
-            case GENERIC       ->  40.0;
+            case SOFT_SOIL     -> ImpactRuntimeConfig.SOFT_SOIL_THRESHOLD_J;
+            case BRITTLE       -> ImpactRuntimeConfig.BRITTLE_THRESHOLD_J;
+            case WOOD          -> ImpactRuntimeConfig.WOOD_THRESHOLD_J;
+            case STONE         -> ImpactRuntimeConfig.STONE_THRESHOLD_J;
+            case METAL         -> ImpactRuntimeConfig.METAL_THRESHOLD_J;
+            case HIGH_STRENGTH -> ImpactRuntimeConfig.HIGH_STRENGTH_THRESHOLD_J;
+            case GENERIC       -> ImpactRuntimeConfig.GENERIC_THRESHOLD_J;
         };
     }
 

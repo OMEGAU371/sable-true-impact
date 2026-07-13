@@ -20,6 +20,10 @@ package io.github.omegau371.trueimpact.damage;
  *
  * Special case: hardness < 0 (bedrock, barriers) → Double.MAX_VALUE (indestructible).
  *
+ * Formula coefficients live in ImpactRuntimeConfig (CRACK_MIN/MAX/COEFF/EXPONENT,
+ * BREAK_BASE/COEFF/EXPONENT) so they're configurable from [advanced.calibration] --
+ * the values below are only the compiled-in defaults, mirrored there at class-init.
+ *
  * No Minecraft imports -- safe to unit-test without the game runtime.
  * Callers (TrueImpactMod) extract hardness/blastResist from BlockState and pass raw floats.
  */
@@ -27,25 +31,17 @@ public final class BlockHardnessProfile {
 
     private BlockHardnessProfile() {}
 
-    static final double CRACK_MIN      =   3.0;
-    static final double CRACK_MAX      = 500.0;
-    static final double CRACK_COEFF    =  15.0;
-    static final double CRACK_EXPONENT =   0.6;
-    static final double BREAK_BASE     =   5.0;
-    static final double BREAK_COEFF    =   3.0;
-    static final double BREAK_EXPONENT =   0.4;
-
     /**
      * Crack-overlay threshold. Also used as the per-hit crack progress denominator in
      * CrackOverlayTracker (ratio = accumulatedEffective / crackThreshold).
      * hardness < 0  → Double.MAX_VALUE (indestructible).
-     * blastResist ≤ 0 → CRACK_MIN (fragile; trivially damaged).
+     * blastResist ≤ 0 → ImpactRuntimeConfig.CRACK_MIN (fragile; trivially damaged).
      */
     public static double crackThresholdJ(float hardness, float blastResist) {
         if (hardness < 0) return Double.MAX_VALUE;
-        if (blastResist <= 0) return CRACK_MIN;
-        double raw = CRACK_COEFF * Math.pow(blastResist, CRACK_EXPONENT);
-        return Math.min(CRACK_MAX, Math.max(CRACK_MIN, raw));
+        if (blastResist <= 0) return ImpactRuntimeConfig.CRACK_MIN;
+        double raw = ImpactRuntimeConfig.CRACK_COEFF * Math.pow(blastResist, ImpactRuntimeConfig.CRACK_EXPONENT);
+        return Math.min(ImpactRuntimeConfig.CRACK_MAX, Math.max(ImpactRuntimeConfig.CRACK_MIN, raw));
     }
 
     /**
@@ -55,7 +51,8 @@ public final class BlockHardnessProfile {
     public static double breakThresholdJ(float hardness, float blastResist) {
         double crack = crackThresholdJ(hardness, blastResist);
         if (crack == Double.MAX_VALUE) return Double.MAX_VALUE;
-        double breakMult = BREAK_BASE + Math.pow(Math.max(0, blastResist), BREAK_EXPONENT) * BREAK_COEFF;
+        double breakMult = ImpactRuntimeConfig.BREAK_BASE
+                + Math.pow(Math.max(0, blastResist), ImpactRuntimeConfig.BREAK_EXPONENT) * ImpactRuntimeConfig.BREAK_COEFF;
         return crack * breakMult;
     }
 }

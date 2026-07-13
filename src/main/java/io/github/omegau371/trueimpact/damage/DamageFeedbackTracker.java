@@ -26,8 +26,9 @@ public final class DamageFeedbackTracker {
 
     private DamageFeedbackTracker() {}
 
-    public static final int PER_BLOCK_COOLDOWN_TICKS = 10;
-    public static final int GLOBAL_BUDGET_PER_TICK   = 16;
+    // Cooldown/budget now live in ImpactRuntimeConfig.FEEDBACK_COOLDOWN_TICKS /
+    // FEEDBACK_BUDGET_PER_TICK (configurable from [advanced.calibration]); defaults
+    // below match the original hardcoded 10/16.
 
     private static final Map<Long, Long> lastFeedbackTick = new HashMap<>();
     private static int  tickBudgetUsed;
@@ -59,11 +60,11 @@ public final class DamageFeedbackTracker {
             tickBudgetUsed        = 0;
             currentBudgetTick     = serverTick;
         }
-        if (tickBudgetUsed >= GLOBAL_BUDGET_PER_TICK) return false;
+        if (tickBudgetUsed >= ImpactRuntimeConfig.FEEDBACK_BUDGET_PER_TICK) return false;
 
         long key  = packPos(posX, posY, posZ);
         Long last = lastFeedbackTick.get(key);
-        if (last != null && serverTick - last < PER_BLOCK_COOLDOWN_TICKS) return false;
+        if (last != null && serverTick - last < ImpactRuntimeConfig.FEEDBACK_COOLDOWN_TICKS) return false;
 
         lastFeedbackTick.put(key, serverTick);
         tickBudgetUsed++;

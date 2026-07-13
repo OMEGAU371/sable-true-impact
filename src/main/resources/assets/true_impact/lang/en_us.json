@@ -1,4 +1,18 @@
 {
+  "true_impact.optionsButton": "True Impact Settings...",
+  "true_impact.cancelButton": "Cancel",
+  "true_impact.cancelButton.tooltip": "Discard changes made on this screen and go back without saving them.",
+
+  "true_impact.dropMode.disabled": "Disabled",
+  "true_impact.dropMode.by_force": "By Force",
+  "true_impact.dropMode.all": "Always",
+
+  "true_impact.damagePreset.mild": "Mild (0.3x)",
+  "true_impact.damagePreset.conservative": "Conservative (0.6x)",
+  "true_impact.damagePreset.default": "Default (1.0x)",
+  "true_impact.damagePreset.intense": "Intense (2.5x)",
+  "true_impact.damagePreset.dramatic": "Dramatic (6.0x)",
+
   "true_impact.configuration.title": "True Impact Configuration",
 
   "true_impact.configuration.general": "General",
@@ -8,6 +22,8 @@
   "true_impact.configuration.physicsStructureDamage": "Physics Structure Damage",
   "true_impact.configuration.structureVsStructureDamage": "Structure-vs-Structure Damage",
   "true_impact.configuration.dropMode": "Drop Mode",
+  "true_impact.configuration.dropChance": "Drop Chance",
+  "true_impact.configuration.dropChance.tooltip": "Chance (0.0-1.0) that a destroyed block drops its item, independent of Drop Mode. Lower it to cut down on item entities and lag when a lot of blocks break at once.",
 
   "true_impact.configuration.advanced": "Advanced",
 
@@ -17,6 +33,11 @@
   "true_impact.configuration.stoneBreakMultiplier": "Stone Break Multiplier",
   "true_impact.configuration.metalBreakMultiplier": "Metal Break Multiplier",
   "true_impact.configuration.highStrengthBreakMultiplier": "High-Strength Break Multiplier",
+
+  "true_impact.configuration.compaction": "Compaction",
+  "true_impact.configuration.enableCompaction": "Enable Compaction",
+  "true_impact.configuration.compactionRules": "Compaction Rules",
+  "true_impact.configuration.compactionRules.tooltip": "One rule per line, format: \"fromBlockId;toBlockId;thresholdJ;probability\", e.g. minecraft:sand;minecraft:sandstone;500.0;0.5 -- an impact on minecraft:sand exceeding 500 energy has a 50% chance to become minecraft:sandstone. Add/remove rules with the + and X buttons in this screen; a block with no matching rule is unaffected by compaction (still takes normal crack/break damage). Malformed lines are ignored.",
 
   "true_impact.configuration.penetrationDynamics": "Penetration Dynamics",
   "true_impact.configuration.enablePenetration": "Enable Penetration Dynamics",
@@ -47,6 +68,32 @@
 
   "true_impact.configuration.crackOverlay": "Crack Overlay",
   "true_impact.configuration.crackUpdateCooldown": "Crack Update Cooldown",
+
+  "true_impact.configuration.calibration": "Calibration",
+  "true_impact.configuration.crackCoefficient": "Crack Coefficient",
+  "true_impact.configuration.crackExponent": "Crack Exponent",
+  "true_impact.configuration.crackMinJ": "Crack Threshold Min",
+  "true_impact.configuration.crackMaxJ": "Crack Threshold Max",
+  "true_impact.configuration.breakBaseMultiplier": "Break Base Multiplier",
+  "true_impact.configuration.breakCoefficient": "Break Coefficient",
+  "true_impact.configuration.breakExponent": "Break Exponent",
+  "true_impact.configuration.strikerYieldTolerance": "Striker Yield Tolerance",
+  "true_impact.configuration.structureVsStructureSplitCoefficient": "Structure Collision Split Coefficient",
+  "true_impact.configuration.confinementPerFaceCap": "Confinement Per-Face Cap",
+  "true_impact.configuration.confinementDirectionBase": "Confinement Direction Base",
+  "true_impact.configuration.confinementDirectionAmplitude": "Confinement Direction Amplitude",
+  "true_impact.configuration.overburdenEfficiency": "Overburden Efficiency",
+  "true_impact.configuration.softSoilThresholdJ": "Soft Soil Base Threshold",
+  "true_impact.configuration.brittleThresholdJ": "Brittle Base Threshold",
+  "true_impact.configuration.woodThresholdJ": "Wood Base Threshold",
+  "true_impact.configuration.stoneThresholdJ": "Stone Base Threshold",
+  "true_impact.configuration.metalThresholdJ": "Metal Base Threshold",
+  "true_impact.configuration.highStrengthThresholdJ": "High-Strength Base Threshold",
+  "true_impact.configuration.genericThresholdJ": "Generic Base Threshold",
+
+  "true_impact.configuration.feedback": "Feedback",
+  "true_impact.configuration.feedbackCooldownTicks": "Feedback Cooldown",
+  "true_impact.configuration.feedbackBudgetPerTick": "Feedback Budget Per Tick",
 
   "true_impact.configuration.mining": "Mining",
   "true_impact.configuration.netheritePickaxeMax": "Netherite Pickaxe Max Energy",

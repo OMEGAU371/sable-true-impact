@@ -44,14 +44,14 @@ class BlockHardnessProfileTest {
     @Test
     void zero_blast_resist_clamps_to_minimum_crack_threshold() {
         double t = BlockHardnessProfile.crackThresholdJ(0.2f, 0f);
-        assertEquals(BlockHardnessProfile.CRACK_MIN, t, 1e-9,
+        assertEquals(ImpactRuntimeConfig.CRACK_MIN, t, 1e-9,
                 "zero blastResist must return CRACK_MIN floor");
     }
 
     @Test
     void negative_blast_resist_treated_as_zero() {
         double t = BlockHardnessProfile.crackThresholdJ(0.5f, -1f);
-        assertEquals(BlockHardnessProfile.CRACK_MIN, t, 1e-9);
+        assertEquals(ImpactRuntimeConfig.CRACK_MIN, t, 1e-9);
     }
 
     // -- glass (hardness=0.3, blastResist=0.3) ------------------------------------
@@ -125,7 +125,7 @@ class BlockHardnessProfileTest {
     void obsidian_crack_threshold_capped_at_500J() {
         // 15 × 1200^0.6 ≈ 670J → clamped at CRACK_MAX=500J
         double t = BlockHardnessProfile.crackThresholdJ(50f, 1200f);
-        assertEquals(BlockHardnessProfile.CRACK_MAX, t, 1e-9,
+        assertEquals(ImpactRuntimeConfig.CRACK_MAX, t, 1e-9,
                 "high blastResist must be clamped at CRACK_MAX");
     }
 

@@ -81,19 +81,19 @@ class DamageFeedbackTrackerTest {
     void global_budget_exhausted_suppresses_further_feedback() {
         // Fill the budget with distinct positions in the same tick
         int admitted = 0;
-        for (int i = 0; i < DamageFeedbackTracker.GLOBAL_BUDGET_PER_TICK + 5; i++) {
+        for (int i = 0; i < ImpactRuntimeConfig.FEEDBACK_BUDGET_PER_TICK + 5; i++) {
             if (DamageFeedbackTracker.shouldEmit(i, 64, 0, DamageState.CRITICAL, 100L)) {
                 admitted++;
             }
         }
-        assertEquals(DamageFeedbackTracker.GLOBAL_BUDGET_PER_TICK, admitted,
+        assertEquals(ImpactRuntimeConfig.FEEDBACK_BUDGET_PER_TICK, admitted,
                 "exactly GLOBAL_BUDGET_PER_TICK events must be admitted per tick");
     }
 
     @Test
     void budget_resets_on_new_tick() {
         // Exhaust budget on tick 100
-        for (int i = 0; i < DamageFeedbackTracker.GLOBAL_BUDGET_PER_TICK; i++) {
+        for (int i = 0; i < ImpactRuntimeConfig.FEEDBACK_BUDGET_PER_TICK; i++) {
             DamageFeedbackTracker.shouldEmit(i, 64, 0, DamageState.CRITICAL, 100L);
         }
         // New tick: budget resets, different position (beyond cooldown doesn't matter here
@@ -115,7 +115,7 @@ class DamageFeedbackTrackerTest {
     @Test
     void feedback_disabled_does_not_consume_budget_slot() {
         ImpactRuntimeConfig.ENABLE_DAMAGE_FEEDBACK = false;
-        for (int i = 0; i < DamageFeedbackTracker.GLOBAL_BUDGET_PER_TICK + 5; i++) {
+        for (int i = 0; i < ImpactRuntimeConfig.FEEDBACK_BUDGET_PER_TICK + 5; i++) {
             DamageFeedbackTracker.shouldEmit(i, 64, 0, DamageState.CRITICAL, 1L);
         }
         // Re-enable: budget should still be full (no slots consumed while disabled)

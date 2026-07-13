@@ -9,7 +9,10 @@ import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 
 /**
- * Registers NeoForge's built-in ConfigurationScreen as this mod's config UI.
+ * Registers NeoForge's built-in ConfigurationScreen as this mod's config UI, using
+ * TrueImpactConfigurationSectionScreen instead of the default section-screen class (only the
+ * category-navigation button layout is reskinned there; save/lifecycle logic is untouched).
+ * ConfigurationScreen itself is final, so this constructs it directly rather than subclassing.
  *
  * Without an explicit factory, third-party generic config screens (Catnip/Ponder)
  * may take over editing our SERVER-type config. Catnip's screen saves through a
@@ -25,6 +28,7 @@ public final class TrueImpactConfigScreenHook {
     @SubscribeEvent
     static void onClientSetup(FMLClientSetupEvent event) {
         ModList.get().getModContainerById("true_impact").ifPresent(container ->
-                container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new));
+                container.registerExtensionPoint(IConfigScreenFactory.class,
+                        (mod, parent) -> new ConfigurationScreen(mod, parent, TrueImpactConfigurationSectionScreen::new)));
     }
 }

@@ -63,7 +63,7 @@ class ConfinementFactorTest {
         double dirtCrack = BlockHardnessProfile.crackThresholdJ(0.5f, 0.5f);
         double cf = ConfinementFactor.compute(
                 new double[]{46, 46, 46, 46, 46, 46}, dirtCrack);
-        assertEquals(ConfinementFactor.PER_FACE_CAP, cf, 0.05,
+        assertEquals(ImpactRuntimeConfig.CONFINEMENT_PER_FACE_CAP, cf, 0.05,
                 "Dirt victim capped by PER_FACE_CAP when neighbors >> victim");
     }
 
@@ -81,7 +81,7 @@ class ConfinementFactorTest {
     void bedrock_neighbor_is_capped_at_per_face_cap() {
         // One MAX_VALUE neighbor → ratio = ∞, capped to PER_FACE_CAP; rest air
         double cf = ConfinementFactor.compute(new double[]{Double.MAX_VALUE, 0, 0, 0, 0, 0}, 46.0);
-        assertEquals(ConfinementFactor.PER_FACE_CAP / 6.0, cf, 0.001);
+        assertEquals(ImpactRuntimeConfig.CONFINEMENT_PER_FACE_CAP / 6.0, cf, 0.001);
     }
 
     // -- indestructible victim (bedrock as victim) ---------------------------------
@@ -231,5 +231,73 @@ class ConfinementFactorTest {
         // sum = 0.5 * 1 + 0.5 * 1 = 1.0; normFactor = 3.0; cf = 1/3
         assertEquals(1.0 / 3.0, cf, 0.01,
                 "Two perpendicular stone neighbors: cf ≈ 1/3 with impact-direction weighting");
+    }
+
+    // ---- overburdenEnergyJ (D-3 extension) ----------------------------------------
+
+    @Test
+    void overburden_zero_depth_gives_zero_energy() {
+        assertEquals(0.0, ConfinementFactor.overburdenEnergyJ(0, 1600.0), 1e-9);
+        assertEquals(0.0, ConfinementFactor.overburdenEnergyJ(-5, 1600.0), 1e-9);
+    }
+
+    @Test
+    void overburden_zero_density_gives_zero_energy() {
+        assertEquals(0.0, ConfinementFactor.overburdenEnergyJ(20, 0.0), 1e-9);
+    }
+
+    @Test
+    void overburden_nan_depth_gives_zero_energy() {
+        assertEquals(0.0, ConfinementFactor.overburdenEnergyJ(Double.NaN, 1600.0), 1e-9);
+    }
+
+    @Test
+    void overburden_scales_linearly_with_depth() {
+        double e10 = ConfinementFactor.overburdenEnergyJ(10, 1600.0);
+        double e20 = ConfinementFactor.overburdenEnergyJ(20, 1600.0);
+        assertEquals(e10 * 2.0, e20, 1e-6, "Overburden energy is linear in depth for fixed density");
+    }
+
+    @Test
+    void overburden_scales_linearly_with_density() {
+        double soft  = ConfinementFactor.overburdenEnergyJ(10, 1600.0);  // SOFT_SOIL
+        double stone = ConfinementFactor.overburdenEnergyJ(10, 2400.0);  // STONE
+        assertEquals(soft * (2400.0 / 1600.0), stone, 1e-6,
+                "Overburden energy is linear in density for fixed depth");
+    }
+
+    @Test
+    void overburden_matches_calibration_reference() {
+        // energy = depth * density * GRAVITY(9.8) * EFFICIENCY(0.15)
+        // 20 blocks of soft soil (1600 kg/m3): 20*1600*9.8*0.15 = 47,040 J
+        assertEquals(47_040.0, ConfinementFactor.overburdenEnergyJ(20, 1600.0), 1.0);
+    }
+
+    @Test
+    void overburden_eventually_exceeds_obsidian_striker_threshold() {
+        // Obsidian breakThresholdJ ~= 28,075 J (hardness=50, blastResist=1200); the yield
+        // gate compares against strikerBreakJ * STRIKER_YIELD_TOLERANCE(1.5) = ~42,113 J.
+        // This is the actual bug this method exists to fix: sand's own tiny base threshold
+        // (~72 J) can never multiplicatively reach that bar, but real overburden energy at
+        // a plausible drilling depth does -- proving drilling through sand must eventually
+        // stop well short of bedrock instead of an unbounded descent.
+        double obsidianBreakJ = BlockHardnessProfile.breakThresholdJ(50f, 1200f);
+        double yieldBar = obsidianBreakJ * 1.5;
+        double sandBreakJ = BlockHardnessProfile.breakThresholdJ(0.5f, 0.5f);
+        double overburdenAt20 = ConfinementFactor.overburdenEnergyJ(20, 1600.0);
+        assertTrue(sandBreakJ + overburdenAt20 > yieldBar,
+                "Sand's own threshold plus overburden at 20 blocks deep must exceed the "
+                        + "obsidian striker's yield bar (sandBreakJ=" + sandBreakJ
+                        + " overburden=" + overburdenAt20 + " bar=" + yieldBar + ")");
+    }
+
+    @Test
+    void overburden_grows_unbounded_with_depth() {
+        // Unlike neighbor-ratio confinement (capped via PER_FACE_CAP), overburden has no
+        // cap -- this is what lets it eventually terminate drilling through homogeneous
+        // soft terrain where neighbor-ratio confinement stays flat.
+        double shallow = ConfinementFactor.overburdenEnergyJ(5, 1600.0);
+        double deep    = ConfinementFactor.overburdenEnergyJ(500, 1600.0);
+        assertTrue(deep > shallow * 50, "Overburden energy keeps growing with depth, no cap");
     }
 }

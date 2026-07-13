@@ -1,13 +1,13 @@
 package io.github.omegau371.trueimpact.damage;
 
-import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Phase 2A: applies real block effects for impact events in the deferred damage queue.
  *
- * Scope (Phase 2A only): SOFT_SOIL compaction.
- *   grass_block  -> dirt  (compaction under impact)
- *   Other SOFT_SOIL blocks (dirt, coarse_dirt, rooted_dirt, ...): APPLIED_NO_OP
+ * Scope (Phase 2A only): SOFT_SOIL compaction, driven by the player-configurable rule list
+ * in ImpactRuntimeConfig.COMPACTION_RULES (see CompactionRule and [advanced.compaction]
+ * compactionRules in TrueImpactConfig). Blocks with no matching rule return APPLIED_NO_OP.
  *
  * All logic is expressed through the BlockView interface (MC-free).
  * The MC-dependent ServerLevelBlockView lives in TrueImpactMod.
@@ -17,7 +17,8 @@ import java.util.Map;
  *   tryApply(view, event)       -- calls checkGates then performs block read/write
  *
  * DamageResolver remains NONE -- Phase 2A does not route through the resolver.
- * ImpactRuntimeConfig.APPLY_BLOCK_EFFECTS must be true for any mutation to occur.
+ * ImpactRuntimeConfig.ENABLE_COMPACTION must be true for any mutation to occur -- independent
+ * of APPLY_BLOCK_EFFECTS (see [advanced.compaction] in TrueImpactConfig).
  *
  * No Minecraft imports -- safe to unit-test without the game runtime.
  */
@@ -25,22 +26,18 @@ public final class ImpactBlockApplicator {
 
     private ImpactBlockApplicator() {}
 
-    // Phase 2A: surface-layer transformation targets.
-    // These blocks convert to a more basic form under impact (one-step only, no chain).
-    // All other SOFT_SOIL blocks (dirt, sand, gravel, etc.) return APPLIED_NO_OP and
-    // accumulate damage normally until CRITICAL, at which point they break.
-    private static final Map<String, String> COMPACTION_TARGETS = Map.of(
-            "minecraft:grass_block",       "minecraft:dirt",
-            "minecraft:farmland",          "minecraft:dirt",
-            "minecraft:podzol",            "minecraft:dirt",
-            "minecraft:mycelium",          "minecraft:dirt",
-            "minecraft:suspicious_sand",   "minecraft:sand",
-            "minecraft:suspicious_gravel", "minecraft:gravel"
-    );
+    /** Returns the first configured rule for the given block ID, or null if none. */
+    public static CompactionRule findRule(String blockId) {
+        for (CompactionRule rule : ImpactRuntimeConfig.COMPACTION_RULES) {
+            if (rule.fromBlockId().equals(blockId)) return rule;
+        }
+        return null;
+    }
 
     /** Returns the transformation target for the given block ID, or null if none. */
     public static String compactionTarget(String blockId) {
-        return COMPACTION_TARGETS.get(blockId);
+        CompactionRule rule = findRule(blockId);
+        return rule == null ? null : rule.toBlockId();
     }
 
     /**
@@ -52,21 +49,20 @@ public final class ImpactBlockApplicator {
      * Fully MC-free and testable without a game level.
      */
     public static ApplyOutcome checkGates(DeferredDamageEvent event) {
-        if (!ImpactRuntimeConfig.APPLY_BLOCK_EFFECTS) {
+        if (!ImpactRuntimeConfig.ENABLE_COMPACTION) {
             return ApplyOutcome.SKIP_EFFECTS_DISABLED;
         }
         if (!Double.isFinite(event.kImpact())) {
             return ApplyOutcome.SKIP_INVALID_ENERGY;
         }
-        // Use the material's crack threshold (5J for SOFT_SOIL), NOT event.threshold().
-        // event.threshold() is the dynamic break threshold (~72J for dirt after
-        // BlockHardnessProfile override) and would gate out all reasonable impacts.
-        // Any impact above the crack threshold is significant enough to compact.
-        if (event.kImpact() <= MaterialThresholdProfile.threshold(event.materialClass())) {
-            return ApplyOutcome.SKIP_BELOW_THRESHOLD;
-        }
         if (event.materialClass() != MaterialThresholdProfile.MaterialClass.SOFT_SOIL) {
             return ApplyOutcome.SKIP_MATERIAL_CLASS;
+        }
+        // A block with no configured rule has no threshold to check here -- it falls
+        // through to tryApply's target lookup, which returns APPLIED_NO_OP for it.
+        CompactionRule rule = findRule(event.victimBlock());
+        if (rule != null && event.kImpact() <= rule.thresholdJ()) {
+            return ApplyOutcome.SKIP_BELOW_THRESHOLD;
         }
         return null; // all gates passed
     }
@@ -78,9 +74,11 @@ public final class ImpactBlockApplicator {
      * 2. Checks hasChunkAt (returns SKIP_CHUNK_UNLOADED if not loaded).
      * 3. Reads current block; verifies it is still SOFT_SOIL class
      *    (stale events where another process already changed the block are skipped).
-     * 4. Looks up compaction target:
-     *    - If found: calls view.setBlock(); returns APPLIED or SKIP_SET_FAILED.
-     *    - If not found: returns APPLIED_NO_OP (SOFT_SOIL but no Phase 2A effect).
+     * 4. Looks up the configured rule for the victim block:
+     *    - If none: returns APPLIED_NO_OP (SOFT_SOIL but no compaction rule defined).
+     *    - If found: rolls the rule's probability; on success calls view.setBlock()
+     *      and returns APPLIED or SKIP_SET_FAILED, on a failed roll returns APPLIED_NO_OP
+     *      (this hit didn't transform the block, but may on a later hit).
      */
     public static ApplyOutcome tryApply(BlockView view, DeferredDamageEvent event) {
         ApplyOutcome gate = checkGates(event);
@@ -100,16 +98,19 @@ public final class ImpactBlockApplicator {
             return ApplyOutcome.SKIP_BLOCK_MISMATCH;
         }
 
-        // Look up compaction target by ORIGINAL victim block (not current block).
-        // The original block is recorded at enqueue time; use it to determine the
-        // effect even if the block has already been compacted to an intermediate state.
-        String target = COMPACTION_TARGETS.get(event.victimBlock());
-        if (target == null) {
-            // SOFT_SOIL but no Phase 2A compaction defined (e.g., dirt -> stays dirt)
+        // Look up the rule by ORIGINAL victim block (not current block). The original
+        // block is recorded at enqueue time; use it to determine the effect even if the
+        // block has already been compacted to an intermediate state.
+        CompactionRule rule = findRule(event.victimBlock());
+        if (rule == null) {
+            // SOFT_SOIL but no compaction rule defined (e.g., dirt -> stays dirt)
             return ApplyOutcome.APPLIED_NO_OP;
         }
+        if (rule.probability() < 1.0 && ThreadLocalRandom.current().nextDouble() >= rule.probability()) {
+            return ApplyOutcome.APPLIED_NO_OP; // threshold cleared, but this hit's roll failed
+        }
 
-        boolean ok = view.setBlock(x, y, z, target);
+        boolean ok = view.setBlock(x, y, z, rule.toBlockId());
         return ok ? ApplyOutcome.APPLIED : ApplyOutcome.SKIP_SET_FAILED;
     }
 }

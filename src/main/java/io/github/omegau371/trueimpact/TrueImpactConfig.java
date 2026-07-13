@@ -10,11 +10,14 @@ import net.neoforged.neoforge.common.ModConfigSpec;
  *   [general]                        — basic toggles for casual users (block breaking, damage accumulation,
  *                                      world/structure damage, structure-vs-structure damage, drop mode)
  *   [advanced.materials]             — per-material break multipliers
+ *   [advanced.compaction]            — surface-layer compaction (grass -> dirt etc.), independent of worldBlockDamage
  *   [advanced.penetrationDynamics]   — penetration dynamics tuning
  *   [advanced.balance]               — damage preset + detection threshold
  *   [advanced.damageMultipliers]     — global/per-category damage multipliers
  *   [advanced.compatibility.create]  — Create mod integration toggles
  *   [advanced.crackOverlay]          — crack overlay timing
+ *   [advanced.calibration]           — formula coefficients and base thresholds (advanced/expert tuning)
+ *   [advanced.feedback]              — cosmetic particle/sound feedback rate limiting
  *   [advanced.mining]                — per-tool-tier impact energy thresholds (used when dropMode=BY_FORCE)
  *
  * Key names are English identifiers; display labels and tooltips for both English and Chinese
@@ -34,6 +37,7 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.BooleanValue ENABLE_PHYSICS_STRUCTURE_DAMAGE;
     public static final ModConfigSpec.BooleanValue ENABLE_STRUCTURE_VS_STRUCTURE;
     public static final ModConfigSpec.EnumValue<DropMode> DROP_MODE;
+    public static final ModConfigSpec.DoubleValue DROP_CHANCE;
 
     // ── [advanced.mining] ───────────────────────────────────────────────────
 
@@ -50,6 +54,13 @@ public final class TrueImpactConfig {
     public static final ModConfigSpec.DoubleValue STONE_BREAK_MULTIPLIER;
     public static final ModConfigSpec.DoubleValue METAL_BREAK_MULTIPLIER;
     public static final ModConfigSpec.DoubleValue HIGH_STRENGTH_BREAK_MULTIPLIER;
+
+    // ── [advanced.compaction] ─────────────────────────────────────────────────
+
+    /** Master switch for surface-layer compaction (grass -> dirt etc.); independent of worldBlockDamage. */
+    public static final ModConfigSpec.BooleanValue ENABLE_COMPACTION;
+    /** Player-configurable compaction rules; see CompactionRule for the "fromId;toId;thresholdJ;probability" format. */
+    public static final ModConfigSpec.ConfigValue<java.util.List<? extends String>> COMPACTION_RULES;
 
     // ── [advanced.penetrationDynamics] ───────────────────────────────────────
 
@@ -88,6 +99,37 @@ public final class TrueImpactConfig {
 
     public static final ModConfigSpec.IntValue CRACK_UPDATE_COOLDOWN_TICKS;
 
+    // ── [advanced.calibration] ────────────────────────────────────────────────
+    // Formula coefficients and base thresholds for the damage calculation system
+    // (see BlockHardnessProfile, ConfinementFactor, MaterialThresholdProfile).
+
+    public static final ModConfigSpec.DoubleValue CRACK_COEFFICIENT;
+    public static final ModConfigSpec.DoubleValue CRACK_EXPONENT;
+    public static final ModConfigSpec.DoubleValue CRACK_MIN_J;
+    public static final ModConfigSpec.DoubleValue CRACK_MAX_J;
+    public static final ModConfigSpec.DoubleValue BREAK_BASE_MULTIPLIER;
+    public static final ModConfigSpec.DoubleValue BREAK_COEFFICIENT;
+    public static final ModConfigSpec.DoubleValue BREAK_EXPONENT;
+    public static final ModConfigSpec.DoubleValue STRIKER_YIELD_TOLERANCE;
+    public static final ModConfigSpec.DoubleValue STRUCTURE_VS_STRUCTURE_SPLIT_COEFFICIENT;
+    public static final ModConfigSpec.DoubleValue CONFINEMENT_PER_FACE_CAP;
+    public static final ModConfigSpec.DoubleValue CONFINEMENT_DIRECTION_BASE;
+    public static final ModConfigSpec.DoubleValue CONFINEMENT_DIRECTION_AMPLITUDE;
+    public static final ModConfigSpec.DoubleValue OVERBURDEN_EFFICIENCY;
+    public static final ModConfigSpec.DoubleValue SOFT_SOIL_THRESHOLD_J;
+    public static final ModConfigSpec.DoubleValue BRITTLE_THRESHOLD_J;
+    public static final ModConfigSpec.DoubleValue WOOD_THRESHOLD_J;
+    public static final ModConfigSpec.DoubleValue STONE_THRESHOLD_J;
+    public static final ModConfigSpec.DoubleValue METAL_THRESHOLD_J;
+    public static final ModConfigSpec.DoubleValue HIGH_STRENGTH_THRESHOLD_J;
+    public static final ModConfigSpec.DoubleValue GENERIC_THRESHOLD_J;
+
+    // ── [advanced.feedback] ───────────────────────────────────────────────────
+    // Cosmetic particle/sound feedback rate limiting.
+
+    public static final ModConfigSpec.IntValue FEEDBACK_COOLDOWN_TICKS;
+    public static final ModConfigSpec.IntValue FEEDBACK_BUDGET_PER_TICK;
+
     // ── [advanced.debug] ──────────────────────────────────────────────────────
     /** Verbose physics structure damage: full per-block calc path (hardness/threshold/confinement/ratio). Requires physicsStructureDamageLog also enabled. */
     public static final ModConfigSpec.BooleanValue LOG_PHASE3A_VERBOSE;
@@ -118,7 +160,9 @@ public final class TrueImpactConfig {
     static {
         ModConfigSpec.Builder b = new ModConfigSpec.Builder();
 
-        b.push("general");
+        b.comment("Basic on/off toggles for casual players: whether blocks break at all,",
+                  "whether damage accumulates over multiple hits, and drop behavior.")
+                .push("general");
         ENABLE_BLOCK_BREAKING = b
                 .comment("Whether damaged blocks are actually destroyed. Does NOT gate damage",
                          "accumulation or crack display -- those are controlled by damageAccumulation below.")
@@ -131,9 +175,10 @@ public final class TrueImpactConfig {
                          "nothing happens and no crack is shown.")
                 .define("damageAccumulation", true);
         ENABLE_WORLD_BLOCK_DAMAGE = b
-                .comment("Master switch for whether world blocks are affected by impacts at all",
-                         "(damage accumulation, crack overlay, destruction, and surface compaction",
-                         "such as grass -> dirt). Mirrors physicsStructureDamage for physics structures.")
+                .comment("Master switch for whether world blocks take damage from impacts",
+                         "(damage accumulation, crack overlay, destruction). Mirrors physicsStructureDamage",
+                         "for physics structures. Does NOT gate surface compaction (grass -> dirt etc.) --",
+                         "see [advanced.compaction], which is independent.")
                 .define("worldBlockDamage", true);
         ENABLE_PHYSICS_STRUCTURE_DAMAGE = b
                 .comment("Whether physics structures take damage when colliding with terrain.")
@@ -144,11 +189,18 @@ public final class TrueImpactConfig {
         DROP_MODE = b
                 .comment("Block drop mode: DISABLED=no drops, BY_FORCE=drops depend on impact energy (see [advanced.mining]), ALL=always drop as if mined by netherite pickaxe.")
                 .defineEnum("dropMode", DropMode.BY_FORCE);
+        DROP_CHANCE = b
+                .comment("Chance (0.0-1.0) that a destroyed block actually drops its item, independent of dropMode.",
+                         "Lower this to reduce item-entity and particle load when a lot of blocks break at once.")
+                .defineInRange("dropChance", 1.0, 0.0, 1.0);
         b.pop();
 
-        b.push("advanced");
+        b.comment("Fine-tuning for players who want more control over damage formulas,",
+                  "thresholds, logging, and Create integration.")
+                .push("advanced");
 
-        b.push("materials");
+        b.comment("Per-material-class break multipliers (brittle/wood/stone/metal/high-strength).")
+                .push("materials");
         BRITTLE_BREAK_MULTIPLIER = b
                 .comment("Break multiplier for brittle materials (glass, ice, terracotta). Base threshold: 45 J.")
                 .defineInRange("brittleBreakMultiplier", 1.0, 0.1, 20.0);
@@ -166,7 +218,33 @@ public final class TrueImpactConfig {
                 .defineInRange("highStrengthBreakMultiplier", 1.0, 0.1, 20.0);
         b.pop();
 
-        b.push("penetrationDynamics");
+        b.comment("Surface-layer compaction (grass -> dirt, farmland -> dirt, etc.) -- a transformation,",
+                  "not damage, so it runs independently of worldBlockDamage.")
+                .push("compaction");
+        ENABLE_COMPACTION = b
+                .comment("Whether impacts compact soft-soil surface blocks into their denser form",
+                         "according to the rules below. Independent of worldBlockDamage: can stay on",
+                         "even with world block damage disabled, and vice versa.")
+                .define("enableCompaction", true);
+        COMPACTION_RULES = b
+                .comment("Compaction rules, one per line: \"fromBlockId;toBlockId;thresholdJ;probability\".",
+                         "An impact on fromBlockId exceeding thresholdJ has probability (0.0-1.0) chance",
+                         "of transforming it into toBlockId. Add/edit/remove lines to add your own rules;",
+                         "a block with no matching rule is left alone by compaction (still accumulates",
+                         "damage and breaks normally). Malformed lines are ignored.")
+                .defineList("compactionRules", java.util.List.of(
+                        "minecraft:grass_block;minecraft:dirt;5.0;1.0",
+                        "minecraft:farmland;minecraft:dirt;5.0;1.0",
+                        "minecraft:podzol;minecraft:dirt;5.0;1.0",
+                        "minecraft:mycelium;minecraft:dirt;5.0;1.0",
+                        "minecraft:suspicious_sand;minecraft:sand;5.0;1.0",
+                        "minecraft:suspicious_gravel;minecraft:gravel;5.0;1.0"
+                ), () -> "minecraft:sand;minecraft:sandstone;500.0;0.5", obj -> obj instanceof String);
+        b.pop();
+
+        b.comment("Tuning for high-energy impacts that punch through terrain layer by layer",
+                  "instead of stopping elastically at first contact.")
+                .push("penetrationDynamics");
         ENABLE_PENETRATION = b
                 .comment("Penetration dynamics: when a high-energy impact crushes the structure's",
                          "leading face, leftover kinetic energy is re-injected as velocity so heavy",
@@ -178,8 +256,8 @@ public final class TrueImpactConfig {
                          "Ordinary falls stay in the elastic/crack regime. Default 1200.")
                 .defineInRange("penetrationTriggerEnergy", 1200.0, 100.0, 1000000.0);
         PENETRATION_MAX_SPEED_MS = b
-                .comment("Cap on re-injected speed (m/s). Keep below ~50 to avoid engine tunneling",
-                         "through thin obstacles; excess energy is lost to crushing/heat. Default 30.")
+                .comment("Cap on re-injected speed (m/s). Above ~50 the engine can tunnel through thin",
+                         "obstacles; excess energy is lost to crushing/heat. Default 30.")
                 .defineInRange("penetrationMaxSpeed", 30.0, 1.0, 50.0);
         PENETRATION_MIN_SPEED_MS = b
                 .comment("Minimum contact speed (m/s) to enter penetration mode — the mass-independent",
@@ -202,7 +280,9 @@ public final class TrueImpactConfig {
                 .defineInRange("penetrationFootprintRadius", 8, 0, 16);
         b.pop();
 
-        b.push("balance");
+        b.comment("Overall damage intensity preset and the minimum energy needed for any",
+                  "damage to be registered at all.")
+                .push("balance");
         DAMAGE_PRESET = b
                 .comment("Damage intensity preset. Multiplied with damageMultipliers.totalDamageMultiplier.",
                          "MILD=0.3x  CONSERVATIVE=0.6x  DEFAULT=1.0x  INTENSE=2.5x  DRAMATIC=6.0x")
@@ -212,7 +292,9 @@ public final class TrueImpactConfig {
                 .defineInRange("detectionThreshold", 40.0, 1.0, 500.0);
         b.pop();
 
-        b.push("damageMultipliers");
+        b.comment("Global and per-category damage multipliers, plus physics-structure",
+                  "elastic floor, stress-relaxation decay, and impact-speed cap tuning.")
+                .push("damageMultipliers");
         TOTAL_DAMAGE_MULTIPLIER = b
                 .comment("Global damage multiplier applied to all impacts. Stacks with damagePreset.")
                 .defineInRange("totalDamageMultiplier", 1.0, 0.1, 10.0);
@@ -242,8 +324,10 @@ public final class TrueImpactConfig {
                 .defineInRange("physicsStructureMaxImpactSpeed", 40.0, 0.0, 1000.0);
         b.pop();
 
-        b.push("compatibility");
-        b.push("create");
+        b.comment("Integration toggles for other mods.").push("compatibility");
+        b.comment("Create mod dynamic structure (contraption) impact interactions:",
+                  "anchor damage, train derailment, minecart destruction.")
+                .push("create");
         ENABLE_CREATE_INTERACTION = b
                 .comment("Whether impacts involving Create mod dynamic structures are processed.",
                          "When enabled, damage is transferred to the anchor block of the dynamic structure",
@@ -265,13 +349,96 @@ public final class TrueImpactConfig {
         b.pop(); // create
         b.pop(); // compatibility
 
-        b.push("crackOverlay");
+        b.comment("Crack overlay network update timing.").push("crackOverlay");
         CRACK_UPDATE_COOLDOWN_TICKS = b
                 .comment("Minimum ticks between crack overlay updates for the same block. Lower = more responsive but more packet traffic.")
                 .defineInRange("crackUpdateCooldown", 10, 1, 100);
         b.pop();
 
-        b.push("mining");
+        b.comment("Formula coefficients and base thresholds for the damage calculation system.")
+                .push("calibration");
+        CRACK_COEFFICIENT = b
+                .comment("Coefficient in crackThresholdJ = clamp(coefficient × blastResist^exponent, min, max).")
+                .defineInRange("crackCoefficient", 15.0, 0.1, 1000.0);
+        CRACK_EXPONENT = b
+                .comment("Exponent in the crackThresholdJ formula. Higher = threshold grows faster with blast resistance.")
+                .defineInRange("crackExponent", 0.6, 0.01, 2.0);
+        CRACK_MIN_J = b
+                .comment("Floor on crackThresholdJ (J) -- fragile blocks (blastResist<=0) use this directly.")
+                .defineInRange("crackMinJ", 3.0, 0.1, 1000.0);
+        CRACK_MAX_J = b
+                .comment("Ceiling on crackThresholdJ (J) -- very blast-resistant blocks (obsidian, etc.) clamp here.")
+                .defineInRange("crackMaxJ", 500.0, 1.0, 100000.0);
+        BREAK_BASE_MULTIPLIER = b
+                .comment("Base term in breakMult = base + blastResist^exponent × coefficient;",
+                         "breakThresholdJ = crackThresholdJ × breakMult.")
+                .defineInRange("breakBaseMultiplier", 5.0, 0.1, 100.0);
+        BREAK_COEFFICIENT = b
+                .comment("Coefficient in the breakMult formula (see breakBaseMultiplier).")
+                .defineInRange("breakCoefficient", 3.0, 0.1, 100.0);
+        BREAK_EXPONENT = b
+                .comment("Exponent in the breakMult formula (see breakBaseMultiplier).")
+                .defineInRange("breakExponent", 0.4, 0.01, 2.0);
+        STRIKER_YIELD_TOLERANCE = b
+                .comment("Material-yield immunity ratio: a victim survives when its own break threshold",
+                         "exceeds the striker's break threshold × this value. Used across world block",
+                         "damage, physics structure damage, penetration, and structure-vs-structure collisions.")
+                .defineInRange("strikerYieldTolerance", 1.5, 1.0, 10.0);
+        STRUCTURE_VS_STRUCTURE_SPLIT_COEFFICIENT = b
+                .comment("Structure-vs-structure hardness-split coefficient: the softer body's energy share",
+                         "is coefficient × otherBreakJ / (myBreakJ + otherBreakJ).")
+                .defineInRange("structureVsStructureSplitCoefficient", 2.0, 0.1, 10.0);
+        CONFINEMENT_PER_FACE_CAP = b
+                .comment("Max contribution of a single neighbor block, relative to the victim's crack threshold.")
+                .defineInRange("confinementPerFaceCap", 3.0, 0.1, 20.0);
+        CONFINEMENT_DIRECTION_BASE = b
+                .comment("Baseline directional confinement weight (0-1) before the impact-direction bonus.")
+                .defineInRange("confinementDirectionBase", 0.5, 0.0, 1.0);
+        CONFINEMENT_DIRECTION_AMPLITUDE = b
+                .comment("Amplitude of the impact-direction bonus added to confinementDirectionBase.")
+                .defineInRange("confinementDirectionAmplitude", 0.5, 0.0, 1.0);
+        OVERBURDEN_EFFICIENCY = b
+                .comment("Fraction of raw hydrostatic overburden pressure (density × gravity × depth)",
+                         "that becomes penetration resistance energy. Higher = terrain resists deep",
+                         "drilling sooner. Default 0.15 (the undamped physical value of 1.0 stops",
+                         "penetration within a few blocks for almost any striker).")
+                .defineInRange("overburdenEfficiency", 0.15, 0.01, 1.0);
+        SOFT_SOIL_THRESHOLD_J = b
+                .comment("Base accumulation threshold (J) for SOFT_SOIL blocks (dirt, sand, gravel, etc.),",
+                         "before the material break multiplier is applied.")
+                .defineInRange("softSoilThresholdJ", 5.0, 0.1, 10000.0);
+        BRITTLE_THRESHOLD_J = b
+                .comment("Base accumulation threshold (J) for BRITTLE blocks (glass, ice, terracotta).")
+                .defineInRange("brittleThresholdJ", 15.0, 0.1, 10000.0);
+        WOOD_THRESHOLD_J = b
+                .comment("Base accumulation threshold (J) for WOOD blocks (planks, logs).")
+                .defineInRange("woodThresholdJ", 20.0, 0.1, 10000.0);
+        STONE_THRESHOLD_J = b
+                .comment("Base accumulation threshold (J) for STONE blocks (stone, cobblestone, concrete).")
+                .defineInRange("stoneThresholdJ", 50.0, 0.1, 10000.0);
+        METAL_THRESHOLD_J = b
+                .comment("Base accumulation threshold (J) for METAL blocks (iron, gold, copper).")
+                .defineInRange("metalThresholdJ", 120.0, 0.1, 10000.0);
+        HIGH_STRENGTH_THRESHOLD_J = b
+                .comment("Base accumulation threshold (J) for HIGH_STRENGTH blocks (obsidian, netherite).")
+                .defineInRange("highStrengthThresholdJ", 300.0, 0.1, 10000.0);
+        GENERIC_THRESHOLD_J = b
+                .comment("Base accumulation threshold (J) for unclassified (GENERIC) blocks.")
+                .defineInRange("genericThresholdJ", 40.0, 0.1, 10000.0);
+        b.pop();
+
+        b.comment("Cosmetic particle/sound feedback rate limiting (CRACKED/CRITICAL states only).")
+                .push("feedback");
+        FEEDBACK_COOLDOWN_TICKS = b
+                .comment("Minimum ticks between feedback events for the same block position.")
+                .defineInRange("feedbackCooldownTicks", 10, 0, 200);
+        FEEDBACK_BUDGET_PER_TICK = b
+                .comment("Max feedback events emitted per server tick across all blocks (prevents spam during chain impacts).")
+                .defineInRange("feedbackBudgetPerTick", 16, 1, 1000);
+        b.pop();
+
+        b.comment("Per-tool-tier impact energy thresholds, used when Drop Mode is set to By Force.")
+                .push("mining");
         NETHERITE_PICKAXE_MAX_J = b
                 .comment("Max impact energy (J) that still drops as netherite-pickaxe tier. Only used when dropMode=BY_FORCE.")
                 .defineInRange("netheritePickaxeMax", 100.0, 0.0, 100000.0);
@@ -289,11 +456,13 @@ public final class TrueImpactConfig {
                 .defineInRange("woodenPickaxeMax", 5000.0, 0.0, 100000.0);
         b.pop();
 
-        b.push("debug");
+        b.comment("Diagnostic logging toggles. High-frequency options generate heavy console output;",
+                  "useful when troubleshooting.")
+                .push("debug");
         LOG_BLOCK_CALLBACK = b
                 .comment("World block collision callback — logs blockId, pos, speed, and thin-block filter",
-                         "result on every collision. WARNING: extremely high frequency (one line per contact",
-                         "face, every physics step). Only enable for short test sessions.")
+                         "result on every collision. Extremely high frequency (one line per contact",
+                         "face, every physics step); suited to short test sessions.")
                 .define("worldBlockCollisionCallback", false);
         LOG_PATH1 = b
                 .comment("World block damage — full enqueue + apply pipeline: kImpact, confinement factor,",
@@ -311,13 +480,13 @@ public final class TrueImpactConfig {
                 .define("dynamicStructureDamageLog", false);
         LOG_IMPACT_CAPTURE = b
                 .comment("Raw physics capture — internals of the collision-processing pipeline: pair map",
-                         "size, whether a world contact was seen, snapshot map size. WARNING: extremely",
-                         "high frequency, fires every Rapier physics step.")
+                         "size, whether a world contact was seen, snapshot map size. Extremely high",
+                         "frequency, fires every Rapier physics step.")
                 .define("impactCaptureDetail", false);
         LOG_BODY_SNAPSHOT = b
                 .comment("Rigid body snapshots — logs position, linear/angular velocity, mass, center of",
-                         "mass, and rotation quaternion every time a body is sampled. WARNING: high",
-                         "frequency, one line per active body per physics step.")
+                         "mass, and rotation quaternion every time a body is sampled. High frequency,",
+                         "one line per active body per physics step.")
                 .define("rigidBodySnapshot", false);
         LOG_ENERGY_SUMMARY = b
                 .comment("Energy summary — one summary line per tick with any collision: event count,",
@@ -340,7 +509,7 @@ public final class TrueImpactConfig {
 
     // ── Preset ────────────────────────────────────────────────────────────────
 
-    public enum DamagePreset {
+    public enum DamagePreset implements net.neoforged.neoforge.common.TranslatableEnum {
         MILD(0.3),
         CONSERVATIVE(0.6),
         DEFAULT(1.0),
@@ -356,12 +525,24 @@ public final class TrueImpactConfig {
         public double multiplier() {
             return multiplier;
         }
+
+        @Override
+        public net.minecraft.network.chat.Component getTranslatedName() {
+            return net.minecraft.network.chat.Component.translatable(
+                    "true_impact.damagePreset." + name().toLowerCase(java.util.Locale.ROOT));
+        }
     }
 
-    public enum DropMode {
+    public enum DropMode implements net.neoforged.neoforge.common.TranslatableEnum {
         DISABLED,  // no drops from impacts
         BY_FORCE,  // tool tier scales with impact energy (see [advanced.mining])
-        ALL        // always drop as if mined by netherite pickaxe
+        ALL;       // always drop as if mined by netherite pickaxe
+
+        @Override
+        public net.minecraft.network.chat.Component getTranslatedName() {
+            return net.minecraft.network.chat.Component.translatable(
+                    "true_impact.dropMode." + name().toLowerCase(java.util.Locale.ROOT));
+        }
     }
 
     // ── Runtime helpers ───────────────────────────────────────────────────────

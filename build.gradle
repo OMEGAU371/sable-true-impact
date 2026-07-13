@@ -155,6 +155,10 @@ tasks.named('jar') {
                 'TI-Project-Line'       : 'rewrite2',
         ])
     }
+    // GameTest classes only run under neoforge.enabledGameTestNamespaces, which dev runs set
+    // via neoForge.runs (loaded straight from sourceSets.main, not this JAR) — see line ~52/57/70.
+    // A packaged JAR never has that system property set, so shipping them is dead weight.
+    exclude 'io/github/omegau371/trueimpact/gametest/**'
 }
 
 // ── Deploy task ───────────────────────────────────────────────────────────────

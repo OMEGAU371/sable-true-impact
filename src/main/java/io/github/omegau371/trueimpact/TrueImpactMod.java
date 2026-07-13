@@ -20,6 +20,7 @@ import io.github.omegau371.trueimpact.damage.DeferredSublevelDamageQueue;
 import io.github.omegau371.trueimpact.damage.SublevelDamageAccumulator;
 import io.github.omegau371.trueimpact.damage.ImpactBlockApplicator;
 import io.github.omegau371.trueimpact.damage.ImpactRuntimeConfig;
+import io.github.omegau371.trueimpact.damage.MaterialPropertiesProfile;
 import io.github.omegau371.trueimpact.damage.MaterialResponsePlan;
 import io.github.omegau371.trueimpact.damage.MaterialResponsePlanner;
 import io.github.omegau371.trueimpact.damage.MaterialThresholdProfile;
@@ -88,8 +89,9 @@ public class TrueImpactMod {
      */
     private static final java.util.Map<String, Double> STRIKER_FACE_BREAK_J = new java.util.HashMap<>();
 
-    /** Victim thresholds above strikerBreakJ × this are immune to that striker (harder-breaks-softer). */
-    private static final double STRIKER_YIELD_TOLERANCE = 1.5;
+    // Yield tolerance lives in ImpactRuntimeConfig.STRIKER_YIELD_TOLERANCE (configurable
+    // from [advanced.calibration]) -- victim thresholds above strikerBreakJ × this are
+    // immune to that striker (harder-breaks-softer).
 
     /**
      * breakJ at or above this is "indestructible" (bedrock returns Double.MAX_VALUE —
@@ -226,9 +228,10 @@ public class TrueImpactMod {
         java.util.List<DeferredDamageEvent> events = DeferredDamageQueue.drainAll();
         if (events.isEmpty()) return;
         // Master switch for world blocks -- mirrors ENABLE_PHYSICS_STRUCTURE_DAMAGE's early
-        // return in applyDeferredSublevelDamage. Must gate everything (accumulation, crack
-        // overlay, destruction, compaction), not just one narrow sub-effect.
-        if (!ImpactRuntimeConfig.APPLY_BLOCK_EFFECTS) return;
+        // return in applyDeferredSublevelDamage. Gates accumulation/crack overlay/destruction.
+        // Compaction (surface transforms like grass->dirt) is independent -- see ENABLE_COMPACTION
+        // below -- so this only bails early when BOTH are off.
+        if (!ImpactRuntimeConfig.APPLY_BLOCK_EFFECTS && !ImpactRuntimeConfig.ENABLE_COMPACTION) return;
         MinecraftServer server = event.getServer();
 
         // LOG_ENERGY_SUMMARY: low-frequency one-liner per tick showing kImpact range + paths.
@@ -294,13 +297,13 @@ public class TrueImpactMod {
             // breakJ. Unknown striker (no sublevel contact nearby this tick) → no clamp.
             double strikerBreakJ = lookupStrikerFaceBreakJ(e.levelKey(), e.posX(), e.posY(), e.posZ());
             if (strikerBreakJ > 0) {
-                if (victimBaseBreakJ > strikerBreakJ * STRIKER_YIELD_TOLERANCE) {
+                if (victimBaseBreakJ > strikerBreakJ * ImpactRuntimeConfig.STRIKER_YIELD_TOLERANCE) {
                     if (ImpactRuntimeConfig.LOG_PATH1)
                         LOGGER.info("[TI-P1] yieldSkip block={} pos=({},{},{}) victimBase={} > striker={}×{}",
                                 e.victimBlock(), e.posX(), e.posY(), e.posZ(),
                                 String.format("%.1f", victimBaseBreakJ),
                                 String.format("%.1f", strikerBreakJ),
-                                STRIKER_YIELD_TOLERANCE);
+                                ImpactRuntimeConfig.STRIKER_YIELD_TOLERANCE);
                     continue;
                 }
                 if (e.kImpact() > strikerBreakJ) {
@@ -318,7 +321,11 @@ public class TrueImpactMod {
 
             // Phase 2C: accumulate effective damage (or, when 裂纹积累 is off, judge this
             // hit alone -- see BlockDamageAccumulator.accumulate for the single-hit branch).
-            BlockDamageAccumulator.Snapshot snap = BlockDamageAccumulator.accumulate(e);
+            // Skipped entirely when world block damage is disabled -- compaction below runs
+            // independently via its own ENABLE_COMPACTION gate and doesn't need this snapshot.
+            BlockDamageAccumulator.Snapshot snap = ImpactRuntimeConfig.APPLY_BLOCK_EFFECTS
+                    ? BlockDamageAccumulator.accumulate(e)
+                    : null;
 
             // Phase 2A: surface-layer transformation (grass→dirt etc.).
             // Skipped when CRITICAL so the block breaks directly without transforming first.
@@ -1079,15 +1086,16 @@ public class TrueImpactMod {
                     float myB = state.getBlock().getExplosionResistance();
                     double myBreakJ = BlockHardnessProfile.breakThresholdJ(myH, myB);
                     if (Double.isFinite(myBreakJ) && myBreakJ > 0) {
-                        if (myBreakJ > otherBreakJ * STRIKER_YIELD_TOLERANCE) {
+                        if (myBreakJ > otherBreakJ * ImpactRuntimeConfig.STRIKER_YIELD_TOLERANCE) {
                             if (ImpactRuntimeConfig.LOG_PHASE3A)
                                 LOGGER.info("[TI3A-AA] victim immune: myBreakJ={} > otherBreakJ={} × {} sl={}",
                                         String.format("%.0f", myBreakJ),
                                         String.format("%.0f", otherBreakJ),
-                                        STRIKER_YIELD_TOLERANCE, sl.getRuntimeId());
+                                        ImpactRuntimeConfig.STRIKER_YIELD_TOLERANCE, sl.getRuntimeId());
                             return;
                         }
-                        double share = 2.0 * otherBreakJ / (myBreakJ + otherBreakJ);
+                        double share = ImpactRuntimeConfig.STRUCTURE_VS_STRUCTURE_SPLIT_COEFFICIENT
+                                * otherBreakJ / (myBreakJ + otherBreakJ);
                         effectiveKImpact *= share;
                         if (ImpactRuntimeConfig.LOG_PHASE3A)
                             LOGGER.info("[TI3A-AA] hardness split: myBreakJ={} otherBreakJ={} share={} eff={} sl={}",
@@ -1313,6 +1321,10 @@ public class TrueImpactMod {
         else if (wax >= waz)           dwx = event.impactDirX() > 0 ? 1 : -1;
         else                           dwz = event.impactDirZ() > 0 ? 1 : -1;
 
+        // D-3 overburden: sampled once per footprint call (roughly constant across the
+        // footprint's small area) rather than per cell.
+        int undisturbedSurfaceY = sampleUndisturbedSurfaceY(level, wbx, wbz, dwy != 0);
+
         double charged = 0.0;
         int processed = 0;
         int ownBroken = 0, worldBroken = 0;
@@ -1388,15 +1400,22 @@ public class TrueImpactMod {
                         if (!Double.isFinite(victimBreakJ)) break;
                         // Confinement: blocks deeper or more surrounded cost more per unit.
                         // R=1 (6 face neighbors only) — performance-safe at up to 512 columns.
-                        // This makes each deeper layer progressively more expensive, so the
-                        // energy budget depletes naturally before infinite drilling occurs.
+                        // Neighbor-ratio confinement alone doesn't scale with depth in
+                        // homogeneous soft terrain (sand next to sand contributes ~nothing),
+                        // so a real overburden-pressure term is added below to make each
+                        // deeper layer genuinely more expensive regardless of neighbor identity.
                         double victimCrackJ = BlockHardnessProfile.crackThresholdJ(wh, wb);
                         double[] nCracks = sampleNeighborCrackThresholds(level, wp, 1);
                         double conf = ConfinementFactor.compute(nCracks, victimCrackJ,
                                 event.impactDirX(), event.impactDirY(), event.impactDirZ());
-                        double effectiveBreakJ = victimBreakJ * (1.0 + conf);
+                        double overburdenDepth = undisturbedSurfaceY - wp.getY();
+                        MaterialThresholdProfile.MaterialClass victimClass = MaterialThresholdProfile.classify(
+                                BuiltInRegistries.BLOCK.getKey(ws.getBlock()).toString());
+                        double victimDensity = MaterialPropertiesProfile.of(wh, wb, victimClass).densityKgM3();
+                        double overburdenJ = ConfinementFactor.overburdenEnergyJ(overburdenDepth, victimDensity);
+                        double effectiveBreakJ = victimBreakJ * (1.0 + conf) + overburdenJ;
                         // Material yield: confined effective threshold vs striker strength.
-                        if (effectiveBreakJ <= columnStrikerBreakJ * STRIKER_YIELD_TOLERANCE) {
+                        if (effectiveBreakJ <= columnStrikerBreakJ * ImpactRuntimeConfig.STRIKER_YIELD_TOLERANCE) {
                             if (dropTool != null) {
                                 Block.dropResources(ws, level, wp, null, null, dropTool);
                             }
@@ -1627,10 +1646,37 @@ public class TrueImpactMod {
             double[] nCracks = sampleNeighborCrackThresholds(level, wp, 1);
             double conf = ConfinementFactor.compute(nCracks, victimCrackJ,
                     event.impactDirX(), event.impactDirY(), event.impactDirZ());
-            double effectiveBreakJ = victimBreakJ * (1.0 + conf);
-            return effectiveBreakJ <= strikerBreakJ * STRIKER_YIELD_TOLERANCE;
+            // D-3 overburden extension: real depth-based confining pressure, so a thick
+            // uniform layer of soft material (e.g. deep sand) eventually stops yielding
+            // even though every individual layer is just as weak as the last. Added
+            // directly in Joules -- see overburdenEnergyJ's doc for why it can't be folded
+            // into the multiplicative neighbor-ratio confinementFactor above.
+            boolean verticalTravel = Math.abs(dy) >= Math.abs(dx) && Math.abs(dy) >= Math.abs(dz);
+            int undisturbedSurfaceY = sampleUndisturbedSurfaceY(level, wp.getX(), wp.getZ(), verticalTravel);
+            double overburdenDepth = undisturbedSurfaceY - wp.getY();
+            MaterialThresholdProfile.MaterialClass victimClass = MaterialThresholdProfile.classify(
+                    BuiltInRegistries.BLOCK.getKey(ws.getBlock()).toString());
+            double victimDensity = MaterialPropertiesProfile.of(wh, wb, victimClass).densityKgM3();
+            double overburdenJ = ConfinementFactor.overburdenEnergyJ(overburdenDepth, victimDensity);
+            double effectiveBreakJ = victimBreakJ * (1.0 + conf) + overburdenJ;
+            return effectiveBreakJ <= strikerBreakJ * ImpactRuntimeConfig.STRIKER_YIELD_TOLERANCE;
         }
         return false;
+    }
+
+    /**
+     * D-3 overburden sample: undisturbed ground-surface height near (but laterally offset
+     * from) a drilling column, so overburden depth doesn't get measured through the shaft
+     * this same drilling has already hollowed out. Offset direction is horizontal and picked
+     * perpendicular to the dominant travel axis; magnitude clears the footprint radius that
+     * bounds how wide any single drilling episode can hollow.
+     */
+    private static int sampleUndisturbedSurfaceY(ServerLevel level, int columnX, int columnZ,
+            boolean verticalTravel) {
+        int margin = ImpactRuntimeConfig.PENETRATION_FOOTPRINT_RADIUS + 3;
+        int obX = columnX + (verticalTravel ? margin : 0);
+        int obZ = columnZ + (verticalTravel ? 0 : margin);
+        return level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, obX, obZ);
     }
 
     private static boolean hasSolidTerrainAlongImpact(ServerLevel level,
@@ -1691,7 +1737,7 @@ public class TrueImpactMod {
     private static ItemStack resolveDropTool(double kImpact) {
         try {
             TrueImpactConfig.DropMode mode = TrueImpactConfig.DROP_MODE.get();
-            return switch (mode) {
+            ItemStack tool = switch (mode) {
                 case DISABLED -> null;
                 case ALL      -> new ItemStack(Items.NETHERITE_PICKAXE);
                 case BY_FORCE -> {
@@ -1703,6 +1749,12 @@ public class TrueImpactMod {
                     yield null; // above wooden threshold → bare hand → no drops
                 }
             };
+            if (tool == null) return null;
+            double dropChance = TrueImpactConfig.DROP_CHANCE.get();
+            if (dropChance < 1.0 && java.util.concurrent.ThreadLocalRandom.current().nextDouble() >= dropChance) {
+                return null; // rolled no-drop, independent of dropMode
+            }
+            return tool;
         } catch (Throwable t) {
             return new ItemStack(Items.NETHERITE_PICKAXE); // fallback when config not loaded
         }
@@ -1848,6 +1900,20 @@ public class TrueImpactMod {
         ImpactRuntimeConfig.ENABLE_BLOCK_BREAKING           = TrueImpactConfig.ENABLE_BLOCK_BREAKING.get();
         ImpactRuntimeConfig.ENABLE_DAMAGE_ACCUMULATION      = TrueImpactConfig.ENABLE_DAMAGE_ACCUMULATION.get();
         ImpactRuntimeConfig.APPLY_BLOCK_EFFECTS             = TrueImpactConfig.ENABLE_WORLD_BLOCK_DAMAGE.get();
+        ImpactRuntimeConfig.ENABLE_COMPACTION               = TrueImpactConfig.ENABLE_COMPACTION.get();
+        {
+            java.util.List<io.github.omegau371.trueimpact.damage.CompactionRule> parsedRules = new java.util.ArrayList<>();
+            for (String line : TrueImpactConfig.COMPACTION_RULES.get()) {
+                io.github.omegau371.trueimpact.damage.CompactionRule rule =
+                        io.github.omegau371.trueimpact.damage.CompactionRule.parse(line);
+                if (rule != null) {
+                    parsedRules.add(rule);
+                } else {
+                    LOGGER.warn("[TI] Ignoring malformed compactionRules entry: {}", line);
+                }
+            }
+            ImpactRuntimeConfig.COMPACTION_RULES = java.util.List.copyOf(parsedRules);
+        }
         ImpactRuntimeConfig.ENABLE_PHYSICS_STRUCTURE_DAMAGE = TrueImpactConfig.ENABLE_PHYSICS_STRUCTURE_DAMAGE.get();
         ImpactRuntimeConfig.ENABLE_STRUCTURE_VS_STRUCTURE   = TrueImpactConfig.ENABLE_STRUCTURE_VS_STRUCTURE.get();
         ImpactRuntimeConfig.ENABLE_CREATE_INTERACTION               = TrueImpactConfig.ENABLE_CREATE_INTERACTION.get();
@@ -1858,6 +1924,30 @@ public class TrueImpactMod {
                 TrueImpactConfig.DETECTION_THRESHOLD_J.get();
         io.github.omegau371.trueimpact.damage.CrackOverlayTracker.PER_BLOCK_UPDATE_COOLDOWN_TICKS =
                 TrueImpactConfig.CRACK_UPDATE_COOLDOWN_TICKS.get();
+        // Calibration: formula coefficients and base thresholds
+        ImpactRuntimeConfig.CRACK_COEFF           = TrueImpactConfig.CRACK_COEFFICIENT.get();
+        ImpactRuntimeConfig.CRACK_EXPONENT        = TrueImpactConfig.CRACK_EXPONENT.get();
+        ImpactRuntimeConfig.CRACK_MIN             = TrueImpactConfig.CRACK_MIN_J.get();
+        ImpactRuntimeConfig.CRACK_MAX             = TrueImpactConfig.CRACK_MAX_J.get();
+        ImpactRuntimeConfig.BREAK_BASE            = TrueImpactConfig.BREAK_BASE_MULTIPLIER.get();
+        ImpactRuntimeConfig.BREAK_COEFF           = TrueImpactConfig.BREAK_COEFFICIENT.get();
+        ImpactRuntimeConfig.BREAK_EXPONENT        = TrueImpactConfig.BREAK_EXPONENT.get();
+        ImpactRuntimeConfig.STRIKER_YIELD_TOLERANCE = TrueImpactConfig.STRIKER_YIELD_TOLERANCE.get();
+        ImpactRuntimeConfig.STRUCTURE_VS_STRUCTURE_SPLIT_COEFFICIENT =
+                TrueImpactConfig.STRUCTURE_VS_STRUCTURE_SPLIT_COEFFICIENT.get();
+        ImpactRuntimeConfig.CONFINEMENT_PER_FACE_CAP = TrueImpactConfig.CONFINEMENT_PER_FACE_CAP.get();
+        ImpactRuntimeConfig.CONFINEMENT_DIRECTION_BASE = TrueImpactConfig.CONFINEMENT_DIRECTION_BASE.get();
+        ImpactRuntimeConfig.CONFINEMENT_DIRECTION_AMPLITUDE = TrueImpactConfig.CONFINEMENT_DIRECTION_AMPLITUDE.get();
+        ImpactRuntimeConfig.OVERBURDEN_EFFICIENCY  = TrueImpactConfig.OVERBURDEN_EFFICIENCY.get();
+        ImpactRuntimeConfig.SOFT_SOIL_THRESHOLD_J     = TrueImpactConfig.SOFT_SOIL_THRESHOLD_J.get();
+        ImpactRuntimeConfig.BRITTLE_THRESHOLD_J       = TrueImpactConfig.BRITTLE_THRESHOLD_J.get();
+        ImpactRuntimeConfig.WOOD_THRESHOLD_J          = TrueImpactConfig.WOOD_THRESHOLD_J.get();
+        ImpactRuntimeConfig.STONE_THRESHOLD_J         = TrueImpactConfig.STONE_THRESHOLD_J.get();
+        ImpactRuntimeConfig.METAL_THRESHOLD_J         = TrueImpactConfig.METAL_THRESHOLD_J.get();
+        ImpactRuntimeConfig.HIGH_STRENGTH_THRESHOLD_J = TrueImpactConfig.HIGH_STRENGTH_THRESHOLD_J.get();
+        ImpactRuntimeConfig.GENERIC_THRESHOLD_J       = TrueImpactConfig.GENERIC_THRESHOLD_J.get();
+        ImpactRuntimeConfig.FEEDBACK_COOLDOWN_TICKS  = TrueImpactConfig.FEEDBACK_COOLDOWN_TICKS.get();
+        ImpactRuntimeConfig.FEEDBACK_BUDGET_PER_TICK = TrueImpactConfig.FEEDBACK_BUDGET_PER_TICK.get();
         // Debug logging flags
         try {
             ImpactRuntimeConfig.LOG_BLOCK_CALLBACK  = TrueImpactConfig.LOG_BLOCK_CALLBACK.get();
