@@ -1745,11 +1745,13 @@ class SableImpactCaptureTest {
     }
 
     @Test
-    void tangential_speed_equals_speed_for_grazing_collision() {
-        // vb=(0,10,0), normal=(-1,0,0). dot=0, tangentialSq=100 → tangentialSpeed=10.
+    void tangential_speed_correct_for_mixed_normal_and_tangential_velocity() {
+        // vb=(8,6,0), normal=(-1,0,0). dot=-8, tangentialSq=100-64=36 -> tangentialSpeed=6.
+        // va=(0,2,0) (post-step, purely tangential) -> vaDotNormal=0.
+        // kImpact = 0.5*mass*|(-8)^2 - 0^2| = 0.5*5*64 = 160J, above detection threshold.
         SableVictimCapture.captureContactPointBlock("minecraft:dirt", 5, 63, 5);
         Map<Integer, BodySnapshot> snaps = Map.of(10, snapWithVel(10, 5.0, 0.0, 2.0, 0.0));
-        Map<Integer, double[]> sv = Map.of(10, new double[]{0.0, 10.0, 0.0});
+        Map<Integer, double[]> sv = Map.of(10, new double[]{8.0, 6.0, 0.0});
 
         SableImpactCapture.process(oneContact(10, 99, 100.0), 983L, 2, snaps, sv);
 
@@ -1759,8 +1761,27 @@ class SableImpactCaptureTest {
         DeferredDamageEvent e = events.get(0);
 
         assertTrue(e.hasTangentialSpeed());
-        assertEquals(10.0, e.tangentialSpeedMs(), 1e-9,
-                "pure grazing impact: tangential speed equals full velocity magnitude");
+        assertEquals(6.0, e.tangentialSpeedMs(), 1e-9,
+                "tangential speed reflects only the velocity component parallel to the contact surface");
+    }
+
+    @Test
+    void pure_tangential_grazing_contact_produces_no_impact_energy() {
+        // vb=(0,10,0), va=(0,2,0), normal=(-1,0,0): velocity is entirely tangential (parallel
+        // to the surface) both before and after -- e.g. a wheeled structure rolling/sliding
+        // along the ground under its own power. kImpact must be computed from the
+        // contact-normal-projected velocity change, not full speed magnitude, or every tick of
+        // ordinary tangential acceleration/deceleration would be misread as a collision.
+        SableVictimCapture.captureContactPointBlock("minecraft:dirt", 5, 63, 5);
+        Map<Integer, BodySnapshot> snaps = Map.of(10, snapWithVel(10, 5.0, 0.0, 2.0, 0.0));
+        Map<Integer, double[]> sv = Map.of(10, new double[]{0.0, 10.0, 0.0});
+
+        SableImpactCapture.process(oneContact(10, 99, 100.0), 983L, 2, snaps, sv);
+
+        List<DeferredDamageEvent> events =
+                io.github.omegau371.trueimpact.damage.DeferredDamageQueue.drainAll();
+        assertEquals(0, events.size(),
+                "pure tangential velocity change carries no force along the contact normal -> no impact energy");
     }
 
     @Test

@@ -441,14 +441,30 @@ public final class SableImpactCapture {
                             worldImpactDirY = vb[1] / mag;
                             worldImpactDirZ = vb[2] / mag;
                         }
-                        // E: tangential speed = sqrt(|v|^2 - (v·n)^2); sign-independent of normal direction.
-                        if (Double.isNaN(worldTangentialSpeedMs) && !Double.isNaN(worldContactNormalX)) {
-                            double dot = vb[0]*worldContactNormalX
-                                       + vb[1]*worldContactNormalY
-                                       + vb[2]*worldContactNormalZ;
-                            worldTangentialSpeedMs = Math.sqrt(Math.max(0.0, vbSq - dot*dot));
+                        // kImpact uses velocity change projected onto the contact normal, not full
+                        // speed magnitude: a body accelerating/decelerating tangentially (e.g. a
+                        // wheeled vehicle under its own power rolling along the ground) changes its
+                        // total kinetic energy with no force along the contact normal at all, and
+                        // must not be charged as impact energy for that -- only normal-direction
+                        // velocity change (the body actually being pushed into or rebounding off the
+                        // surface) represents a genuine collision. Falls back to full-magnitude delta
+                        // when no usable contact normal was resolved (near-zero-magnitude edge case).
+                        double k;
+                        if (!Double.isNaN(worldContactNormalX)) {
+                            double vbDotNormal = vb[0]*worldContactNormalX
+                                                + vb[1]*worldContactNormalY
+                                                + vb[2]*worldContactNormalZ;
+                            // E: tangential speed = sqrt(|v|^2 - (v·n)^2); sign-independent of normal direction.
+                            if (Double.isNaN(worldTangentialSpeedMs)) {
+                                worldTangentialSpeedMs = Math.sqrt(Math.max(0.0, vbSq - vbDotNormal*vbDotNormal));
+                            }
+                            double vaDotNormal = aSnap.linVelX()*worldContactNormalX
+                                                + aSnap.linVelY()*worldContactNormalY
+                                                + aSnap.linVelZ()*worldContactNormalZ;
+                            k = 0.5 * aSnap.massKpg() * Math.abs(vbDotNormal*vbDotNormal - vaDotNormal*vaDotNormal);
+                        } else {
+                            k = 0.5 * aSnap.massKpg() * Math.abs(vbSq - vaSq);
                         }
-                        double k = 0.5 * aSnap.massKpg() * Math.abs(vbSq - vaSq);
                         if (Double.isNaN(worldKImpact) || k > worldKImpact) {
                             worldKImpact = k;
                         }
